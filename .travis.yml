@@ -15,7 +15,8 @@ compiler:
   - clang
   - gcc
   
+env:
+  - LD_LIBRARY_PATH=.
+  
 script:
-  - ./configure
-  - make
-  - LD_LIBRARY_PATH=. make check
+  - ./configure && make && make check

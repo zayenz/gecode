@@ -92,7 +92,8 @@ notifications:
     on_success: change
 
 env:
-  - LD_LIBRARY_PATH=.
+  global: 
+    - LD_LIBRARY_PATH=.
   
 script:
   - ./configure && make && make check

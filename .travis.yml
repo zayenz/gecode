@@ -1,0 +1,19 @@
+language: cpp
+
+git:
+  depth: 20
+  
+branches:
+  only:
+    - master
+    - develop
+    - /^feature\/.*$/
+    - /^release\/.*$/
+    - /^hotfix\/.*$/
+    
+compiler:
+  - clang
+  - gcc
+  
+script:
+  - ./configure && make && make check

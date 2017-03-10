@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/zayenz/gecode.svg?branch=master)](https://travis-ci.org/zayenz/gecode)
+
+
 # Gecode - Generic Constraint Development Environment
 
 Gecode is a toolkit for developing constraint-based systems and applications. Gecode provides a constraint solver with state-of-the-art performance while being modular and extensible. Gecode is:

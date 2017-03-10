@@ -37,7 +37,7 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - g++-4.9
-      env: COMPILER=g++-4.9
+      env: COMPILER=g++-4.9 LD_LIBRARY_PATH=.
     - os: linux
       compiler: gcc
       addons:
@@ -46,7 +46,7 @@ matrix:
             - ubuntu-toolchain-r-test
           packages:
             - g++-5
-      env: COMPILER=g++-5
+      env: COMPILER=g++-5 LD_LIBRARY_PATH=.
     - os: linux
       compiler: clang
       addons:
@@ -56,7 +56,7 @@ matrix:
             - llvm-toolchain-precise-3.6
           packages:
             - clang-3.6
-      env: COMPILER=clang++-3.6
+      env: COMPILER=clang++-3.6 LD_LIBRARY_PATH=.
     - os: linux
       compiler: clang
       addons:
@@ -66,7 +66,7 @@ matrix:
             - llvm-toolchain-precise-3.7
           packages:
             - clang-3.7
-      env: COMPILER=clang++-3.7
+      env: COMPILER=clang++-3.7 LD_LIBRARY_PATH=.
     - os: linux
       compiler: clang
       addons:
@@ -76,11 +76,11 @@ matrix:
             - llvm-toolchain-precise-3.8
           packages:
             - clang-3.8
-      env: COMPILER=clang++-3.8
+      env: COMPILER=clang++-3.8 LD_LIBRARY_PATH=.
     - os: osx
       osx_image: xcode7.3
       compiler: clang
-      env: COMPILER=clang++
+      env: COMPILER=clang++ DYLD_LIBRARY_PATH=.
       
 #install: ./ci/travis/install.sh
   
@@ -91,9 +91,9 @@ notifications:
     on_failure: change
     on_success: change
 
-env:
-  global: 
-    - LD_LIBRARY_PATH=.
+#env:
+#  global: 
+#    - 
   
 script:
   - ./configure && make && make check

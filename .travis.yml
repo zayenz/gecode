@@ -16,4 +16,6 @@ compiler:
   - gcc
   
 script:
-  - ./configure && make && make check
+  - ./configure
+  - make
+  - LD_LIBRARY_PATH=. make check

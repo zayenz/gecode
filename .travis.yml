@@ -96,4 +96,4 @@ notifications:
 #    - 
   
 script:
-  - ./configure && make && make install && make check
+  - ./configure && make && sudo make install && make check

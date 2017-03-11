@@ -29,6 +29,10 @@ language: cpp
 # issue: https://github.com/travis-ci/apt-source-whitelist/pull/205
 matrix:
   include:
+    - os: osx
+      osx_image: xcode7.3
+      compiler: clang
+      env: COMPILER=clang++ DYLD_LIBRARY_PATH=.
     - os: linux
       compiler: gcc
       addons:
@@ -77,10 +81,6 @@ matrix:
           packages:
             - clang-3.8
       env: COMPILER=clang++-3.8 LD_LIBRARY_PATH=.
-    - os: osx
-      osx_image: xcode7.3
-      compiler: clang
-      env: COMPILER=clang++ DYLD_LIBRARY_PATH=.
       
 #install: ./ci/travis/install.sh
   
@@ -96,4 +96,4 @@ notifications:
 #    - 
   
 script:
-  - ./configure && make && make check
+  - ./configure && make && make install && make check

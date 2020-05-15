@@ -2796,6 +2796,7 @@ $as_echo "Windows" >&6; }
        ;;
        *)
        as_fn_error $? "Host OS not supported." "$LINENO" 5
+       as_fn_error $? "${guess_host_os}" "$LINENO" 5
        ;;
      esac
 

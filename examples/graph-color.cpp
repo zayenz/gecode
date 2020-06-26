@@ -5,10 +5,12 @@
  *
  *  Contributing authors:
  *     Stefano Gualandi <stefano.gualandi@gmail.com>
+ *     Mikael Lagerkvist <lagerkvist@gecode.org>
  *
  *  Copyright:
  *     Christian Schulte, 2004
  *     Stefano Gualandi, 2013
+ *     Mikael Lagerkvist, 2020
  *
  *  This file is part of Gecode, the generic constraint
  *  development environment:
@@ -35,6 +37,7 @@
  *
  */
 
+#include <algorithm>
 #include <gecode/driver.hh>
 #include <gecode/int.hh>
 
@@ -55,9 +58,9 @@ using namespace Gecode;
 /// %Graph specification
 class GraphColorSpec {
 public:
-  const int  n_v; ///< Number of nodes
-  const int* e;   ///< Edges
-  const int* c;   ///< Cliques
+  const int n_v; ///< Number of nodes
+  const int* e;  ///< Edges
+  const int* c;  ///< Cliques
   GraphColorSpec(const int n_v0, const int* e0, const int* c0)
     : n_v(n_v0), e(e0), c(c0) {}
 };
@@ -323,103 +326,137 @@ public:
   };
   /// Branching to use for model
   enum {
-    BRANCH_DEGREE,         ///< Choose variable with largest degree
-    BRANCH_SIZE,           ///< Choose variablee with smallest size
-    BRANCH_DEGREE_SIZE,    ///< Choose variable with largest degree/size
-    BRANCH_AFC_SIZE,       ///< Choose variable with largest afc/size
+    BRANCH_DEGREE,      ///< Choose variable with largest degree
+    BRANCH_SIZE,        ///< Choose variable with smallest size
+    BRANCH_DEGREE_SIZE, ///< Choose variable with largest degree/size
+    BRANCH_AFC_SIZE,    ///< Choose variable with largest afc/size
     BRANCH_ACTION_SIZE  ///< Choose variable with smallest size/action
   };
   /// Symmetry variants
   enum {
     SYMMETRY_NONE,      ///< Simple symmetry
-    SYMMETRY_LDSB       ///< Use LDSB for value symmetry breaking
+    SYMMETRY_LDSB,       ///< Use LDSB for value symmetry breaking
+    SYMMETRY_PRECEDENCE ///< Use value precendence constraint for value symmetry breaking
   };
+
   /// The actual model
   GraphColor(const SizeOptions& opt)
     : IntMinimizeScript(opt),
       g(opt.size() == 1 ? g2 : g1),
-      v(*this,g.n_v,0,g.n_v-1),
-      m(*this,0,g.n_v-1) {
+      v(*this, g.n_v, 0, g.n_v - 1),
+      m(*this, 0, g.n_v - 1) {
+    // All colors are at most he maximum color
     rel(*this, v, IRT_LQ, m);
-    for (int i = 0; g.e[i] != -1; i += 2)
-      rel(*this, v[g.e[i]], IRT_NQ, v[g.e[i+1]]);
 
+    // All edges have different colors for the nodes
+    for (int i = 0; g.e[i] != -1; i += 2)
+      rel(*this, v[g.e[i]], IRT_NQ, v[g.e[i + 1]]);
+
+    // Use cliques
     const int* c = g.c;
-    for (int i = *c++; i--; c++)
+    // Assign the first clique statically
+    for (int i = *c++; i--; c++) {
       rel(*this, v[*c], IRT_EQ, i);
+    }
+    // Post distinct over each remaining clique
     while (*c != -1) {
       int n = *c;
-      IntVarArgs x(n); c++;
+      IntVarArgs x(n);
+      c++;
       for (int i = n; i--; c++)
         x[i] = v[*c];
       distinct(*this, x, opt.ipl());
+
+      // The size of a clique is a lower bound for the number of colors
       if (opt.model() == MODEL_CLIQUE)
-        rel(*this, m, IRT_GQ, n-1);
+        rel(*this, m, IRT_GQ, n - 1);
     }
+
+    if (opt.symmetry() == SYMMETRY_PRECEDENCE) {
+      // Collect variables, with the statically assigned first clique first in order
+      IntArgs first_clique(*g.c, g.c+1);
+      IntVarArgs ordered;
+      for (int index : first_clique) {
+        ordered << v[index];
+      }
+      for (int i = 0; i < g.n_v; ++i) {
+        if (std::find(first_clique.begin(), first_clique.end(), i) == first_clique.end()) {
+          ordered << v[i];
+        }
+      }
+      precede(*this, ordered, IntArgs::create(g.n_v, 0));
+    }
+
+
     // Branching on the number of colors
     branch(*this, m, INT_VAL_MIN());
-    if (opt.symmetry() == SYMMETRY_NONE) {
-      // Branching without symmetry breaking
-      switch (opt.branching()) {
-      case BRANCH_SIZE:
-        branch(*this, v, INT_VAR_SIZE_MIN(), INT_VAL_MIN());
-        break;
-      case BRANCH_DEGREE:
-        branch(*this, v, tiebreak(INT_VAR_DEGREE_MAX(),INT_VAR_SIZE_MIN()),
-               INT_VAL_MIN());
-        break;
-      case BRANCH_DEGREE_SIZE:
-        branch(*this, v, INT_VAR_DEGREE_SIZE_MAX(), INT_VAL_MIN());
-        break;
-      case BRANCH_AFC_SIZE:
-        branch(*this, v, INT_VAR_AFC_SIZE_MAX(opt.decay()), INT_VAL_MIN());
-        break;
-      case BRANCH_ACTION_SIZE:
-        branch(*this, v, INT_VAR_ACTION_SIZE_MAX(opt.decay()), INT_VAL_MIN());
-        break;
-      }
-    } else { // opt.symmetry() == SYMMETRY_LDSB
+    // Branch on the colors for nodes
+    if (opt.symmetry() == SYMMETRY_LDSB) {
       // Branching while considering value symmetry breaking
       // (every permutation of color values gives equivalent solutions)
       Symmetries syms;
-      syms << ValueSymmetry(IntArgs::create(g.n_v,0));
+      syms << ValueSymmetry(IntArgs::create(g.n_v, 0));
       switch (opt.branching()) {
-      case BRANCH_SIZE:
-        branch(*this, v, INT_VAR_SIZE_MIN(), INT_VAL_MIN(), syms);
-        break;
-      case BRANCH_DEGREE:
-        branch(*this, v, tiebreak(INT_VAR_DEGREE_MAX(),
-                                  INT_VAR_SIZE_MIN()),
-               INT_VAL_MIN(), syms);
-        break;
-      case BRANCH_DEGREE_SIZE:
-        branch(*this, v, INT_VAR_DEGREE_SIZE_MAX(), INT_VAL_MIN(), syms);
-        break;
-      case BRANCH_AFC_SIZE:
-        branch(*this, v, INT_VAR_AFC_SIZE_MAX(opt.decay()),
-               INT_VAL_MIN(), syms);
-        break;
-      case BRANCH_ACTION_SIZE:
-        branch(*this, v, INT_VAR_ACTION_SIZE_MAX(opt.decay()),
-               INT_VAL_MIN(), syms);
-        break;
+        case BRANCH_SIZE:
+          branch(*this, v, INT_VAR_SIZE_MIN(), INT_VAL_MIN(), syms);
+          break;
+        case BRANCH_DEGREE:
+          branch(*this, v, tiebreak(INT_VAR_DEGREE_MAX(),
+                                    INT_VAR_SIZE_MIN()),
+                 INT_VAL_MIN(), syms);
+          break;
+        case BRANCH_DEGREE_SIZE:
+          branch(*this, v, INT_VAR_DEGREE_SIZE_MAX(), INT_VAL_MIN(), syms);
+          break;
+        case BRANCH_AFC_SIZE:
+          branch(*this, v, INT_VAR_AFC_SIZE_MAX(opt.decay()),
+                 INT_VAL_MIN(), syms);
+          break;
+        case BRANCH_ACTION_SIZE:
+          branch(*this, v, INT_VAR_ACTION_SIZE_MAX(opt.decay()),
+                 INT_VAL_MIN(), syms);
+          break;
+      }
+    } else { // opt.symmetry() == SYMMETRY_NONE or opt.symmetry() == SYMMETRY_PRECEDENCE
+      // Branching without considering symmetry breaking
+      switch (opt.branching()) {
+        case BRANCH_SIZE:
+          branch(*this, v, INT_VAR_SIZE_MIN(), INT_VAL_MIN());
+          break;
+        case BRANCH_DEGREE:
+          branch(*this, v, tiebreak(INT_VAR_DEGREE_MAX(), INT_VAR_SIZE_MIN()),
+                 INT_VAL_MIN());
+          break;
+        case BRANCH_DEGREE_SIZE:
+          branch(*this, v, INT_VAR_DEGREE_SIZE_MAX(), INT_VAL_MIN());
+          break;
+        case BRANCH_AFC_SIZE:
+          branch(*this, v, INT_VAR_AFC_SIZE_MAX(opt.decay()), INT_VAL_MIN());
+          break;
+        case BRANCH_ACTION_SIZE:
+          branch(*this, v, INT_VAR_ACTION_SIZE_MAX(opt.decay()), INT_VAL_MIN());
+          break;
       }
     }
   }
+
   /// Cost function
   virtual IntVar cost(void) const {
     return m;
   }
+
   /// Constructor for cloning \a s
   GraphColor(GraphColor& s) : IntMinimizeScript(s), g(s.g) {
     v.update(*this, s.v);
     m.update(*this, s.m);
   }
+
   /// Copying during cloning
   virtual Space*
   copy(void) {
     return new GraphColor(*this);
   }
+
   /// Print the solution
   virtual void
   print(std::ostream& os) const {
@@ -427,7 +464,7 @@ public:
        << "\tv[] = {";
     for (int i = 0; i < v.size(); i++) {
       os << v[i] << ", ";
-      if ((i+1) % 15 == 0)
+      if ((i + 1) % 15 == 0)
         os << std::endl << "\t       ";
     }
     os << "};" << std::endl;
@@ -439,7 +476,7 @@ public:
  *  \relates GraphColor
  */
 int
-main(int argc, char* argv[]) {
+main(int argc, char *argv[]) {
   SizeOptions opt("GraphColor");
   opt.ipl(IPL_DOM);
   opt.solutions(0);
@@ -460,10 +497,12 @@ main(int argc, char* argv[]) {
   opt.symmetry(GraphColor::SYMMETRY_NONE);
   opt.symmetry(GraphColor::SYMMETRY_NONE, "none");
   opt.symmetry(GraphColor::SYMMETRY_LDSB, "ldsb",
-               "use value symmetry breaking");
+               "use value symmetry breaking during search");
+  opt.symmetry(GraphColor::SYMMETRY_PRECEDENCE, "precedence",
+               "use value symmetry breaking using precede constraint");
 
-  opt.parse(argc,argv);
-  Script::run<GraphColor,BAB,SizeOptions>(opt);
+  opt.parse(argc, argv);
+  Script::run<GraphColor, BAB, SizeOptions>(opt);
   return 0;
 }
 

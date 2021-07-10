@@ -103,3 +103,4 @@ examples/sudoku-advanced
 examples/tsp
 examples/warehouses
 examples/word-square
+test/test

@@ -94,6 +94,7 @@ examples/qcp
 examples/queen-armies
 examples/queens
 examples/radiotherapy
+examples/rectangle-knapsack
 examples/sat
 examples/schurs-lemma
 examples/sports-league

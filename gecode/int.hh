@@ -3143,7 +3143,7 @@ namespace Gecode {
              const IntVarArgs& l,
              const IntVarArgs& b, const IntArgs& s,
              IntPropLevel ipl=IPL_DEF);
-  /* \brief Post propagator for multi-dimensional bin packing
+  /** \brief Post propagator for multi-dimensional bin packing
    *
    * In the following \a n refers to the number of items and \a m
    * refers to the number of bins.

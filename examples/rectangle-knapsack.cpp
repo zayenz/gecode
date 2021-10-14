@@ -57,6 +57,7 @@ enum CapacityPropagation {
   CAPACITY_CUMULATIVE_EF, ///< Use cumulative constraint with edge finding
   CAPACITY_CUMULATIVE     ///< Use cumulative constraint with both time tabling and edge finding
 };
+
 /// The IntPropLevel to use for cumulative given a certain CapacityPropagation level
 IntPropLevel cumulative_ipl(CapacityPropagation propagation) {
   switch (propagation) {
@@ -96,9 +97,14 @@ enum SymmetryBreaking {
  * \relates RectangleKnapsack
  */
 enum BranchingStrategy {
-  BRANCH_ORDER,           ///< Branch on rectangles in value/area order. Place each rectangle fully.
-  BRANCH_ORDER_SEPARATED, ///< Branch on rectangles in value/area order. PLace rectangles in x-direction before y-direction.
-  BRANCH_SEPARATED,       ///< Branch on usage, x-position, width
+  BRANCH_ORDER,                      ///< Branch on rectangles in value/area order. Place each rectangle fully.
+  BRANCH_ORDER_SEPARATED,            ///< Branch on rectangles in value/area order. PLace rectangles in x-direction before y-direction.
+  BRANCH_SEPARATED,                  ///< Branch on usage, x-position, width
+  BRANCH_LEFT_BOTTOM_ORDER,          ///< Branch using left bottom placement prioritized by value/area, no rotation decisions,
+  BRANCH_LEFT_BOTTOM_ORDER_STANDING, ///< Branch using left bottom placement prioritized by value/area, setting rotation to standing
+  BRANCH_LEFT_BOTTOM_ORDER_LAYING,   ///< Branch using left bottom placement prioritized by value/area, setting rotation to laying
+  BRANCH_LEFT_BOTTOM_ORDER_INPUT,    ///< Branch using left bottom placement prioritized by value/area, setting rotation to the input
+  BRANCH_LEFT_BOTTOM_ORDER_FLIPPED,  ///< Branch using left bottom placement prioritized by value/area, setting rotation to the flipped input
 };
 
 /** \brief Options for %RectangleKnapsack problems
@@ -114,50 +120,66 @@ private:
 public:
   /// Initialize options with file name \a s
   RectangleOptions(const char* s)
-  : SizeOptions(s),
-    _capacity("capacity", "Propagation to use for capacity constraints", CAPACITY_CUMULATIVES),
-    _used_area("used-area", "Propagation to use for used area constraints", USED_AREA_BINPACKING)
-  {
+    : SizeOptions(s),
+      _capacity("capacity", "Propagation to use for capacity constraints", CAPACITY_CUMULATIVES),
+      _used_area("used-area", "Propagation to use for used area constraints", USED_AREA_BINPACKING) {
     add(_capacity);
     add(_used_area);
 
     // Add capacity options
-    _capacity.add(CapacityPropagation::CAPACITY_NONE,          "none",        "No capacity propagation");
-    _capacity.add(CapacityPropagation::CAPACITY_REIFIED,       "reified",     "Use reified capacity constraints");
-    _capacity.add(CapacityPropagation::CAPACITY_CUMULATIVES,   "cumulatives", "Use cumulatives for capacity constraints");
-    _capacity.add(CapacityPropagation::CAPACITY_CUMULATIVE_TT, "cumulative-tt", "Use cumulative with time tabling for capacity constraints");
-    _capacity.add(CapacityPropagation::CAPACITY_CUMULATIVE_EF, "cumulative-ef", "Use cumulative with edge finding for capacity constraints");
-    _capacity.add(CapacityPropagation::CAPACITY_CUMULATIVE,    "cumulative",   "Use cumulative with time tabling and edge finding for capacity constraints");
+    _capacity.add(CapacityPropagation::CAPACITY_NONE, "none", "No capacity propagation");
+    _capacity.add(CapacityPropagation::CAPACITY_REIFIED, "reified", "Use reified capacity constraints");
+    _capacity.add(CapacityPropagation::CAPACITY_CUMULATIVES, "cumulatives", "Use cumulatives for capacity constraints");
+    _capacity.add(CapacityPropagation::CAPACITY_CUMULATIVE_TT, "cumulative-tt",
+                  "Use cumulative with time tabling for capacity constraints");
+    _capacity.add(CapacityPropagation::CAPACITY_CUMULATIVE_EF, "cumulative-ef",
+                  "Use cumulative with edge finding for capacity constraints");
+    _capacity.add(CapacityPropagation::CAPACITY_CUMULATIVE, "cumulative",
+                  "Use cumulative with time tabling and edge finding for capacity constraints");
 
     // Add used area options
-    _used_area.add(UsedAreaPropagation::USED_AREA_NONE,       "none",       "No used area propagation");
-    _used_area.add(UsedAreaPropagation::USED_AREA_LINEAR,     "linear",     "Use linear propagation for used area");
+    _used_area.add(UsedAreaPropagation::USED_AREA_NONE, "none", "No used area propagation");
+    _used_area.add(UsedAreaPropagation::USED_AREA_LINEAR, "linear", "Use linear propagation for used area");
     _used_area.add(UsedAreaPropagation::USED_AREA_BINPACKING, "binpacking", "Use binpacking propagation for used area");
 
     // Set symmetry options
     symmetry(SymmetryBreaking::SYMMETRY_TYPES);
-    symmetry(SymmetryBreaking::SYMMETRY_NONE,  "none", "No symmetry breaking");
+    symmetry(SymmetryBreaking::SYMMETRY_NONE, "none", "No symmetry breaking");
     symmetry(SymmetryBreaking::SYMMETRY_TYPES, "types", "Break symmetry among rectangle types");
 
     // Set branching options
-    branching(BranchingStrategy::BRANCH_ORDER);
-    branching(BranchingStrategy::BRANCH_ORDER,           "order", "Use value per area ordering");
-    branching(BranchingStrategy::BRANCH_ORDER_SEPARATED, "order-separated", "Use vvalue per area ordering, x before y");
-    branching(BranchingStrategy::BRANCH_SEPARATED,       "separated", "Branch on used, then x, then width, then y, and lastly height.");
+    branching(BranchingStrategy::BRANCH_LEFT_BOTTOM_ORDER_LAYING);
+    branching(BranchingStrategy::BRANCH_ORDER, "order", "Use value per area ordering");
+    branching(BranchingStrategy::BRANCH_ORDER_SEPARATED, "order-separated", "Use value per area ordering, x before y");
+    branching(BranchingStrategy::BRANCH_SEPARATED, "separated",
+              "Branch on used, then x, then width, then y, and lastly height.");
+    branching(BranchingStrategy::BRANCH_LEFT_BOTTOM_ORDER, "left-bottom",
+              "Branch placing left bottom, tie break with value per area. Delay rotation choices.");
+    branching(BranchingStrategy::BRANCH_LEFT_BOTTOM_ORDER_STANDING, "left-bottom-standing",
+              "Branch placing left bottom, tie break with value per area setting rotation to standing.");
+    branching(BranchingStrategy::BRANCH_LEFT_BOTTOM_ORDER_LAYING, "left-bottom-laying",
+              "Branch placing left bottom, tie break with value per area setting rotation to laying.");
+    branching(BranchingStrategy::BRANCH_LEFT_BOTTOM_ORDER_INPUT, "left-bottom-input",
+              "Branch placing left bottom, tie break with value per area setting rotation to input orientation.");
+    branching(BranchingStrategy::BRANCH_LEFT_BOTTOM_ORDER_FLIPPED, "left-bottom-flipped",
+              "Branch placing left bottom, tie break with value per area setting rotation to flipped input orientation.");
 
     // Set recomputation options
     a_d(5);
     c_d(20);
   }
+
   /// Parse options from arguments \a argv (number is \a argc)
   void parse(int& argc, char* argv[]) {
     // Parse regular options
-    Options::parse(argc,argv);
+    Options::parse(argc, argv);
   }
+
   /// The way to propagate capacity constraints
   CapacityPropagation capacity() const {
     return (CapacityPropagation) _capacity.value();
   }
+
   /// The way to propagate used area constraints
   UsedAreaPropagation used_area() const {
     return (UsedAreaPropagation) _used_area.value();
@@ -235,7 +257,7 @@ struct Instance {
   /// Create vector of all rectangles based on the rectangle types and their count
   std::vector<Rectangle> make_rectangles() const {
     int count = 0;
-    for (const auto& rectangle_type : rectangle_types) {
+    for (const auto& rectangle_type: rectangle_types) {
       count += rectangle_type.count;
     }
     std::vector<Rectangle> result;
@@ -243,7 +265,7 @@ struct Instance {
     unsigned int id = 0;
     for (unsigned int t = 0; t < rectangle_types.size(); ++t) {
       for (int i = 0; i < rectangle_types[t].count; ++i) {
-        result.emplace_back(Rectangle {
+        result.emplace_back(Rectangle{
           .width = rectangle_types[t].width,
           .height = rectangle_types[t].height,
           .value = rectangle_types[t].value,
@@ -262,16 +284,16 @@ const Instance yampc = {
   .width = 30,
   .height = 20,
   .rectangle_types = {
-     { 20,  4, 2, 338984},
-     { 12, 17, 6, 849246},
-     { 20, 12, 2, 524022},
-     { 16,  7, 9, 263303},
-     {  3,  6, 3, 113436},
-     { 13,  5, 3, 551072},
-     {  4,  7, 6,  86166},
-     {  6, 18, 8, 755094},
-     { 14,  2, 7, 223516},
-     {  9, 11, 5, 369560},
+    {20, 4,  2, 338984},
+    {12, 17, 6, 849246},
+    {20, 12, 2, 524022},
+    {16, 7,  9, 263303},
+    {3,  6,  3, 113436},
+    {13, 5,  3, 551072},
+    {4,  7,  6, 86166},
+    {6,  18, 8, 755094},
+    {14, 2,  7, 223516},
+    {9,  11, 5, 369560},
   },
 };
 
@@ -314,10 +336,10 @@ public:
       rectangles(instances[opt.size()]->make_rectangles()),
       area_width(instances[opt.size()]->width),
       area_height(instances[opt.size()]->height),
-      x(*this,rectangles.size(),0,area_width),
-      y(*this,rectangles.size(),0,area_height),
-      width(*this,rectangles.size(),0,area_width),
-      height(*this,rectangles.size(),0,area_height),
+      x(*this, rectangles.size(), 0, area_width),
+      y(*this, rectangles.size(), 0, area_height),
+      width(*this, rectangles.size(), 0, area_width),
+      height(*this, rectangles.size(), 0, area_height),
       used(*this, rectangles.size(), 0, 1),
       value(*this, 0, instances[opt.size()]->max_total_value()) {
 
@@ -336,7 +358,7 @@ public:
     for (unsigned int r = 0; r < rectangles.size(); ++r) {
       const Rectangle& rect = rectangles[r];
       IntSet domain{rect.min_domain(), rect.max_domain()};
-      dom(*this,  width[r], domain);
+      dom(*this, width[r], domain);
       dom(*this, height[r], domain);
       if (!rect.is_square()) {
         rel(*this, width[r] != height[r]);
@@ -345,7 +367,7 @@ public:
 
     // Restrict position according to area size
     for (unsigned int r = 0; r < rectangles.size(); r++) {
-      rel(*this, x[r], IRT_LQ, area_width  - rectangles[r].width);
+      rel(*this, x[r], IRT_LQ, area_width - rectangles[r].width);
       rel(*this, y[r], IRT_LQ, area_height - rectangles[r].height);
     }
 
@@ -353,7 +375,7 @@ public:
     IntVarArgs x_end(*this, rectangles.size(), 0, area_width);
     IntVarArgs y_end(*this, rectangles.size(), 0, area_height);
     for (unsigned int r = 0; r < rectangles.size(); ++r) {
-      rel(*this, x[r] +  width[r] == x_end[r]);
+      rel(*this, x[r] + width[r] == x_end[r]);
       rel(*this, y[r] + height[r] == y_end[r]);
     }
 
@@ -394,8 +416,7 @@ public:
     /*
      * Symmetry breaking constraints.
      */
-    if (opt.symmetry() == SYMMETRY_TYPES)
-    {
+    if (opt.symmetry() == SYMMETRY_TYPES) {
       // Symmetry among copies of the same type
       for (unsigned int t = 0; t < instances[opt.size()]->rectangle_types.size(); ++t) {
         // Variables indicating if a rectangle of type t is used
@@ -465,7 +486,8 @@ public:
 
     // Use cumulative constraint for capacities
     // Encode rotation with mutually exclusive variants of each rectangle when it is not square.
-    if (opt.capacity() == CAPACITY_CUMULATIVE_TT || opt.capacity() == CAPACITY_CUMULATIVE_EF || opt.capacity() == CAPACITY_CUMULATIVE) {
+    if (opt.capacity() == CAPACITY_CUMULATIVE_TT || opt.capacity() == CAPACITY_CUMULATIVE_EF ||
+        opt.capacity() == CAPACITY_CUMULATIVE) {
       IntPropLevel ipl = cumulative_ipl(opt.capacity());
 
       IntVarArgs nr_x_start;
@@ -478,13 +500,13 @@ public:
           nr_x_start << x[r];
           nr_y_start << y[r];
           nr_height << rectangles[r].height;
-          nr_width  << rectangles[r].width;
+          nr_width << rectangles[r].width;
           nr_used << used[r];
         } else {
           nr_x_start << x[r] << x[r];
           nr_y_start << y[r] << y[r];
           nr_height << rectangles[r].height << rectangles[r].width;
-          nr_width  << rectangles[r].width  << rectangles[r].height;
+          nr_width << rectangles[r].width << rectangles[r].height;
           BoolVar original(*this, 0, 1);
           BoolVar flipped(*this, 0, 1);
           nr_used << original << flipped;
@@ -515,13 +537,12 @@ public:
 
     // Set up ordering of rectangles based on their contributed value per area unit
     std::vector<Rectangle> order(rectangles);
-    std::sort(order.begin(), order.end(), [](const Rectangle& a, const Rectangle& b) -> bool
-    {
+    std::sort(order.begin(), order.end(), [](const Rectangle& a, const Rectangle& b) -> bool {
       if (a.type == b.type) {
         return a.id < b.id;
       }
-      double a_weight = ((double)a.value) / (a.height * a.width);
-      double b_weight = ((double)b.value) / (b.height * b.width);
+      double a_weight = ((double) a.value) / (a.height * a.width);
+      double b_weight = ((double) b.value) / (b.height * b.width);
       return a_weight > b_weight;
     });
 
@@ -535,7 +556,7 @@ public:
           branch(*this, rectangle_variables, INT_VAR_NONE(), INT_VAL_MIN());
         }
       }
-      break;
+        break;
       case BRANCH_ORDER_SEPARATED: {
         for (unsigned int o = 0; o < order.size(); ++o) {
           unsigned int pos = order[o].id;
@@ -552,12 +573,77 @@ public:
         }
 
       }
-      break;
+        break;
       case BRANCH_SEPARATED: {
         branch(*this, used, BOOL_VAR_AFC_MAX(), BOOL_VAL_MAX());
         branch(*this, x, INT_VAR_MIN_MIN(), INT_VAL_MIN());
         branch(*this, width, INT_VAR_MIN_MIN(), INT_VAL_MIN());
         branch(*this, y, INT_VAR_MIN_MIN(), INT_VAL_MIN());
+        branch(*this, height, INT_VAR_MIN_MIN(), INT_VAL_MIN());
+      }
+        break;
+      case BRANCH_LEFT_BOTTOM_ORDER: {
+        // Rectangle x-y placements such that min value implies left bottom placement, with a value < max placement
+        // implying that the rectangle is used.
+        IntVarArgs placements;
+        for (unsigned int o = 0; o < order.size(); ++o) {
+          unsigned int r = order[o].id;
+          IntVar xy(*this, 0, area_height*area_width+1);
+          rel(*this, used[r] == (xy == x[r]*area_height + y[r]));
+          rel(*this, !used[r] == (xy == area_height * area_width + 1));
+          placements << xy;
+        }
+        branch(*this, placements, INT_VAR_MIN_MIN(), INT_VAL_MIN());
+        branch(*this, used, BOOL_VAR_NONE(), BOOL_VAL_MAX());
+        branch(*this, width, INT_VAR_MIN_MIN(), INT_VAL_MIN());
+        branch(*this, height, INT_VAR_MIN_MIN(), INT_VAL_MIN());
+      }
+      case BRANCH_LEFT_BOTTOM_ORDER_STANDING:
+      case BRANCH_LEFT_BOTTOM_ORDER_LAYING:
+      case BRANCH_LEFT_BOTTOM_ORDER_INPUT:
+      case BRANCH_LEFT_BOTTOM_ORDER_FLIPPED: {
+        // Rectangle x-y placements such that min value implies left bottom placement, with a value < max placement
+        // implying that the rectangle is used. Use two values per placement, indicating the rotation of a part
+        IntVarArgs placements;
+        for (unsigned int o = 0; o < order.size(); ++o) {
+          unsigned int r = order[o].id;
+          IntVar xy(*this, 0, 2*area_height*area_width+2);
+          // The use_second_orientation to use.
+          // NOTE: 0 for the preferred use_second_orientation
+          BoolVar use_second_orientation;
+          if (rectangles[r].is_square()) {
+            use_second_orientation = BoolVar(*this, 0, 0);
+          } else {
+            switch (opt.branching()) {
+              case BRANCH_LEFT_BOTTOM_ORDER_STANDING: {
+                use_second_orientation = expr(*this, width[r] == rectangles[r].max_domain());
+              }
+              break;
+              case BRANCH_LEFT_BOTTOM_ORDER_LAYING: {
+                use_second_orientation = expr(*this, width[r] == rectangles[r].min_domain());
+              }
+                break;
+              case BRANCH_LEFT_BOTTOM_ORDER_INPUT: {
+                use_second_orientation = expr(*this, width[r] == rectangles[r].height);
+              }
+                break;
+              case BRANCH_LEFT_BOTTOM_ORDER_FLIPPED: {
+                use_second_orientation = expr(*this, width[r] == rectangles[r].width);
+              }
+                break;
+              default:
+                GECODE_NEVER;
+            }
+          }
+          IntVar iuse_second_orientation = channel(*this, use_second_orientation);
+          rel(*this, used[r] == (xy == 2 * (x[r] * area_height + y[r]) + iuse_second_orientation));
+          rel(*this, !used[r] == (xy == 2 * area_height * area_width + 2));
+          rel(*this, xy >= 2*(x[r] * area_height + y[r]) + iuse_second_orientation);
+          placements << xy;
+        }
+        branch(*this, placements, INT_VAR_MIN_MIN(), INT_VAL_MIN());
+        branch(*this, used, BOOL_VAR_NONE(), BOOL_VAL_MAX());
+        branch(*this, width, INT_VAR_MIN_MIN(), INT_VAL_MIN());
         branch(*this, height, INT_VAR_MIN_MIN(), INT_VAL_MIN());
       }
     }
@@ -579,23 +665,32 @@ public:
     used.update(*this, s.used);
     value.update(*this, s.value);
   }
+
   /// Copy during cloning
   virtual Space*
   copy(void) {
     return new RectangleKnapsack(*this);
   }
+
   /// Print solution
   virtual void
   print(std::ostream& os) const {
-    os << "\t";
-    for (int r=0; r<x.size(); r++) {
-      if (used[r].max() == 1) {
+    os << "\tPlaced: ";
+    for (int r = 0; r < x.size(); r++) {
+      if (used[r].min() == 1) {
+        os << r << "@(" << x[r] << "," << y[r] << ") w=" << width[r] << ",h=" << height[r] << "  ";
+      }
+    }
+    os << std::endl;
+    os << "\tUnknown: ";
+    for (int r = 0; r < x.size(); r++) {
+      if (!used[r].assigned()) {
         os << r << "@(" << x[r] << "," << y[r] << ") w=" << width[r] << ",h=" << height[r] << "  ";
       }
     }
     os << std::endl;
     os << "\tUnused: ";
-    for (int r=0; r<x.size(); r++) {
+    for (int r = 0; r < x.size(); r++) {
       if (used[r].max() == 0) {
         os << r << ", ";
       }
@@ -611,13 +706,13 @@ public:
 int
 main(int argc, char* argv[]) {
   RectangleOptions opt("RectangleKnapsack");
-  opt.parse(argc,argv);
+  opt.parse(argc, argv);
   if (opt.size() >= n_instances) {
     std::cerr << "Error: size must be between 0 and " << n_instances - 1
               << std::endl;
     return 1;
   }
-  Script::run<RectangleKnapsack,BAB,RectangleOptions>(opt);
+  Script::run<RectangleKnapsack, BAB, RectangleOptions>(opt);
   return 0;
 }
 

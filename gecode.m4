@@ -62,6 +62,7 @@ AC_DEFUN([AC_GECODE_GET_OS],
        ;;
        *)
        AC_MSG_ERROR([Host OS not supported.])
+       AC_MSG_ERROR([${guess_host_os}])
        ;;
      esac])
 

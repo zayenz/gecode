@@ -2411,6 +2411,7 @@ namespace Gecode {
       void resize(void);
       /// Is datastructure finalized
       bool finalized(void) const;
+
       /// Initialize as empty tuple set with arity \a a
       Data(int a);
       /// Delete implementation

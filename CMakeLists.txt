@@ -403,40 +403,13 @@ foreach(i RANGE ${length})
   set(CONFIG_OUT "${CONFIG_OUT}${line}")
 endforeach()
 
-set(GECODE_BUILD_DEFINES "/* Disable autolink because all dependencies are handled by CMake. */\n")
-foreach(component SUPPORT KERNEL)
-  string(APPEND GECODE_BUILD_DEFINES "#define GECODE_BUILD_${component}\n")
-endforeach()
-if(GECODE_ENABLE_SEARCH)
-  string(APPEND GECODE_BUILD_DEFINES "#define GECODE_BUILD_SEARCH\n")
-endif()
-if(GECODE_ENABLE_INT_VARS)
-  string(APPEND GECODE_BUILD_DEFINES "#define GECODE_BUILD_INT\n")
-endif()
-if(GECODE_ENABLE_SET_VARS)
-  string(APPEND GECODE_BUILD_DEFINES "#define GECODE_BUILD_SET\n")
-endif()
-if(GECODE_ENABLE_FLOAT_VARS)
-  string(APPEND GECODE_BUILD_DEFINES "#define GECODE_BUILD_FLOAT\n")
-endif()
-if(GECODE_ENABLE_MINIMODEL)
-  string(APPEND GECODE_BUILD_DEFINES "#define GECODE_BUILD_MINIMODEL\n")
-endif()
-if(GECODE_ENABLE_FLATZINC)
-  string(APPEND GECODE_BUILD_DEFINES "#define GECODE_BUILD_FLATZINC\n")
-endif()
-if(GECODE_ENABLE_DRIVER)
-  string(APPEND GECODE_BUILD_DEFINES "#define GECODE_BUILD_DRIVER\n")
-endif()
-if(GECODE_BUILD_GIST_TARGET)
-  string(APPEND GECODE_BUILD_DEFINES "#define GECODE_BUILD_GIST\n")
-endif()
-
 file(WRITE ${GECODE_BINARY_DIR}/gecode/support/config.hpp
 "/* gecode/support/config.hpp.  Generated from config.hpp.in by configure.  */
 /* gecode/support/config.hpp.in.  Generated from configure.ac by autoheader.  */
 
-${GECODE_BUILD_DEFINES}
+/* Disable MSVC pragma-based auto-linking: CMake wires dependencies explicitly. */
+#define GECODE_NO_AUTOLINK 1
+
 ${CONFIG_OUT}")
 
 # ---------------------------------------------------------------------------
@@ -567,6 +540,7 @@ function(add_gecode_component_library lib)
 
   if(GECODE_BUILD_SHARED)
     add_library(gecode${lib}_shared SHARED ${sources})
+    target_compile_definitions(gecode${lib}_shared PRIVATE GECODE_BUILD_${libupper})
     target_include_directories(gecode${lib}_shared
       PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
@@ -585,6 +559,7 @@ function(add_gecode_component_library lib)
 
   if(GECODE_BUILD_STATIC)
     add_library(gecode${lib}_static STATIC ${sources})
+    target_compile_definitions(gecode${lib}_static PRIVATE GECODE_BUILD_${libupper})
     target_include_directories(gecode${lib}_static
       PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>

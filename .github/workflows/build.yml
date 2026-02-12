@@ -118,3 +118,44 @@ jobs:
     - name: Build test binary
       shell: pwsh
       run: cmake --build "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }} --target gecode-test
+
+  build-autoconf-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: >-
+          autoconf
+          automake
+          bison
+          flex
+          gcc
+          make
+          m4
+          libtool
+          perl
+          mingw-w64-ucrt-x86_64-gcc
+          mingw-w64-ucrt-x86_64-gmp
+          mingw-w64-ucrt-x86_64-mpfr
+
+    - name: Stabilize generated configure script timestamp
+      shell: msys2 {0}
+      run: touch configure
+
+    - name: Configure
+      shell: msys2 {0}
+      run: ./configure --disable-qt --disable-gist
+
+    - name: Build
+      shell: msys2 {0}
+      run: make test -j4
+
+    - name: Check
+      shell: msys2 {0}
+      run: make check

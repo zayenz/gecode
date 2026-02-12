@@ -47,8 +47,16 @@ macro (GECODE_EXAMPLE NAME)
 endmacro ()
 
 file(GLOB EXAMPLE_FILES *.cpp)
+set(GECODE_MPFR_EXAMPLES
+  archimedean-spiral
+  golden-spiral)
 foreach (EXAMPLE_FILE ${EXAMPLE_FILES})
 	get_filename_component(EXAMPLE_NAME ${EXAMPLE_FILE} NAME_WE)
+	if (EXAMPLE_NAME IN_LIST GECODE_MPFR_EXAMPLES AND
+	    (NOT GECODE_ENABLE_FLOAT_VARS OR NOT GECODE_ENABLE_MPFR OR NOT MPFR_FOUND))
+		message("-- Skipping example: " ${EXAMPLE_NAME} " (requires MPFR float support)")
+		continue()
+	endif()
 	message("-- Adding example: " ${EXAMPLE_NAME})
 	gecode_example(${EXAMPLE_NAME})
 endforeach()

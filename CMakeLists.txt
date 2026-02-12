@@ -22,11 +22,33 @@ endif()
 # ---------------------------------------------------------------------------
 # Build options (configure/autoconf parity-oriented)
 # ---------------------------------------------------------------------------
+# Legacy aliases are translated after option() initialization so they also
+# override stale cache values from previous configure runs.
+if(DEFINED ENABLE_THREADS)
+  set(GECODE_ALIAS_ENABLE_THREAD_VALUE "${ENABLE_THREADS}")
+  set(GECODE_USED_ENABLE_THREADS_ALIAS TRUE)
+endif()
+if(DEFINED ENABLE_GIST)
+  set(GECODE_ALIAS_ENABLE_GIST_VALUE "${ENABLE_GIST}")
+  set(GECODE_USED_ENABLE_GIST_ALIAS TRUE)
+endif()
+if(DEFINED BUILD_EXAMPLES)
+  set(GECODE_ALIAS_BUILD_EXAMPLES_VALUE "${BUILD_EXAMPLES}")
+  set(GECODE_USED_BUILD_EXAMPLES_ALIAS TRUE)
+endif()
+if(DEFINED ENABLE_CPPROFILER)
+  set(GECODE_ALIAS_ENABLE_CPPROFILER_VALUE "${ENABLE_CPPROFILER}")
+  set(GECODE_USED_ENABLE_CPPROFILER_ALIAS TRUE)
+endif()
+
 option(GECODE_BUILD_SHARED "Build shared libraries" ON)
 option(GECODE_BUILD_STATIC "Build static libraries" OFF)
 
 option(GECODE_ENABLE_THREAD "Enable thread support" ON)
 option(GECODE_ENABLE_QT "Enable Qt support" ON)
+set(GECODE_QT_DETECTION "cmake" CACHE STRING
+  "Qt detection policy: cmake or autoconf")
+set_property(CACHE GECODE_QT_DETECTION PROPERTY STRINGS cmake autoconf)
 option(GECODE_ENABLE_GIST "Enable Gist" ON)
 option(GECODE_ENABLE_CPPROFILER "Enable CPProfiler support" ON)
 option(GECODE_ENABLE_CBS "Enable counting-based search support" OFF)
@@ -50,20 +72,20 @@ set(GECODE_FREELIST64_SIZE_MAX "" CACHE STRING "Max freelist size on 64-bit plat
 set(GECODE_WITH_VIS "" CACHE STRING "Additional .vis files (comma-separated)")
 
 # Compatibility aliases (temporary)
-if(DEFINED ENABLE_THREADS AND NOT DEFINED GECODE_ENABLE_THREAD)
-  set(GECODE_ENABLE_THREAD ${ENABLE_THREADS} CACHE BOOL "Enable thread support" FORCE)
+if(GECODE_USED_ENABLE_THREADS_ALIAS)
+  set(GECODE_ENABLE_THREAD ${GECODE_ALIAS_ENABLE_THREAD_VALUE} CACHE BOOL "Enable thread support" FORCE)
   message(WARNING "ENABLE_THREADS is deprecated; use GECODE_ENABLE_THREAD")
 endif()
-if(DEFINED ENABLE_GIST AND NOT DEFINED GECODE_ENABLE_GIST)
-  set(GECODE_ENABLE_GIST ${ENABLE_GIST} CACHE BOOL "Enable Gist" FORCE)
+if(GECODE_USED_ENABLE_GIST_ALIAS)
+  set(GECODE_ENABLE_GIST ${GECODE_ALIAS_ENABLE_GIST_VALUE} CACHE BOOL "Enable Gist" FORCE)
   message(WARNING "ENABLE_GIST is deprecated; use GECODE_ENABLE_GIST")
 endif()
-if(DEFINED BUILD_EXAMPLES AND NOT DEFINED GECODE_ENABLE_EXAMPLES)
-  set(GECODE_ENABLE_EXAMPLES ${BUILD_EXAMPLES} CACHE BOOL "Build examples" FORCE)
+if(GECODE_USED_BUILD_EXAMPLES_ALIAS)
+  set(GECODE_ENABLE_EXAMPLES ${GECODE_ALIAS_BUILD_EXAMPLES_VALUE} CACHE BOOL "Build examples" FORCE)
   message(WARNING "BUILD_EXAMPLES is deprecated; use GECODE_ENABLE_EXAMPLES")
 endif()
-if(DEFINED ENABLE_CPPROFILER AND NOT DEFINED GECODE_ENABLE_CPPROFILER)
-  set(GECODE_ENABLE_CPPROFILER ${ENABLE_CPPROFILER} CACHE BOOL "Enable CPProfiler support" FORCE)
+if(GECODE_USED_ENABLE_CPPROFILER_ALIAS)
+  set(GECODE_ENABLE_CPPROFILER ${GECODE_ALIAS_ENABLE_CPPROFILER_VALUE} CACHE BOOL "Enable CPProfiler support" FORCE)
   message(WARNING "ENABLE_CPPROFILER is deprecated; use GECODE_ENABLE_CPPROFILER")
 endif()
 
@@ -96,6 +118,9 @@ endif()
 include(CheckCXXCompilerFlag)
 if(GECODE_ENABLE_GCC_VISIBILITY)
   check_cxx_compiler_flag(-fvisibility=hidden HAVE_VISIBILITY_HIDDEN_FLAG)
+  if(HAVE_VISIBILITY_HIDDEN_FLAG)
+    add_compile_options(-fvisibility=hidden)
+  endif()
 endif()
 
 find_package(Perl REQUIRED)
@@ -105,28 +130,72 @@ if(GECODE_ENABLE_MPFR)
 endif()
 
 set(GECODE_HAS_QT_RUNTIME FALSE)
+string(TOLOWER "${GECODE_QT_DETECTION}" GECODE_QT_DETECTION_MODE)
+if(NOT GECODE_QT_DETECTION_MODE STREQUAL "cmake"
+   AND NOT GECODE_QT_DETECTION_MODE STREQUAL "autoconf")
+  message(FATAL_ERROR
+    "GECODE_QT_DETECTION must be one of: cmake, autoconf")
+endif()
 if(GECODE_ENABLE_QT)
-  find_package(Qt6 QUIET COMPONENTS Core Gui Widgets PrintSupport)
-  if(Qt6_FOUND)
-    set(GECODE_HAS_QT_RUNTIME TRUE)
-    set(GECODE_QT_CORE Qt6::Core)
-    set(GECODE_QT_WIDGETS Qt6::Widgets Qt6::Gui Qt6::PrintSupport)
-    set(CMAKE_AUTOMOC TRUE)
-  else()
-    find_package(Qt5 QUIET COMPONENTS Core Gui Widgets PrintSupport)
-    if(Qt5_FOUND)
+  set(GECODE_QT_PROBE_ALLOWED TRUE)
+  if(GECODE_QT_DETECTION_MODE STREQUAL "autoconf")
+    find_program(GECODE_QMAKE_EXECUTABLE NAMES qmake-qt4 qmake)
+    find_program(GECODE_MOC_EXECUTABLE NAMES moc-qt4 moc)
+    if(NOT GECODE_QMAKE_EXECUTABLE OR NOT GECODE_MOC_EXECUTABLE)
+      set(GECODE_QT_PROBE_ALLOWED FALSE)
+      message(STATUS
+        "GECODE_QT_DETECTION=autoconf: qmake or moc not found, disabling Qt")
+    else()
+      execute_process(
+        COMMAND "${GECODE_QMAKE_EXECUTABLE}" -query QT_VERSION
+        OUTPUT_VARIABLE GECODE_QMAKE_QT_VERSION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE GECODE_QMAKE_QT_VERSION_RESULT)
+      if(NOT GECODE_QMAKE_QT_VERSION_RESULT EQUAL 0)
+        set(GECODE_QT_PROBE_ALLOWED FALSE)
+        message(STATUS
+          "GECODE_QT_DETECTION=autoconf: unable to query Qt version from qmake, disabling Qt")
+      elseif(NOT GECODE_QMAKE_QT_VERSION MATCHES "^([0-9]+)\\.([0-9]+)")
+        set(GECODE_QT_PROBE_ALLOWED FALSE)
+        message(STATUS
+          "GECODE_QT_DETECTION=autoconf: invalid Qt version from qmake, disabling Qt")
+      else()
+        set(GECODE_QT_MAJOR "${CMAKE_MATCH_1}")
+        set(GECODE_QT_MINOR "${CMAKE_MATCH_2}")
+        if(GECODE_QT_MAJOR LESS 4 OR
+           (GECODE_QT_MAJOR EQUAL 4 AND GECODE_QT_MINOR LESS 3))
+          set(GECODE_QT_PROBE_ALLOWED FALSE)
+          message(STATUS
+            "GECODE_QT_DETECTION=autoconf: Qt ${GECODE_QMAKE_QT_VERSION} is too old (< 4.3), disabling Qt")
+        endif()
+      endif()
+    endif()
+  endif()
+
+  if(GECODE_QT_PROBE_ALLOWED)
+    find_package(Qt6 QUIET COMPONENTS Core Gui Widgets PrintSupport)
+    if(Qt6_FOUND)
       set(GECODE_HAS_QT_RUNTIME TRUE)
-      set(GECODE_QT_CORE Qt5::Core)
-      set(GECODE_QT_WIDGETS Qt5::Widgets Qt5::Gui Qt5::PrintSupport)
+      set(GECODE_QT_CORE Qt6::Core)
+      set(GECODE_QT_WIDGETS Qt6::Widgets Qt6::Gui Qt6::PrintSupport)
       set(CMAKE_AUTOMOC TRUE)
     else()
-      find_package(Qt4 QUIET)
-      if(QT4_FOUND)
-        include(${QT_USE_FILE})
+      find_package(Qt5 QUIET COMPONENTS Core Gui Widgets PrintSupport)
+      if(Qt5_FOUND)
         set(GECODE_HAS_QT_RUNTIME TRUE)
-        set(GECODE_QT_CORE ${QT_LIBRARIES})
-        set(GECODE_QT_WIDGETS ${QT_LIBRARIES})
+        set(GECODE_QT_CORE Qt5::Core)
+        set(GECODE_QT_WIDGETS Qt5::Widgets Qt5::Gui Qt5::PrintSupport)
         set(CMAKE_AUTOMOC TRUE)
+      else()
+        find_package(Qt4 QUIET)
+        if(QT4_FOUND)
+          include(${QT_USE_FILE})
+          set(GECODE_HAS_QT_RUNTIME TRUE)
+          set(GECODE_QT_CORE ${QT_LIBRARIES})
+          set(GECODE_QT_WIDGETS ${QT_LIBRARIES})
+          set(CMAKE_AUTOMOC TRUE)
+        endif()
       endif()
     endif()
   endif()
@@ -297,9 +366,9 @@ if(HAVE_FORCE_INLINE)
   set(forceinline "__forceinline")
 endif()
 
-check_c_source_compiles("int main() { return __builtin_ffsl(0); }" HAVE_BUILTIN_FFSL)
-if(HAVE_BUILTIN_FFSL)
-  set(GECODE_HAS_BUILTIN_FFSL "/**/")
+check_c_source_compiles("int main() { return __builtin_ffsll(0); }" HAVE_BUILTIN_FFSLL)
+if(HAVE_BUILTIN_FFSLL)
+  set(GECODE_HAS_BUILTIN_FFSLL "/**/")
 endif()
 check_c_source_compiles("int main() { return __builtin_popcountll(0); }" HAVE_BUILTIN_POPCOUNTLL)
 if(HAVE_BUILTIN_POPCOUNTLL)
@@ -631,35 +700,78 @@ if(GECODE_ENABLE_FLATZINC)
 endif()
 
 set(GECODE_CAN_BUILD_TESTS TRUE)
-foreach(required search int set float minimodel driver flatzinc)
+foreach(required search int minimodel driver)
   if(NOT TARGET gecode${required})
     set(GECODE_CAN_BUILD_TESTS FALSE)
   endif()
 endforeach()
+
+if(GECODE_ENABLE_SET_VARS AND NOT TARGET gecodeset)
+  set(GECODE_CAN_BUILD_TESTS FALSE)
+endif()
+if(GECODE_ENABLE_FLOAT_VARS AND NOT TARGET gecodefloat)
+  set(GECODE_CAN_BUILD_TESTS FALSE)
+endif()
+if(GECODE_ENABLE_FLATZINC AND NOT TARGET gecodeflatzinc)
+  set(GECODE_CAN_BUILD_TESTS FALSE)
+endif()
+
+set(GECODE_TEST_SOURCES_SELECTED ${GECODE_TEST_SOURCES})
+if(NOT GECODE_ENABLE_SET_VARS)
+  list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/set(/|\\.cpp)")
+endif()
+if(NOT GECODE_ENABLE_FLOAT_VARS)
+  list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/float(/|\\.cpp)")
+endif()
+if(NOT GECODE_ENABLE_FLATZINC)
+  list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/flatzinc(/|\\.cpp)")
+endif()
+
 if(GECODE_CAN_BUILD_TESTS)
-  add_executable(gecode-test EXCLUDE_FROM_ALL ${GECODE_TEST_SOURCES})
-  target_link_libraries(gecode-test PRIVATE gecodeflatzinc gecodeminimodel)
+  add_executable(gecode-test EXCLUDE_FROM_ALL ${GECODE_TEST_SOURCES_SELECTED})
+  set(GECODE_TEST_LINK_LIBS gecodeminimodel)
+  if(GECODE_ENABLE_FLATZINC)
+    list(APPEND GECODE_TEST_LINK_LIBS gecodeflatzinc)
+  endif()
+  target_link_libraries(gecode-test PRIVATE ${GECODE_TEST_LINK_LIBS})
 
   enable_testing()
-  add_test(NAME test COMMAND gecode-test
-    -iter 2 -threads 0
-    -test Branch::Int::Dense::3
-    -test FlatZinc::magic_square
-    -test Int::Arithmetic::Abs
-    -test Int::Arithmetic::ArgMax
-    -test Int::Arithmetic::Max::Nary
-    -test Int::Cumulative::Man::Fix::0::4
-    -test Int::Distinct::Random
-    -test Int::Linear::Bool::Int::Lq
-    -test Int::MiniModel::LinExpr::Bool::352
-    -test NoGoods::Queens
-    -test Search::DFS::Sol::Binary::Nary::Binary::1::1::1
-    -test Set::Dom::Dom::Gr
-    -test Set::RelOp::ConstSSI::Union
-    -test Set::Sequence::SeqU1
-    -test Set::Wait)
+  set(GECODE_CHECK_TESTS
+    Branch::Int::Dense::3
+    Int::Arithmetic::Abs
+    Int::Arithmetic::ArgMax
+    Int::Arithmetic::Max::Nary
+    Int::Cumulative::Man::Fix::0::4
+    Int::Distinct::Random
+    Int::Linear::Bool::Int::Lq
+    Int::MiniModel::LinExpr::Bool::352
+    NoGoods::Queens
+    Search::DFS::Sol::Binary::Nary::Binary::1::1::1)
+  if(GECODE_ENABLE_FLATZINC)
+    list(INSERT GECODE_CHECK_TESTS 1 FlatZinc::magic_square)
+  endif()
+  if(GECODE_ENABLE_SET_VARS)
+    list(APPEND GECODE_CHECK_TESTS
+      Set::Dom::Dom::Gr
+      Set::RelOp::ConstSSI::Union
+      Set::Sequence::SeqU1
+      Set::Wait)
+  endif()
+
+  set(GECODE_CHECK_ARGS -iter 2 -threads 0)
+  foreach(gecode_check_test ${GECODE_CHECK_TESTS})
+    list(APPEND GECODE_CHECK_ARGS -test ${gecode_check_test})
+  endforeach()
+
+  add_test(NAME test COMMAND gecode-test ${GECODE_CHECK_ARGS})
+  add_custom_target(check
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$"
+    DEPENDS gecode-test
+    USES_TERMINAL)
 else()
-  message(WARNING "Skipping gecode-test target because required modules are disabled")
+  message(WARNING "Skipping gecode-test/check targets because required modules are disabled")
+  add_custom_target(check
+    COMMAND ${CMAKE_COMMAND} -E echo "Skipping check target because required modules are disabled")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -668,20 +780,22 @@ endif()
 set(prefix ${CMAKE_INSTALL_PREFIX})
 set(datarootdir \${prefix}/share)
 set(datadir \${datarootdir})
-if(WIN32)
-  configure_file(${PROJECT_SOURCE_DIR}/tools/flatzinc/mzn-gecode.bat.in
-                 ${PROJECT_BINARY_DIR}/tools/flatzinc/mzn-gecode.bat @ONLY)
-  set(MZN_SCRIPT ${PROJECT_BINARY_DIR}/tools/flatzinc/mzn-gecode.bat)
-else()
-  configure_file(${PROJECT_SOURCE_DIR}/tools/flatzinc/mzn-gecode.in
-                 ${PROJECT_BINARY_DIR}/tools/flatzinc/mzn-gecode @ONLY)
-  set(MZN_SCRIPT ${PROJECT_BINARY_DIR}/tools/flatzinc/mzn-gecode)
-endif()
-configure_file(${PROJECT_SOURCE_DIR}/tools/flatzinc/gecode.msc.in
-               ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode.msc @ONLY)
-if(GECODE_BUILD_GIST_TARGET)
-  configure_file(${PROJECT_SOURCE_DIR}/tools/flatzinc/gecode-gist.msc.in
-                 ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode-gist.msc @ONLY)
+if(GECODE_ENABLE_FLATZINC)
+  if(WIN32)
+    configure_file(${PROJECT_SOURCE_DIR}/tools/flatzinc/mzn-gecode.bat.in
+                   ${PROJECT_BINARY_DIR}/tools/flatzinc/mzn-gecode.bat @ONLY)
+    set(MZN_SCRIPT ${PROJECT_BINARY_DIR}/tools/flatzinc/mzn-gecode.bat)
+  else()
+    configure_file(${PROJECT_SOURCE_DIR}/tools/flatzinc/mzn-gecode.in
+                   ${PROJECT_BINARY_DIR}/tools/flatzinc/mzn-gecode @ONLY)
+    set(MZN_SCRIPT ${PROJECT_BINARY_DIR}/tools/flatzinc/mzn-gecode)
+  endif()
+  configure_file(${PROJECT_SOURCE_DIR}/tools/flatzinc/gecode.msc.in
+                 ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode.msc @ONLY)
+  if(GECODE_BUILD_GIST_TARGET)
+    configure_file(${PROJECT_SOURCE_DIR}/tools/flatzinc/gecode-gist.msc.in
+                   ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode-gist.msc @ONLY)
+  endif()
 endif()
 
 if(GECODE_ENABLE_EXAMPLES)
@@ -700,7 +814,9 @@ install(TARGETS ${GECODE_INSTALL_TARGETS}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-install(FILES ${MZN_SCRIPT} DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(GECODE_ENABLE_FLATZINC)
+  install(FILES ${MZN_SCRIPT} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 install(DIRECTORY gecode
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
@@ -716,14 +832,35 @@ install(DIRECTORY gecode
 install(FILES ${PROJECT_BINARY_DIR}/gecode/support/config.hpp
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gecode/support/)
 
-install(DIRECTORY gecode/flatzinc/mznlib/
-  DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/gecode)
+if(GECODE_ENABLE_FLATZINC)
+  install(DIRECTORY gecode/flatzinc/mznlib/
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/gecode)
 
-install(FILES ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode.msc
-  DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/solvers)
-if(GECODE_BUILD_GIST_TARGET)
-  install(FILES ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode-gist.msc
+  install(FILES ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode.msc
     DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/solvers)
+  if(GECODE_BUILD_GIST_TARGET)
+    install(FILES ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode-gist.msc
+      DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/solvers)
+  endif()
+endif()
+
+set(GECODE_PACKAGE_NEEDS_THREADS OFF)
+if(GECODE_ENABLE_THREAD)
+  set(GECODE_PACKAGE_NEEDS_THREADS ON)
+endif()
+set(GECODE_PACKAGE_QT_MAJOR "")
+set(GECODE_PACKAGE_QT_COMPONENTS "")
+if(GECODE_BUILD_GIST_TARGET)
+  set(GECODE_PACKAGE_QT_COMPONENTS "Core;Gui;Widgets;PrintSupport")
+elseif(GECODE_ENABLE_FLATZINC AND GECODE_HAS_QT_RUNTIME)
+  set(GECODE_PACKAGE_QT_COMPONENTS "Core")
+endif()
+if(NOT GECODE_PACKAGE_QT_COMPONENTS STREQUAL "")
+  if(Qt6_FOUND)
+    set(GECODE_PACKAGE_QT_MAJOR "6")
+  elseif(Qt5_FOUND)
+    set(GECODE_PACKAGE_QT_MAJOR "5")
+  endif()
 endif()
 
 configure_package_config_file(

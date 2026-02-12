@@ -28,11 +28,13 @@ jobs:
       shell: bash
       run: make check
 
-  build-cmake:
+  build-cmake-unix:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest]
+        qt_detection: [cmake, autoconf]
 
     steps:
     - uses: actions/checkout@v4
@@ -43,9 +45,58 @@ jobs:
     - name: Configure CMake
       shell: bash
       working-directory: ${{github.workspace}}/build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+      run: >
+        cmake $GITHUB_WORKSPACE
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        -DGECODE_QT_DETECTION=${{ matrix.qt_detection }}
 
     - name: Build
       working-directory: ${{github.workspace}}/build
       shell: bash
       run: cmake --build . --config $BUILD_TYPE
+
+    - name: Check
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --build . --config $BUILD_TYPE --target check
+
+  build-cmake-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: shared
+            build_shared: ON
+            build_static: OFF
+          - name: static
+            build_shared: OFF
+            build_static: ON
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Create Build Environment
+      shell: bash
+      run: cmake -E make_directory ${{github.workspace}}/build
+
+    - name: Configure CMake
+      shell: bash
+      working-directory: ${{github.workspace}}/build
+      run: >
+        cmake $GITHUB_WORKSPACE
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        -DGECODE_ENABLE_QT=OFF
+        -DGECODE_ENABLE_GIST=OFF
+        -DGECODE_BUILD_SHARED=${{ matrix.build_shared }}
+        -DGECODE_BUILD_STATIC=${{ matrix.build_static }}
+
+    - name: Build
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --build . --config $BUILD_TYPE
+
+    - name: Build test binary
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --build . --config $BUILD_TYPE --target gecode-test

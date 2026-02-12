@@ -1,5 +1,16 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
+if("@GECODE_PACKAGE_NEEDS_THREADS@" STREQUAL "ON")
+  find_dependency(Threads REQUIRED)
+endif()
+set(_gecode_qt_components "@GECODE_PACKAGE_QT_COMPONENTS@")
+if("@GECODE_PACKAGE_QT_MAJOR@" STREQUAL "6")
+  find_dependency(Qt6 REQUIRED COMPONENTS ${_gecode_qt_components})
+elseif("@GECODE_PACKAGE_QT_MAJOR@" STREQUAL "5")
+  find_dependency(Qt5 REQUIRED COMPONENTS ${_gecode_qt_components})
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/GecodeTargets.cmake")
 
 set(Gecode_VERSION "@GECODE_PROJECT_VERSION@")

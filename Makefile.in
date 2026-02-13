@@ -124,10 +124,11 @@ export SOSUFFIX         = @DLL_ARCH@@USERSUFFIX@@SOSUFFIX@
 #
 export RMF		= rm -rf
 export MV		= mv
+export UVRUN		= uv run --script
 export MANIFEST		= @MANIFEST@ -nologo
-export FIXMANIFEST	= perl $(top_srcdir)/misc/fixmanifest.perl $(DLLSUFFIX)
+export FIXMANIFEST	= $(UVRUN) $(top_srcdir)/misc/fixmanifest.py $(DLLSUFFIX)
 export RESCOMP		= @RESCOMP@ -n -i$(top_srcdir)
-export RCGEN		= perl $(top_srcdir)/misc/genrc.perl $(DLLSUFFIX) $(top_srcdir)
+export RCGEN		= $(UVRUN) $(top_srcdir)/misc/genrc.py $(DLLSUFFIX) $(top_srcdir)
 
 ifeq "@need_soname@" "yes"
 export CREATELINK       = ln -fs
@@ -1365,12 +1366,12 @@ compilesubdirs:
 
 VIS = @ALLVIS@
 VISDEP = $(VIS) \
-	$(top_srcdir)/misc/genvarimp.perl Makefile
+	$(top_srcdir)/misc/genvarimp.py Makefile
 
 gecode/kernel/var-type.hpp: $(VISDEP)
-	perl $(top_srcdir)/misc/genvarimp.perl -typehpp $(VIS) > $@
+	$(UVRUN) $(top_srcdir)/misc/genvarimp.py -typehpp $(VIS) > $@
 gecode/kernel/var-imp.hpp: $(VISDEP)
-	perl $(top_srcdir)/misc/genvarimp.perl -header $(VIS) > $@
+	$(UVRUN) $(top_srcdir)/misc/genvarimp.py -header $(VIS) > $@
 
 #
 # Object targets
@@ -1867,26 +1868,26 @@ DOCSRC_NOTGENERATED = \
 	misc/doxygen/back.png misc/doxygen/footer.html \
 	misc/doxygen/gecode-logo-100.png \
 	misc/doxygen/stylesheet.css \
-	misc/genlicense.perl misc/genstatistics.perl \
-	misc/genchangelog.perl
+	misc/genlicense.py misc/genstatistics.py \
+	misc/genchangelog.py
 DOCSRC = $(DOCSRC_NOTGENERATED:%=$(top_srcdir)/%) \
 	doxygen.conf.use header.html \
 	doxygen.hh license.hh stat.hh changelog.hh
 
 changelog.hh: $(top_srcdir)/changelog.in
-	perl $(top_srcdir)/misc/genchangelog.perl < $^ > changelog.hh
+	$(UVRUN) $(top_srcdir)/misc/genchangelog.py < $^ > changelog.hh
 
 ChangeLog: $(top_srcdir)/changelog.in
-	perl $(top_srcdir)/misc/gentxtchangelog.perl < $^ > ChangeLog
+	$(UVRUN) $(top_srcdir)/misc/gentxtchangelog.py < $^ > ChangeLog
 
 license.hh: $(ALLGECODEHDR:%=$(top_srcdir)/%) $(ALLSRC:%=$(top_srcdir)/%) \
 	$(VARIMPHDR)
-	perl $(top_srcdir)/misc/genlicense.perl $^ > license.hh
+	$(UVRUN) $(top_srcdir)/misc/genlicense.py $^ > license.hh
 
 stat.hh: $(ALLGECODEHDR:%=$(top_srcdir)/%) $(ALLSRC:%=$(top_srcdir)/%) \
 	$(TESTHDR:%=$(top_srcdir)/%) $(TESTSRC:%=$(top_srcdir)/%) \
 	$(VARIMPHDR)
-	perl $(top_srcdir)/misc/genstatistics.perl $^ > stat.hh
+	$(UVRUN) $(top_srcdir)/misc/genstatistics.py $^ > stat.hh
 
 
 ifeq "@ENABLEDOCCHM@" "yes"
@@ -2138,7 +2139,7 @@ distclean: veryclean
 
 depend: mkcompiledirs
 	@$(MAKE) $(VARIMP) gecode/flatzinc/parser.tab.hpp
-	perl $(top_srcdir)/misc/makedepend.perl \
+	$(UVRUN) $(top_srcdir)/misc/makedepend.py \
 	$(top_srcdir) \
 	$(ALLSRC) \
 	$(FLATZINC_GENSRC) \

@@ -90,9 +90,9 @@ AC_CHECK_PROG(PROG_SED, sed, [ok])
  if test "${PROG_SED}x" = "x"; then
     AC_MSG_ERROR([In order to compile Gecode, you need the sed tool.])
  fi
-AC_CHECK_PROG(PROG_PERL, perl, [ok])
- if test "${PROG_PERL}x" = "x"; then
-    AC_MSG_ERROR([In order to compile Gecode, you need perl.])
+AC_CHECK_PROG(PROG_UV, uv, [ok])
+ if test "${PROG_UV}x" = "x"; then
+    AC_MSG_ERROR([In order to compile Gecode, you need uv.])
  fi
 
 dnl Check for environment to use when running programs in the Makefile

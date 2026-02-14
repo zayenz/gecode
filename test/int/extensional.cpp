@@ -39,6 +39,11 @@
 
 #include <gecode/minimodel.hh>
 #include <climits>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
 
 namespace Test { namespace Int {
 
@@ -500,6 +505,67 @@ namespace Test { namespace Int {
        }
      };
 
+     /// Crash reproducer for Inglenook tuple-set finalization
+     class InglenookCrashReproducer : public ::Test::Base {
+     public:
+       InglenookCrashReproducer(void)
+         : ::Test::Base("Extensional::TupleSet::Crash::Inglenook") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         const char* default_csv =
+           "/Users/zayenz/.codex/worktrees/4e83/gecode/data8.csv";
+         const char* csv = std::getenv("GECODE_INGLENOOK_CSV");
+         if (csv == nullptr || csv[0] == '\0')
+           csv = default_csv;
+
+         std::ifstream file(csv);
+         if (!file.good()) {
+           std::cerr << "ERROR: Could not open CSV file: "
+                     << csv << std::endl;
+           return false;
+         }
+
+         std::cerr << "DEBUG: Opened CSV file: " << csv << std::endl;
+
+         TupleSet ts(2);
+         std::string line;
+
+         // Skip header line.
+         if (!std::getline(file, line)) {
+           std::cerr << "ERROR: CSV file is empty: "
+                     << csv << std::endl;
+           return false;
+         }
+
+         int line_count = 0;
+         while (std::getline(file, line)) {
+           if (line.empty())
+             continue;
+
+           std::istringstream stream(line);
+           int from, to;
+           char comma;
+           if (!(stream >> from >> comma >> to) || comma != ',') {
+             std::cerr << "ERROR: Malformed CSV line " << (line_count + 2)
+                       << ": " << line << std::endl;
+             return false;
+           }
+
+           ts.add(IntArgs({from, to}));
+           line_count++;
+         }
+
+         std::cerr << "DEBUG: About to call ts.finalize() with "
+                   << line_count << " tuples" << std::endl;
+         ts.finalize();
+         std::cerr << "DEBUG: ts.finalize() completed successfully" << std::endl;
+
+         return true;
+       }
+     };
+
      /// %Test with large tuple set
      class TupleSetLarge : public Test {
      protected:
@@ -828,6 +894,8 @@ namespace Test { namespace Int {
      RegOpt ro5(SHRT_MAX);
      RegOpt ro6(static_cast<int>(USHRT_MAX-1));
      RegOpt ro7(static_cast<int>(USHRT_MAX));
+
+     InglenookCrashReproducer inglenook_crash_reproducer;
      //@}
 
    }

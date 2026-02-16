@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Generate kernel var-type.hpp or var-imp.hpp from variable implementation specs."""
+
 import re
 import sys
 from typing import Dict, List, Optional

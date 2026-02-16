@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Generate a Makefile that runs tests/examples and collects lcov coverage."""
+
 import os
 import subprocess
 import sys

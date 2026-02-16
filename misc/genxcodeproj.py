@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Generate a minimal Xcode project listing the repository C/C++ sources."""
+
 import os
 import re
 import subprocess

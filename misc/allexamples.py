@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Run all examples and expand supported -propagation/-model combinations."""
+
 import os
 import subprocess
 import sys

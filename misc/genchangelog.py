@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Generate doxygen changelog.hh from changelog.in release and entry blocks."""
+
 import re
 import sys
 from collections import defaultdict

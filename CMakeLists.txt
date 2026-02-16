@@ -2,22 +2,15 @@
 # CMake build script for Gecode.
 #
 
-cmake_minimum_required(VERSION 3.8.0)
+cmake_minimum_required(VERSION 3.21)
 
 project(GECODE LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/misc/cmake_modules)
 
-if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.11.0)
-  cmake_policy(SET CMP0072 NEW)
-  set(OpenGL_GL_PREFERENCE LEGACY)
-endif()
-if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.17.0)
-  cmake_policy(SET CMP0100 NEW)
-endif()
+# Keep this preference to preserve existing Gist/OpenGL linkage behavior.
+set(OpenGL_GL_PREFERENCE LEGACY)
 
 # ---------------------------------------------------------------------------
 # Build options (configure/autoconf parity-oriented)
@@ -46,9 +39,6 @@ option(GECODE_BUILD_STATIC "Build static libraries" OFF)
 
 option(GECODE_ENABLE_THREAD "Enable thread support" ON)
 option(GECODE_ENABLE_QT "Enable Qt support" ON)
-set(GECODE_QT_DETECTION "cmake" CACHE STRING
-  "Qt detection policy: cmake or autoconf")
-set_property(CACHE GECODE_QT_DETECTION PROPERTY STRINGS cmake autoconf)
 option(GECODE_ENABLE_GIST "Enable Gist" ON)
 option(GECODE_ENABLE_CPPROFILER "Enable CPProfiler support" ON)
 option(GECODE_ENABLE_CBS "Enable counting-based search support" OFF)
@@ -67,6 +57,7 @@ option(GECODE_ENABLE_ALLOCATOR "Enable default allocator" ON)
 option(GECODE_ENABLE_AUDIT "Enable audit code" OFF)
 option(GECODE_ENABLE_GCC_VISIBILITY "Enable GCC visibility attributes" ON)
 option(GECODE_ENABLE_OSX_UNFAIR_MUTEX "Enable macOS unfair mutexes" ON)
+option(GECODE_REGENERATE_VARIMP "Regenerate checked-in var-imp headers during build" OFF)
 set(GECODE_FREELIST32_SIZE_MAX "" CACHE STRING "Max freelist size on 32-bit platforms")
 set(GECODE_FREELIST64_SIZE_MAX "" CACHE STRING "Max freelist size on 64-bit platforms")
 set(GECODE_WITH_VIS "" CACHE STRING "Additional .vis files (comma-separated)")
@@ -116,88 +107,39 @@ if(GECODE_ENABLE_EXAMPLES)
 endif()
 
 include(CheckCXXCompilerFlag)
+set(GECODE_VISIBILITY_COMPILE_OPTION)
 if(GECODE_ENABLE_GCC_VISIBILITY)
   check_cxx_compiler_flag(-fvisibility=hidden HAVE_VISIBILITY_HIDDEN_FLAG)
   if(HAVE_VISIBILITY_HIDDEN_FLAG)
-    add_compile_options(-fvisibility=hidden)
+    set(GECODE_VISIBILITY_COMPILE_OPTION -fvisibility=hidden)
   endif()
 endif()
 
-find_package(Perl REQUIRED)
+if(GECODE_REGENERATE_VARIMP)
+  find_package(Perl REQUIRED)
+endif()
 
 if(GECODE_ENABLE_MPFR)
   find_package(MPFR)
 endif()
 
 set(GECODE_HAS_QT_RUNTIME FALSE)
-string(TOLOWER "${GECODE_QT_DETECTION}" GECODE_QT_DETECTION_MODE)
-if(NOT GECODE_QT_DETECTION_MODE STREQUAL "cmake"
-   AND NOT GECODE_QT_DETECTION_MODE STREQUAL "autoconf")
-  message(FATAL_ERROR
-    "GECODE_QT_DETECTION must be one of: cmake, autoconf")
-endif()
+set(GECODE_QT_CORE)
+set(GECODE_QT_WIDGETS)
 if(GECODE_ENABLE_QT)
-  set(GECODE_QT_PROBE_ALLOWED TRUE)
-  if(GECODE_QT_DETECTION_MODE STREQUAL "autoconf")
-    find_program(GECODE_QMAKE_EXECUTABLE NAMES qmake-qt4 qmake)
-    find_program(GECODE_MOC_EXECUTABLE NAMES moc-qt4 moc)
-    if(NOT GECODE_QMAKE_EXECUTABLE OR NOT GECODE_MOC_EXECUTABLE)
-      set(GECODE_QT_PROBE_ALLOWED FALSE)
-      message(STATUS
-        "GECODE_QT_DETECTION=autoconf: qmake or moc not found, disabling Qt")
-    else()
-      execute_process(
-        COMMAND "${GECODE_QMAKE_EXECUTABLE}" -query QT_VERSION
-        OUTPUT_VARIABLE GECODE_QMAKE_QT_VERSION
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET
-        RESULT_VARIABLE GECODE_QMAKE_QT_VERSION_RESULT)
-      if(NOT GECODE_QMAKE_QT_VERSION_RESULT EQUAL 0)
-        set(GECODE_QT_PROBE_ALLOWED FALSE)
-        message(STATUS
-          "GECODE_QT_DETECTION=autoconf: unable to query Qt version from qmake, disabling Qt")
-      elseif(NOT GECODE_QMAKE_QT_VERSION MATCHES "^([0-9]+)\\.([0-9]+)")
-        set(GECODE_QT_PROBE_ALLOWED FALSE)
-        message(STATUS
-          "GECODE_QT_DETECTION=autoconf: invalid Qt version from qmake, disabling Qt")
-      else()
-        set(GECODE_QT_MAJOR "${CMAKE_MATCH_1}")
-        set(GECODE_QT_MINOR "${CMAKE_MATCH_2}")
-        if(GECODE_QT_MAJOR LESS 4 OR
-           (GECODE_QT_MAJOR EQUAL 4 AND GECODE_QT_MINOR LESS 3))
-          set(GECODE_QT_PROBE_ALLOWED FALSE)
-          message(STATUS
-            "GECODE_QT_DETECTION=autoconf: Qt ${GECODE_QMAKE_QT_VERSION} is too old (< 4.3), disabling Qt")
-        endif()
-      endif()
-    endif()
+  find_package(QT NAMES Qt6 Qt5 QUIET COMPONENTS Core Gui Widgets PrintSupport)
+  if(QT_FOUND)
+    find_package(Qt${QT_VERSION_MAJOR} QUIET COMPONENTS Core Gui Widgets PrintSupport)
   endif()
 
-  if(GECODE_QT_PROBE_ALLOWED)
-    find_package(Qt6 QUIET COMPONENTS Core Gui Widgets PrintSupport)
-    if(Qt6_FOUND)
-      set(GECODE_HAS_QT_RUNTIME TRUE)
-      set(GECODE_QT_CORE Qt6::Core)
-      set(GECODE_QT_WIDGETS Qt6::Widgets Qt6::Gui Qt6::PrintSupport)
-      set(CMAKE_AUTOMOC TRUE)
-    else()
-      find_package(Qt5 QUIET COMPONENTS Core Gui Widgets PrintSupport)
-      if(Qt5_FOUND)
-        set(GECODE_HAS_QT_RUNTIME TRUE)
-        set(GECODE_QT_CORE Qt5::Core)
-        set(GECODE_QT_WIDGETS Qt5::Widgets Qt5::Gui Qt5::PrintSupport)
-        set(CMAKE_AUTOMOC TRUE)
-      else()
-        find_package(Qt4 QUIET)
-        if(QT4_FOUND)
-          include(${QT_USE_FILE})
-          set(GECODE_HAS_QT_RUNTIME TRUE)
-          set(GECODE_QT_CORE ${QT_LIBRARIES})
-          set(GECODE_QT_WIDGETS ${QT_LIBRARIES})
-          set(CMAKE_AUTOMOC TRUE)
-        endif()
-      endif()
-    endif()
+  if(TARGET Qt6::Core)
+    set(GECODE_HAS_QT_RUNTIME TRUE)
+    set(GECODE_QT_CORE Qt6::Core)
+    set(GECODE_QT_WIDGETS Qt6::Widgets Qt6::Gui Qt6::PrintSupport)
+  elseif(TARGET Qt5::Core)
+    set(GECODE_HAS_QT_RUNTIME TRUE)
+    set(GECODE_QT_CORE Qt5::Core)
+    set(GECODE_QT_WIDGETS Qt5::Widgets Qt5::Gui Qt5::PrintSupport)
   endif()
 endif()
 
@@ -459,36 +401,46 @@ foreach(vis ${GECODE_VIS_FILES})
 endforeach()
 string(JOIN "||" GECODE_VIS_FILES_SERIALIZED ${GECODE_VIS_FILES_FOR_GEN})
 
-set(GECODE_VAR_TYPE_HPP ${CMAKE_CURRENT_SOURCE_DIR}/gecode/kernel/var-type.hpp)
-set(GECODE_VAR_IMP_HPP ${CMAKE_CURRENT_SOURCE_DIR}/gecode/kernel/var-imp.hpp)
+set(GECODE_VAR_TYPE_HPP_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/gecode/kernel/var-type.hpp)
+set(GECODE_VAR_IMP_HPP_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/gecode/kernel/var-imp.hpp)
+set(GECODE_VAR_TYPE_HPP ${GECODE_VAR_TYPE_HPP_SOURCE})
+set(GECODE_VAR_IMP_HPP ${GECODE_VAR_IMP_HPP_SOURCE})
 
-add_custom_command(
-  OUTPUT ${GECODE_VAR_TYPE_HPP}
-  COMMAND ${CMAKE_COMMAND}
-    -DPERL_EXECUTABLE=${PERL_EXECUTABLE}
-    -DGENVARIMP=${CMAKE_CURRENT_SOURCE_DIR}/misc/genvarimp.perl
-    -DMODE=-typehpp
-    -DOUT_FILE=${GECODE_VAR_TYPE_HPP}
-    -DVIS_FILES_SERIALIZED=${GECODE_VIS_FILES_SERIALIZED}
-    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVarImp.cmake
-  DEPENDS ${GECODE_VIS_DEPENDS} ${CMAKE_CURRENT_SOURCE_DIR}/misc/genvarimp.perl ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt ${CMAKE_CURRENT_SOURCE_DIR}/configure.ac
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  VERBATIM
-)
-add_custom_command(
-  OUTPUT ${GECODE_VAR_IMP_HPP}
-  COMMAND ${CMAKE_COMMAND}
-    -DPERL_EXECUTABLE=${PERL_EXECUTABLE}
-    -DGENVARIMP=${CMAKE_CURRENT_SOURCE_DIR}/misc/genvarimp.perl
-    -DMODE=-header
-    -DOUT_FILE=${GECODE_VAR_IMP_HPP}
-    -DVIS_FILES_SERIALIZED=${GECODE_VIS_FILES_SERIALIZED}
-    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVarImp.cmake
-  DEPENDS ${GECODE_VIS_DEPENDS} ${CMAKE_CURRENT_SOURCE_DIR}/misc/genvarimp.perl ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt ${CMAKE_CURRENT_SOURCE_DIR}/configure.ac
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  VERBATIM
-)
-add_custom_target(gecode-varimp-gen DEPENDS ${GECODE_VAR_TYPE_HPP} ${GECODE_VAR_IMP_HPP})
+if(GECODE_REGENERATE_VARIMP)
+  set(GECODE_VAR_TYPE_HPP ${CMAKE_CURRENT_BINARY_DIR}/gecode/kernel/var-type.hpp)
+  set(GECODE_VAR_IMP_HPP ${CMAKE_CURRENT_BINARY_DIR}/gecode/kernel/var-imp.hpp)
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/gecode/kernel")
+
+  add_custom_command(
+    OUTPUT ${GECODE_VAR_TYPE_HPP}
+    COMMAND ${CMAKE_COMMAND}
+      -DPERL_EXECUTABLE=${PERL_EXECUTABLE}
+      -DGENVARIMP=${CMAKE_CURRENT_SOURCE_DIR}/misc/genvarimp.perl
+      -DMODE=-typehpp
+      -DOUT_FILE=${GECODE_VAR_TYPE_HPP}
+      -DVIS_FILES_SERIALIZED=${GECODE_VIS_FILES_SERIALIZED}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVarImp.cmake
+    DEPENDS ${GECODE_VIS_DEPENDS} ${CMAKE_CURRENT_SOURCE_DIR}/misc/genvarimp.perl ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt ${CMAKE_CURRENT_SOURCE_DIR}/configure.ac
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    VERBATIM
+  )
+  add_custom_command(
+    OUTPUT ${GECODE_VAR_IMP_HPP}
+    COMMAND ${CMAKE_COMMAND}
+      -DPERL_EXECUTABLE=${PERL_EXECUTABLE}
+      -DGENVARIMP=${CMAKE_CURRENT_SOURCE_DIR}/misc/genvarimp.perl
+      -DMODE=-header
+      -DOUT_FILE=${GECODE_VAR_IMP_HPP}
+      -DVIS_FILES_SERIALIZED=${GECODE_VIS_FILES_SERIALIZED}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateVarImp.cmake
+    DEPENDS ${GECODE_VIS_DEPENDS} ${CMAKE_CURRENT_SOURCE_DIR}/misc/genvarimp.perl ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt ${CMAKE_CURRENT_SOURCE_DIR}/configure.ac
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    VERBATIM
+  )
+  add_custom_target(gecode-varimp-gen DEPENDS ${GECODE_VAR_TYPE_HPP} ${GECODE_VAR_IMP_HPP})
+else()
+  add_custom_target(gecode-varimp-gen)
+endif()
 
 # ---------------------------------------------------------------------------
 # Target creation helpers
@@ -541,11 +493,15 @@ function(add_gecode_component_library lib)
   if(GECODE_BUILD_SHARED)
     add_library(gecode${lib}_shared SHARED ${sources})
     target_compile_definitions(gecode${lib}_shared PRIVATE GECODE_BUILD_${libupper})
+    target_compile_features(gecode${lib}_shared PUBLIC cxx_std_17)
     target_include_directories(gecode${lib}_shared
       PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    if(GECODE_VISIBILITY_COMPILE_OPTION)
+      target_compile_options(gecode${lib}_shared PRIVATE ${GECODE_VISIBILITY_COMPILE_OPTION})
+    endif()
     set_target_properties(gecode${lib}_shared PROPERTIES
       OUTPUT_NAME gecode${lib}
       VERSION ${GECODE_PROJECT_VERSION}
@@ -560,11 +516,15 @@ function(add_gecode_component_library lib)
   if(GECODE_BUILD_STATIC)
     add_library(gecode${lib}_static STATIC ${sources})
     target_compile_definitions(gecode${lib}_static PRIVATE GECODE_BUILD_${libupper})
+    target_compile_features(gecode${lib}_static PUBLIC cxx_std_17)
     target_include_directories(gecode${lib}_static
       PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    if(GECODE_VISIBILITY_COMPILE_OPTION)
+      target_compile_options(gecode${lib}_static PRIVATE ${GECODE_VISIBILITY_COMPILE_OPTION})
+    endif()
     set_target_properties(gecode${lib}_static PROPERTIES OUTPUT_NAME gecode${lib})
     add_dependencies(gecode${lib}_static gecode-varimp-gen)
     list(APPEND GECODE_INSTALL_TARGETS gecode${lib}_static)
@@ -593,6 +553,12 @@ function(gecode_link_component comp)
   endforeach()
 endfunction()
 
+function(gecode_enable_automoc_if_exists target_name)
+  if(TARGET ${target_name})
+    set_target_properties(${target_name} PROPERTIES AUTOMOC ON)
+  endif()
+endfunction()
+
 foreach(component ${GECODE_LIBRARY_COMPONENTS})
   add_gecode_component_library(${component})
 endforeach()
@@ -617,8 +583,12 @@ if(GECODE_ENABLE_FLOAT_VARS)
   if(GECODE_ENABLE_MPFR AND MPFR_FOUND)
     foreach(kind shared static)
       if(TARGET gecodefloat_${kind})
-        target_link_libraries(gecodefloat_${kind} PUBLIC ${MPFR_LIBRARIES})
-        target_include_directories(gecodefloat_${kind} PRIVATE ${MPFR_INCLUDES})
+        if(TARGET MPFR::MPFR)
+          target_link_libraries(gecodefloat_${kind} PUBLIC MPFR::MPFR)
+        else()
+          target_link_libraries(gecodefloat_${kind} PUBLIC ${MPFR_LIBRARIES})
+          target_include_directories(gecodefloat_${kind} PRIVATE ${MPFR_INCLUDES})
+        endif()
       endif()
     endforeach()
   endif()
@@ -641,6 +611,8 @@ if(GECODE_ENABLE_DRIVER)
   gecode_link_component(driver ${driver_deps})
 endif()
 if(GECODE_BUILD_GIST_TARGET)
+  gecode_enable_automoc_if_exists(gecodegist_shared)
+  gecode_enable_automoc_if_exists(gecodegist_static)
   foreach(kind shared static)
     if(TARGET gecodegist_${kind})
       target_link_libraries(gecodegist_${kind} PUBLIC ${GECODE_QT_WIDGETS})
@@ -806,6 +778,10 @@ install(DIRECTORY gecode
 
 install(FILES ${PROJECT_BINARY_DIR}/gecode/support/config.hpp
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gecode/support/)
+if(GECODE_REGENERATE_VARIMP)
+  install(FILES ${GECODE_VAR_TYPE_HPP} ${GECODE_VAR_IMP_HPP}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gecode/kernel/)
+endif()
 
 if(GECODE_ENABLE_FLATZINC)
   install(DIRECTORY gecode/flatzinc/mznlib/

@@ -228,10 +228,6 @@ dnl find out what parts the user wants to build
 AC_GECODE_DOC_SWITCHES
 
 dnl ------------------------------------------------------------------
-dnl Enabling of non-variable contribs
-dnl @CONTRIBS@
-
-dnl ------------------------------------------------------------------
 dnl Definition of variable types
 
 dnl Include contributor's vtis

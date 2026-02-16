@@ -1336,21 +1336,6 @@ makecompletedmessage:
 	@echo make install
 	@echo
 
-# ugly hack by Gr�goire Dooms to call a target on a contribs after evaluating all the variables in this Makefile.
-# used as make contribs:cpgraph:doc or make contribs:cpgraph:Makefile.in
-.PHONY: contribs\:%
-contribs\:%:
-	$(MAKE) -C $(shell echo $@ | sed 's/\(contribs:[^:]*\):.*/\1/;s+:+/+') $(shell echo $@ | sed 's/contribs:[^:]*:\(.*\)/\1/;s+:+/+')
-
-# less ugly hack by Guido Tack to call a target
-# Just give ICD (in-contrib-dir) and ICT (in-contrib-target) as arguments
-# to make incontrib
-ICT=
-ICD=
-.PHONY: incontrib
-incontrib:
-	$(MAKE) -C contribs/$(ICD) $(ICT)
-
 compilesubdirs:
 	@for_subdirs="$(subdirs)"; for i in $$for_subdirs; do \
 	  if test -f $$i/Makefile; then \

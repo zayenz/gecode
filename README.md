@@ -26,6 +26,8 @@ Gecode comes with
 ## CMake Build Options
 
 CMake now exposes options aligned with the Autoconf build switches.
+The minimum required CMake version is 3.21.
+Qt discovery uses CMake packages (Qt6 or Qt5).
 
 | Configure switch | CMake option | Default |
 |---|---|---|
@@ -47,6 +49,9 @@ CMake now exposes options aligned with the Autoconf build switches.
 
 Additional parity-oriented options are available for advanced features,
 including MPFR, allocator/audit toggles, visibility, and freelist sizes.
+By default, CMake uses checked-in `gecode/kernel/var-type.hpp` and
+`gecode/kernel/var-imp.hpp`; regeneration is opt-in via
+`-DGECODE_REGENERATE_VARIMP=ON`.
 
 Compatibility aliases are still accepted temporarily:
 `ENABLE_THREADS`, `ENABLE_GIST`, `BUILD_EXAMPLES`, `ENABLE_CPPROFILER`.

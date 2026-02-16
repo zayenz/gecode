@@ -45,7 +45,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest]
-        qt_detection: [cmake, autoconf]
 
     steps:
     - uses: actions/checkout@v4
@@ -66,7 +65,6 @@ jobs:
       run: >
         cmake $GITHUB_WORKSPACE
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-        -DGECODE_QT_DETECTION=${{ matrix.qt_detection }}
 
     - name: Build
       working-directory: ${{github.workspace}}/build

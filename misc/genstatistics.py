@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Generate stat.hh code metrics from files annotated with // STATISTICS tags."""
+
 import re
 import sys
 from collections import defaultdict

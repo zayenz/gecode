@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Inject Gecode assembly identity metadata into Windows manifest files."""
+
 import os
 import re
 import sys

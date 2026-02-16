@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Compute include dependencies for Makefile.dep from C/C++ source files."""
+
 import os
 import re
 import sys

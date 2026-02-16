@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Post-process autoheader output for Gecode's generated support/config.hpp."""
+
 import re
 import sys
 

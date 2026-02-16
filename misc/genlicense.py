@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Generate license.hh by extracting authors and contributor names from inputs."""
+
 import fileinput
 import re
 import sys

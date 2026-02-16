@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Generate Windows .rc resource files for Gecode DLLs and executables."""
+
 import re
 import sys
 

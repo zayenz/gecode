@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Emit shell commands to copy the Boost header closure for vendoring."""
+
 import re
 import sys
 

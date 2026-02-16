@@ -3,6 +3,8 @@
 # requires-python = ">=3.9"
 # ///
 
+"""Generate plain-text ChangeLog content from changelog.in."""
+
 import re
 import sys
 from collections import defaultdict

@@ -35,7 +35,7 @@ dnl
 dnl
 
 AC_REVISION([$Id$])
-AC_PREREQ(2.53)
+AC_PREREQ([2.69])
 AC_INIT(GECODE, 6.3.0, users@gecode.org)
 AC_CONFIG_HEADERS([gecode/support/config.hpp])
 AC_CONFIG_SRCDIR(gecode/kernel.hh)

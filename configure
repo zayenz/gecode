@@ -1526,7 +1526,7 @@ Optional Features:
                           [default=yes]
   --enable-int-vars       build finite domain library [default=yes]
   --enable-mpfr           build with MPFR support [default=yes]
-  --enable-qt             build with Qt support, requires at least Qt 4.3
+  --enable-qt             build with Qt support, requires Qt 5 or newer
                           [default=yes]
   --enable-gist           build Gecode Interactive Search Tool [default=yes]
   --enable-cbs            build with support for counting-based search
@@ -7427,10 +7427,9 @@ int
 main (void)
 {
 
-       #if SIZEOF_INT>=4
-       #else
-       blablub
-       #endif
+#if SIZEOF_INT<4
+choke me
+#endif
 
   ;
   return 0;
@@ -7455,10 +7454,9 @@ int
 main (void)
 {
 
-       #if DBL_MANT_DIG>=53
-       #else
-       blablub
-       #endif
+#if DBL_MANT_DIG<53
+choke me
+#endif
 
   ;
   return 0;
@@ -13661,7 +13659,7 @@ then :
   enableval=$enable_qt;
 fi
 
-  for ac_prog in qmake-qt4 qmake
+  for ac_prog in qmake6 qmake-qt6 qmake-qt5 qmake5 qmake
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
@@ -13709,7 +13707,7 @@ fi
   test -n "$QMAKE" && break
 done
 
-  for ac_prog in moc-qt4 moc
+  for ac_prog in moc-qt6 moc6 moc-qt5 moc
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
@@ -13763,19 +13761,23 @@ printf %s "checking whether to build with Qt support... " >&6; }
     if test "${QMAKE}x" = "x" -o "${MOC}x" = "x"; then
       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Qt support requested but qmake/moc were not found. Disabling Qt support." >&5
+printf "%s\n" "$as_me: WARNING: Qt support requested but qmake/moc were not found. Disabling Qt support." >&2;}
+      enable_qt=no
     else
-      ac_gecode_qt_version=`${QMAKE} -query QT_VERSION`
-      ac_gecode_qt_major=`echo ${ac_gecode_qt_version} | grep -o '^[0-9]*'`
-      ac_gecode_qt_minor=`echo ${ac_gecode_qt_version} | sed -e 's/^[0-9]*\\.//g' -e 's/\\.[0-9]*$//g'`
+      ac_gecode_qt_version=`${QMAKE} -query QT_VERSION 2>/dev/null`
+      ac_gecode_qt_major=`echo ${ac_gecode_qt_version} | sed -e 's/\\..*$//'`
       ac_gecode_qt_ok="yes"
-      if test ${ac_gecode_qt_major} -lt 4; then ac_gecode_qt_ok="no";
-      else if test ${ac_gecode_qt_major} -eq 4 \
-                -a ${ac_gecode_qt_minor} -lt 3; then ac_gecode_qt_ok="no";
-           fi
-      fi
+      case ${ac_gecode_qt_major} in
+        ''|*[!0-9]*) ac_gecode_qt_ok="no" ;;
+        *) if test ${ac_gecode_qt_major} -lt 5; then ac_gecode_qt_ok="no"; fi ;;
+      esac
       if test "${ac_gecode_qt_ok}" != "yes"; then
         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Qt support requested but qmake did not report Qt 5/6. Disabling Qt support." >&5
+printf "%s\n" "$as_me: WARNING: Qt support requested but qmake did not report Qt 5/6. Disabling Qt support." >&2;}
+        enable_qt=no
       else
         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
@@ -13785,9 +13787,7 @@ printf "%s\n" "#define GECODE_HAS_QT /**/" >>confdefs.h
                 ac_gecode_qt_tmpdir=`mktemp -d gistqt.XXXXXX` || exit 1
         cd ${ac_gecode_qt_tmpdir}
         echo "CONFIG += release" > a.pro
-        if test ${ac_gecode_qt_major} -ge 5; then
-          echo "QT += widgets printsupport" >> a.pro
-        fi
+        echo "QT += core gui widgets printsupport" >> a.pro
         ${QMAKE}
         if test -d a.xcodeproj; then
           ac_gecode_qt_makefile=a.xcodeproj/qt_preprocess.mak
@@ -13806,7 +13806,7 @@ printf "%s\n" "#define GECODE_HAS_QT /**/" >>confdefs.h
         ac_gecode_qt_inc=`grep ${ac_gecode_qt_makefile} -e 'INCPATH.*=' | sed -e 's/.*=//' -e 's|\\\\|/|g' -e 's|-I\\("*\\)\\.\\./\\.\\.|-I\\1..|g'`
         ac_gecode_qt_libs=`grep ${ac_gecode_qt_makefile} -e 'LIBS.*=' | sed -e 's/.*=//' -e 's|\\\\|/|g' -e 's|-I\\("*\\)\\.\\./\\.\\.|-I\\1..|g'`
         if test -d a.xcodeproj -o -d a.pbproj; then
-          ac_gecode_qt_libs="-framework QtGui -framework QtCore"
+          ac_gecode_qt_libs="-framework QtWidgets -framework QtPrintSupport -framework QtGui -framework QtCore"
         fi
         cd ..
         rm -r ${ac_gecode_qt_tmpdir}
@@ -13817,14 +13817,12 @@ printf "%s\n" "#define GECODE_HAS_QT /**/" >>confdefs.h
         QTLIBS=${ac_gecode_qt_libs}
 
         enable_qt=yes
-
-        enable_qt=yes;
       fi
     fi
   else
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
-    enable_qt=no;
+    enable_qt=no
   fi
   enable_qt=${enable_qt}
 

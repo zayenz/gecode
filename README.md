@@ -28,6 +28,9 @@ Gecode comes with
 CMake now exposes options aligned with the Autoconf build switches.
 The minimum required CMake version is 3.21.
 Qt discovery uses CMake packages (Qt6 or Qt5).
+For Autoconf, `--enable-qt` now targets Qt 5/Qt 6 via `qmake`/`moc`
+discovery; if suitable Qt tools are unavailable, Qt (and therefore Gist)
+is disabled automatically.
 
 | Configure switch | CMake option | Default |
 |---|---|---|

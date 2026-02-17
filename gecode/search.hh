@@ -920,8 +920,19 @@ namespace Gecode { namespace Search {
    */
   class GECODE_SEARCH_EXPORT Engine : public HeapAllocated {
   public:
+    /// Classification of a \a next call
+    enum NextResult {
+      /// A solution has been found
+      NEXT_SOL,
+      /// Search space has been exhausted
+      NEXT_EXH,
+      /// Search has been stopped
+      NEXT_STOP
+    };
     /// Return next solution (nullptr, if none exists or search has been stopped)
     virtual Space* next(void) = 0;
+    /// Return next classification and store returned solution in \a s
+    NextResult next(Space*& s);
     /// Return statistics
     virtual Statistics statistics(void) const = 0;
     /// Check whether engine has been stopped
@@ -957,6 +968,8 @@ namespace Gecode { namespace Search {
   public:
     /// Return next solution (nullptr, if none exists or search has been stopped)
     virtual T* next(void);
+    /// Return next classification and store returned solution in \a s
+    virtual Engine::NextResult next(T*& s);
     /// Return statistics
     virtual Statistics statistics(void) const;
     /// Check whether engine has been stopped

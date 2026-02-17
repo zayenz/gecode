@@ -35,6 +35,14 @@
 
 namespace Gecode { namespace Search {
 
+  Engine::NextResult
+  Engine::next(Space*& s) {
+    s = next();
+    if (s != nullptr)
+      return NEXT_SOL;
+    return stopped() ? NEXT_STOP : NEXT_EXH;
+  }
+
   void
   Engine::constrain(const Space& b) {
     (void) b;

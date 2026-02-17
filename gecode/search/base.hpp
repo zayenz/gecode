@@ -47,6 +47,14 @@ namespace Gecode { namespace Search {
     return dynamic_cast<T*>(e->next());
   }
   template<class T>
+  forceinline Engine::NextResult
+  Base<T>::next(T*& s) {
+    Space* n;
+    Engine::NextResult r = e->next(n);
+    s = dynamic_cast<T*>(n);
+    return r;
+  }
+  template<class T>
   forceinline Statistics
   Base<T>::statistics(void) const {
     return e->statistics();

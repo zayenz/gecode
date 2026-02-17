@@ -308,6 +308,50 @@ namespace Test {
       }
     };
 
+    /// Space that always reports incomplete restart rounds, with call counters.
+    class IncompleteRestart : public HasSolutions {
+    public:
+      static unsigned int init_calls;
+      static unsigned int restart_calls;
+      static void reset_calls(void) {
+        init_calls = 0;
+        restart_calls = 0;
+      }
+      IncompleteRestart(HowToBranch h1, HowToBranch h2, HowToBranch h3,
+                        HowToConstrain h=HTC_NONE)
+        : HasSolutions(h1,h2,h3,h) {}
+      IncompleteRestart(IncompleteRestart& s)
+        : HasSolutions(s) {}
+      virtual Space* copy(void) {
+        return new IncompleteRestart(*this);
+      }
+      virtual bool slave(const MetaInfo& mi) {
+        if (mi.type() != MetaInfo::RESTART)
+          return true;
+        if (mi.reason() == MetaInfo::RR_INIT)
+          init_calls++;
+        else
+          restart_calls++;
+        // Always request incomplete restart behavior.
+        return false;
+      }
+      static std::string name(void) {
+        return "IncompleteRestart";
+      }
+    };
+
+    unsigned int IncompleteRestart::init_calls = 0;
+    unsigned int IncompleteRestart::restart_calls = 0;
+
+    /// Stop object that always stops (models expired hard limits such as timeout).
+    class AlwaysStop : public Gecode::Search::Stop {
+    public:
+      virtual bool stop(const Gecode::Search::Statistics&,
+                        const Gecode::Search::Options&) {
+        return true;
+      }
+    };
+
     /// %Base class for search tests
     class Test : public Base {
     public:
@@ -647,6 +691,137 @@ namespace Test {
       }
     };
 
+    /// Regression: meta-stop alone must not trigger restart callbacks in RBS.
+    class RBSMetaStopNoRestart : public Test {
+    public:
+      RBSMetaStopNoRestart(void)
+        : Test("RBS::MetaStopNoRestart",
+               HTB_BINARY,HTB_BINARY,HTB_BINARY) {}
+      virtual bool run(void) {
+        IncompleteRestart::reset_calls();
+        IncompleteRestart* m =
+          new IncompleteRestart(htb1,htb2,htb3);
+        AlwaysStop as;
+        Gecode::Search::Options o;
+        o.stop = &as;
+        o.cutoff = Gecode::Search::Cutoff::constant(1);
+        Gecode::RBS<IncompleteRestart,Gecode::DFS> rbs(m,o);
+        delete m;
+
+        // RR_INIT is always expected once from RBS setup.
+        if (IncompleteRestart::init_calls == 0)
+          return false;
+        if (IncompleteRestart::restart_calls != 0)
+          return false;
+
+        for (unsigned int i=0; i<3; i++) {
+          IncompleteRestart* s = nullptr;
+          Gecode::Search::Engine::NextResult r = rbs.next(s);
+          if (s != nullptr) {
+            delete s;
+            return false;
+          }
+          if (r != Gecode::Search::Engine::NEXT_STOP)
+            return false;
+          // nullptr + stopped means interrupted search, not exhaustion.
+          if (!rbs.stopped())
+            return false;
+          // Meta-stop must not be misinterpreted as a true restart trigger.
+          if (IncompleteRestart::restart_calls != 0)
+            return false;
+        }
+        return true;
+      }
+    };
+
+    /// Regression: PBS containing an RBS asset must not induce restarts on meta-stop.
+    class PBSRBSMetaStopNoRestart : public Test {
+    public:
+      PBSRBSMetaStopNoRestart(void)
+        : Test("PBS::RBS::MetaStopNoRestart",
+               HTB_BINARY,HTB_BINARY,HTB_BINARY) {}
+      virtual bool run(void) {
+        using namespace Gecode;
+
+        IncompleteRestart::reset_calls();
+        IncompleteRestart* m =
+          new IncompleteRestart(htb1,htb2,htb3);
+
+        AlwaysStop as;
+        Gecode::Search::Options ro;
+        ro.stop = &as;
+        ro.cutoff = Gecode::Search::Cutoff::constant(1);
+        ro.threads = 1;
+
+        Gecode::Search::Options po;
+        po.threads = 1;
+
+        SEBs sebs(1);
+        sebs[0] = rbs<IncompleteRestart,Gecode::DFS>(ro);
+        Gecode::PBS<IncompleteRestart,Gecode::DFS> pbs(m, sebs, po);
+        delete m;
+
+        if (IncompleteRestart::restart_calls != 0)
+          return false;
+
+        for (unsigned int i=0; i<3; i++) {
+          IncompleteRestart* s = nullptr;
+          Gecode::Search::Engine::NextResult r = pbs.next(s);
+          if (s != nullptr) {
+            delete s;
+            return false;
+          }
+          if (r != Gecode::Search::Engine::NEXT_STOP)
+            return false;
+          // Portfolio propagates the stop as stop, not as exhaustion.
+          if (!pbs.stopped())
+            return false;
+          if (IncompleteRestart::restart_calls != 0)
+            return false;
+        }
+        return true;
+      }
+    };
+
+    /// Regression: next-result classification must distinguish stop from exhaustion.
+    class NextResultClassification : public Test {
+    public:
+      NextResultClassification(void)
+        : Test("NextResultClassification",
+               HTB_NONE,HTB_NONE,HTB_NONE) {}
+      virtual bool run(void) {
+        {
+          // Immediate failure without stop object is exhaustion.
+          FailImmediate* m = new FailImmediate(htb1,htb2,htb3);
+          Gecode::Search::Options o;
+          Gecode::DFS<FailImmediate> dfs(m,o);
+          delete m;
+          FailImmediate* s = nullptr;
+          Gecode::Search::Engine::NextResult r = dfs.next(s);
+          if ((s != nullptr) || (r != Gecode::Search::Engine::NEXT_EXH))
+            return false;
+          if (dfs.stopped())
+            return false;
+        }
+        {
+          // Immediate stop object hit is stop.
+          FailImmediate* m = new FailImmediate(htb1,htb2,htb3);
+          AlwaysStop as;
+          Gecode::Search::Options o;
+          o.stop = &as;
+          Gecode::DFS<FailImmediate> dfs(m,o);
+          delete m;
+          FailImmediate* s = nullptr;
+          Gecode::Search::Engine::NextResult r = dfs.next(s);
+          if ((s != nullptr) || (r != Gecode::Search::Engine::NEXT_STOP))
+            return false;
+          if (!dfs.stopped())
+            return false;
+        }
+        return true;
+      }
+    };
+
     /// Iterator for branching types
     class BranchTypes {
     private:
@@ -765,6 +940,8 @@ namespace Test {
           (void) new RBS<SolveImmediate,Gecode::LDS>("LDS",t);
           (void) new RBS<SolveImmediate,Gecode::BAB>("BAB",t);
         }
+        (void) new RBSMetaStopNoRestart();
+        (void) new NextResultClassification();
         // Portfolio-based search
         for (unsigned int a=1; a<=4; a++)
           for (unsigned int t=1; t<=2*a; t++) {
@@ -778,6 +955,7 @@ namespace Test {
             (void) new PBS<SolveImmediate,Gecode::LDS>("LDS",false,a,t);
             (void) new PBS<SolveImmediate,Gecode::BAB>("BAB",true,a,t);
           }
+        (void) new PBSRBSMetaStopNoRestart();
         // Portfolio-based search using SEBs
         for (unsigned int mt=1; mt<=3; mt += 2)
           for (unsigned int st=1; st<=8; st++) {

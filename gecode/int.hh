@@ -2315,6 +2315,17 @@ namespace Gecode {
 
 namespace Gecode {
 
+  /**
+   * \brief Representation and posting preference for extensional tuple sets
+   *
+   * \ingroup TaskModelIntExt
+   */
+  enum ExtensionalPropKind {
+    EPK_AUTO,   ///< Select representation/posting automatically
+    EPK_DENSE,  ///< Prefer dense tuple-set posting
+    EPK_SPARSE  ///< Prefer sparse tuple-set posting
+  };
+
   /** \brief Class representing a set of tuples.
    *
    * A TupleSet is used for storing an extensional representation of a
@@ -2341,6 +2352,8 @@ namespace Gecode {
       int max;
       /// Begin of supports
       BitSetData* s;
+      /// Base index for sparse support values
+      unsigned int sparse_base;
       /// Return the width
       unsigned int width(void) const;
       /// Return the supports for value \a n
@@ -2388,6 +2401,16 @@ namespace Gecode {
       Range* range;
       /// Pointer to all support data
       BitSetData* support;
+      /// Whether tuple set uses sparse (non-bitset) support representation
+      bool sparse;
+      /// Number of sparse support values
+      unsigned int sparse_n_vals;
+      /// Sparse support offsets (size sparse_n_vals+1)
+      unsigned int* sparse_offsets;
+      /// Sparse support tuple ids (size arity*n_tuples)
+      unsigned int* sparse_tuples;
+      /// Tuple cell to sparse support id map (size arity*n_tuples)
+      unsigned int* sparse_tv;
 
       /// Return newly added tuple
       Tuple add(void);
@@ -2405,7 +2428,7 @@ namespace Gecode {
       const Range* lst(int i) const;
       /// Finalize datastructure (disallows additions of more Tuples)
       GECODE_INT_EXPORT
-      void finalize(void);
+      void finalize(ExtensionalPropKind epk);
       /// Resize tuple data
       GECODE_INT_EXPORT
       void resize(void);
@@ -2464,7 +2487,7 @@ namespace Gecode {
     /// Is tuple set finalized
     bool finalized(void) const;
     /// Finalize tuple set
-    void finalize(void);
+    void finalize(ExtensionalPropKind epk=EPK_AUTO);
     //@}
 
     /// \name Tuple access
@@ -2483,6 +2506,22 @@ namespace Gecode {
     int max(void) const;
     /// Return hash key
     std::size_t hash(void) const;
+    /// Whether dense support representation is available
+    bool dense_support(void) const;
+    /// Whether tuple set uses sparse support representation
+    bool sparse_support(void) const;
+    /// Convert tuple set to DFA accepting exactly the tuples
+    GECODE_INT_EXPORT
+    DFA dfa(void) const;
+    /// Return number of sparse support values
+    unsigned int sparse_values(void) const;
+    /// Return tuple-value sparse ids (size tuples()*arity())
+    const unsigned int* sparse_tuple_value_ids(void) const;
+    /// Return sparse support tuple id range for position/value, false if absent
+    bool sparse_support(int p, int n,
+                        const unsigned int*& b,
+                        const unsigned int*& e,
+                        unsigned int& gid) const;
     //@}
 
     /// \name Range access and iteration
@@ -2592,7 +2631,8 @@ namespace Gecode {
    */
   GECODE_INT_EXPORT void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
-              IntPropLevel ipl=IPL_DEF);
+              IntPropLevel ipl=IPL_DEF,
+              ExtensionalPropKind epk=EPK_AUTO);
 
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$.
    *
@@ -2623,7 +2663,8 @@ namespace Gecode {
   GECODE_INT_EXPORT void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
               Reify r,
-              IntPropLevel ipl=IPL_DEF);
+              IntPropLevel ipl=IPL_DEF,
+              ExtensionalPropKind epk=EPK_AUTO);
 
   /** \brief Post propagator for \f$x\in t\f$.
    *
@@ -2653,7 +2694,8 @@ namespace Gecode {
    */
   GECODE_INT_EXPORT void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
-              IntPropLevel ipl=IPL_DEF);
+              IntPropLevel ipl=IPL_DEF,
+              ExtensionalPropKind epk=EPK_AUTO);
 
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$.
    *
@@ -2684,7 +2726,8 @@ namespace Gecode {
   GECODE_INT_EXPORT void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               Reify r,
-              IntPropLevel ipl=IPL_DEF);
+              IntPropLevel ipl=IPL_DEF,
+              ExtensionalPropKind epk=EPK_AUTO);
 
 }
 
@@ -5850,4 +5893,3 @@ namespace Gecode {
 
 // IFDEF: GECODE_HAS_INT_VARS
 // STATISTICS: int-post
-

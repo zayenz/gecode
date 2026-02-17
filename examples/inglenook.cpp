@@ -37,6 +37,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 
 using namespace Gecode;
 
@@ -56,7 +57,7 @@ public:
       _target("target","target state",10),
       _size("size","number of moves",100),
       _numStates("states","number of states",50),
-      _csvFile("csv","CSV file path","/Users/zayenz/gecode/gecode/data8.csv") {
+      _csvFile("csv","CSV file path","data8.csv") {
     add(_start);
     add(_target);
     add(_size);
@@ -107,52 +108,53 @@ public:
 
     // Create a tuple set for valid transitions from the CSV file
     TupleSet ts(2);
-    bool read_from_file = true;
-    int line_count = 0;
-    if (read_from_file) {
-        std::ifstream file(opt.csvFile());
-        if (!file.good()) {
-            std::cerr << "Error: Could not open " << opt.csvFile() << std::endl;
-            return;
-        }
-
-        std::cerr << "DEBUG: Opened CSV file: " << opt.csvFile() << std::endl;
-
-        std::string line;
-        // Skip the first line (column titles)
-        if (std::getline(file, line)) {
-            // First line is read but ignored
-            //std::cerr << "DEBUG: Skipped header line: " << line << std::endl;
-        }
-
-        // Read the rest of the lines and populate the tuple set
-        while (std::getline(file, line)) {
-            line_count++;
-            //std::cerr << "DEBUG: Processing line " << line_count << ": " << line << std::endl;
-
-            std::istringstream stream(line);
-            int first, second;
-            char comma;
-
-            // Parse "first,second" format
-            stream >> first >> comma >> second;
-
-            //std::cerr << "DEBUG: Parsed values: first=" << first << ", second=" << second << std::endl;
-
-            ts.add(IntArgs({first, second}));
-            //std::cerr << "DEBUG: Added tuple to TupleSet" << std::endl;
-        }
-    } else {
-        int a = 0;
-        int b = 0;
-        for (int i = 0; i < 2284811; ++i) {
-            line_count++;
-            ts.add(IntArgs({a, b}));
-            a = (a + 12) % 356161;
-            b = (b + 35) % 356161;
-        }
+    std::ifstream file(opt.csvFile());
+    if (!file.good()) {
+      std::ostringstream os;
+      os << "Could not open CSV file: " << opt.csvFile();
+      throw std::runtime_error(os.str());
     }
-    std::cerr << "DEBUG: About to call ts.finalize() with " << line_count << " tuples" << std::endl;
+
+    std::cerr << "DEBUG: Opened CSV file: " << opt.csvFile() << std::endl;
+
+    const int min_state = 0;
+    const int max_state = opt.numStates() - 1;
+    int raw_count = 0;
+    int kept_count = 0;
+    int skipped_out_of_domain = 0;
+    int skipped_malformed = 0;
+    std::string line;
+
+    // Skip header line.
+    (void) std::getline(file, line);
+
+    while (std::getline(file, line)) {
+      raw_count++;
+      std::istringstream stream(line);
+      int from, to;
+      char comma;
+
+      if (!(stream >> from >> comma >> to) || (comma != ',')) {
+        skipped_malformed++;
+        continue;
+      }
+
+      if ((from < min_state) || (from > max_state) ||
+          (to < min_state) || (to > max_state)) {
+        skipped_out_of_domain++;
+        continue;
+      }
+
+      ts.add(IntArgs({from, to}));
+      kept_count++;
+    }
+
+    std::cerr << "DEBUG: Filtered transitions: kept=" << kept_count
+              << ", skipped_out_of_domain=" << skipped_out_of_domain
+              << ", skipped_malformed=" << skipped_malformed
+              << ", raw_rows=" << raw_count << std::endl;
+    std::cerr << "DEBUG: About to call ts.finalize() with " << kept_count
+              << " tuples" << std::endl;
     ts.finalize();  // Finalize the tuple set after adding all tuples
     std::cerr << "DEBUG: ts.finalize() completed successfully" << std::endl;
 

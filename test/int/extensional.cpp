@@ -55,6 +55,21 @@ namespace Test { namespace Int {
       * \ingroup TaskTestInt
       */
      //@{
+     std::string
+     extensional_kind_name(Gecode::ExtensionalPropKind epk) {
+       switch (epk) {
+       case Gecode::EPK_DENSE:
+         return "Dense";
+       case Gecode::EPK_SPARSE:
+         return "Sparse";
+       case Gecode::EPK_AUTO:
+         return "Auto";
+       default:
+         GECODE_NEVER;
+         return "Unknown";
+       }
+     }
+
      /// %Test with simple regular expression
      class RegSimpleA : public Test {
      public:
@@ -379,17 +394,7 @@ namespace Test { namespace Int {
 
      ///% Transform a TupleSet into a DFA
      Gecode::DFA tupleset2dfa(Gecode::TupleSet ts) {
-       using namespace Gecode;
-       REG expression;
-       for (int i = 0; i<ts.tuples(); i++) {
-         REG r;
-         for (int j = 0; j<ts.arity(); j++) {
-           r += REG(ts[i][j]);
-         }
-         expression |= r;
-       }
-       DFA dfa(expression);
-       return dfa;
+       return ts.dfa();
      }
 
      /// %Test with tuple set
@@ -399,11 +404,15 @@ namespace Test { namespace Int {
        Gecode::TupleSet t;
        /// Whether the table is positive or negative
        bool pos;
+       /// Dense/sparse posting mode
+       Gecode::ExtensionalPropKind epk;
      public:
        /// Create and register test
-       TupleSetBase(bool p)
-         : Test("Extensional::TupleSet::" + str(p) + "::Base",
-                4,1,5,true,Gecode::IPL_DOM), t(4), pos(p) {
+       TupleSetBase(bool p, Gecode::ExtensionalPropKind epk0)
+         : Test("Extensional::TupleSet::" + extensional_kind_name(epk0) +
+                "::" + str(p) + "::Base",
+                4,1,5,true,Gecode::IPL_DOM),
+           t(4), pos(p), epk(epk0) {
          using namespace Gecode;
          IntArgs t1({2, 1, 2, 4});
          IntArgs t2({2, 2, 1, 4});
@@ -418,7 +427,7 @@ namespace Test { namespace Int {
           .add(t3).add(t3).add(t4).add(t4)
           .add(t5).add(t5).add(t5).add(t5)
           .add(t5).add(t5).add(t5).add(t5)
-          .finalize();
+          .finalize(epk);
        }
        /// %Test whether \a x is solution
        virtual bool solution(const Assignment& x) const {
@@ -433,12 +442,12 @@ namespace Test { namespace Int {
          using namespace Gecode;
          TupleSet ts = TupleSet(t.arity(),tupleset2dfa(t));
          assert(t == ts);
-         extensional(home, x, t, pos, ipl);
+         extensional(home, x, t, pos, ipl, epk);
        }
        /// Post reified constraint on \a x for \a r
        virtual void post(Gecode::Space& home, Gecode::IntVarArray& x,
                          Gecode::Reify r) {
-         extensional(home, x, t, pos, r, ipl);
+         extensional(home, x, t, pos, r, ipl, epk);
        }
      };
 
@@ -447,6 +456,8 @@ namespace Test { namespace Int {
      protected:
        /// Whether the table is positive or negative
        bool pos;
+       /// Dense/sparse posting mode
+       Gecode::ExtensionalPropKind epk;
        /// The tuple set to use
        Gecode::TupleSet ts;
        /// Whether to validate dfa2tupleset
@@ -454,10 +465,12 @@ namespace Test { namespace Int {
      public:
        /// Create and register test
        TupleSetTest(const std::string& s, bool p,
-                    Gecode::IntSet d0, Gecode::TupleSet ts0, bool td)
-         : Test("Extensional::TupleSet::" + str(p) + "::" + s,
+                    Gecode::IntSet d0, Gecode::TupleSet ts0, bool td,
+                    Gecode::ExtensionalPropKind epk0)
+         : Test("Extensional::TupleSet::" + extensional_kind_name(epk0) +
+                "::" + str(p) + "::" + s,
                 ts0.arity(),d0,true,Gecode::IPL_DOM),
-           pos(p), ts(ts0), toDFA(td) {
+           pos(p), epk(epk0), ts(ts0), toDFA(td) {
        }
        /// %Test whether \a x is solution
        virtual bool solution(const Assignment& x) const {
@@ -480,13 +493,13 @@ namespace Test { namespace Int {
            TupleSet t = TupleSet(ts.arity(),tupleset2dfa(ts));
            assert(ts == t);
          }
-         extensional(home, x, ts, pos, ipl);
+         extensional(home, x, ts, pos, ipl, epk);
        }
        /// Post reified constraint on \a x for \a r
        virtual void post(Gecode::Space& home, Gecode::IntVarArray& x,
                          Gecode::Reify r) {
          using namespace Gecode;
-         extensional(home, x, ts, pos, r, ipl);
+         extensional(home, x, ts, pos, r, ipl, epk);
        }
      };
 
@@ -494,8 +507,9 @@ namespace Test { namespace Int {
      public:
        /// Create and register test
        RandomTupleSetTest(const std::string& s, bool p,
-                          Gecode::IntSet d0, Gecode::TupleSet ts0)
-         : TupleSetTest(s,p,d0,ts0,false) {
+                          Gecode::IntSet d0, Gecode::TupleSet ts0,
+                          Gecode::ExtensionalPropKind epk0)
+         : TupleSetTest(s,p,d0,ts0,false,epk0) {
          testsearch = false;
        }
        /// Create and register initial assignment
@@ -514,11 +528,9 @@ namespace Test { namespace Int {
        virtual bool run(void) {
          using namespace Gecode;
 
-         const char* default_csv =
-           "/Users/zayenz/.codex/worktrees/4e83/gecode/data8.csv";
          const char* csv = std::getenv("GECODE_INGLENOOK_CSV");
-         if (csv == nullptr || csv[0] == '\0')
-           csv = default_csv;
+         if ((csv == nullptr) || (csv[0] == '\0'))
+           return true;
 
          std::ifstream file(csv);
          if (!file.good()) {
@@ -566,18 +578,410 @@ namespace Test { namespace Int {
        }
      };
 
+     /// Sparse fallback smoke test for very low-density unary tuplesets
+     class SparseTupleSetFallback : public ::Test::Base {
+     public:
+       SparseTupleSetFallback(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::UnaryFallback") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         const int n = 50000;
+         TupleSet ts(1);
+         for (int i=0; i<n; i++)
+           ts.add(IntArgs({i}));
+         ts.finalize(EPK_SPARSE);
+
+         if (!ts.sparse_support()) {
+           std::cerr << "ERROR: TupleSet did not select sparse support"
+                     << std::endl;
+           return false;
+         }
+
+         TupleSet rt(1, ts.dfa());
+         if (!(ts == rt)) {
+           std::cerr << "ERROR: TupleSet::dfa() round-trip failed"
+                     << std::endl;
+           return false;
+         }
+
+         class SparseUnarySpace : public Space {
+         public:
+           IntVarArray x;
+           SparseUnarySpace(const TupleSet& t, int n0)
+             : x(*this,1,0,n0-1) {
+             extensional(*this, x, t, true, IPL_DOM, EPK_SPARSE);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           SparseUnarySpace(SparseUnarySpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space*
+           copy(void) {
+             return new SparseUnarySpace(*this);
+           }
+         };
+
+         SparseUnarySpace* root = new SparseUnarySpace(ts,n);
+         DFS<SparseUnarySpace> e(root);
+         delete root;
+
+         SparseUnarySpace* sol = e.next();
+         if (sol == nullptr)
+           return false;
+         const bool ok = sol->x[0].assigned() && (sol->x[0].val() == 0);
+         delete sol;
+         return ok;
+       }
+     };
+
+     /// Sparse fallback smoke test for low-density ternary tuplesets
+     class SparseTupleSetFallbackTernary : public ::Test::Base {
+     public:
+       SparseTupleSetFallbackTernary(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::TernaryFallback") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         const int n = 30000;
+         TupleSet ts(3);
+         for (int i=0; i<n; i++)
+           ts.add(IntArgs({i, (i*7) % n, (i*11) % n}));
+         ts.finalize(EPK_SPARSE);
+
+         if (!ts.sparse_support()) {
+           std::cerr << "ERROR: Ternary TupleSet did not select sparse support"
+                     << std::endl;
+           return false;
+         }
+
+         class SparseTernarySpace : public Space {
+         public:
+           IntVarArray x;
+           SparseTernarySpace(const TupleSet& t, int n0)
+             : x(*this,3,0,n0-1) {
+             extensional(*this, x, t, true, IPL_DOM, EPK_SPARSE);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           SparseTernarySpace(SparseTernarySpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space*
+           copy(void) {
+             return new SparseTernarySpace(*this);
+           }
+         };
+
+         SparseTernarySpace* root = new SparseTernarySpace(ts,n);
+         DFS<SparseTernarySpace> e(root);
+         delete root;
+
+         SparseTernarySpace* sol = e.next();
+         if (sol == nullptr)
+           return false;
+         const int a = sol->x[0].val();
+         const int b = sol->x[1].val();
+         const int c = sol->x[2].val();
+         delete sol;
+         return (b == ((a*7) % n)) && (c == ((a*11) % n));
+       }
+     };
+
+     /// Sparse fallback smoke test for low-density higher-arity tuplesets
+     class SparseTupleSetFallbackHighArity : public ::Test::Base {
+     public:
+       SparseTupleSetFallbackHighArity(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::HighArityFallback") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         const int n = 20000;
+         TupleSet ts(6);
+         for (int i=0; i<n; i++)
+           ts.add(IntArgs({i, (i*3) % n, (i*5) % n,
+                           (i*7) % n, (i*11) % n, (i*13) % n}));
+         ts.finalize(EPK_SPARSE);
+
+         if (!ts.sparse_support()) {
+           std::cerr << "ERROR: High-arity TupleSet did not select sparse support"
+                     << std::endl;
+           return false;
+         }
+
+         class SparseHighAritySpace : public Space {
+         public:
+           IntVarArray x;
+           SparseHighAritySpace(const TupleSet& t, int n0)
+             : x(*this,6,0,n0-1) {
+             extensional(*this, x, t, true, IPL_DOM, EPK_SPARSE);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           SparseHighAritySpace(SparseHighAritySpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space*
+           copy(void) {
+             return new SparseHighAritySpace(*this);
+           }
+         };
+
+         SparseHighAritySpace* root = new SparseHighAritySpace(ts,n);
+         DFS<SparseHighAritySpace> e(root);
+         delete root;
+
+         SparseHighAritySpace* sol = e.next();
+         if (sol == nullptr)
+           return false;
+         const int a = sol->x[0].val();
+         const int b = sol->x[1].val();
+         const int c = sol->x[2].val();
+         const int d = sol->x[3].val();
+         const int e0 = sol->x[4].val();
+         const int f = sol->x[5].val();
+         delete sol;
+         return (b == ((a*3) % n)) &&
+                (c == ((a*5) % n)) &&
+                (d == ((a*7) % n)) &&
+                (e0 == ((a*11) % n)) &&
+                (f == ((a*13) % n));
+       }
+     };
+
+     /// Sparse fallback smoke test for nullary tuplesets
+     class SparseTupleSetFallbackNullary : public ::Test::Base {
+     public:
+       SparseTupleSetFallbackNullary(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::NullaryFallback") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         class SparseNullarySpace : public Space {
+         public:
+           IntVarArray x;
+           SparseNullarySpace(const TupleSet& t)
+             : x(*this,0,0,0) {
+             extensional(*this, x, t, true, IPL_DOM, EPK_SPARSE);
+           }
+           SparseNullarySpace(SparseNullarySpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space*
+           copy(void) {
+             return new SparseNullarySpace(*this);
+           }
+         };
+
+         TupleSet sat(0);
+         sat.add(IntArgs(0));
+         sat.finalize(EPK_SPARSE);
+         if (!sat.sparse_support()) {
+           std::cerr << "ERROR: Nullary sat table not sparse" << std::endl;
+           return false;
+         }
+         SparseNullarySpace* sat_root = new SparseNullarySpace(sat);
+         DFS<SparseNullarySpace> sat_engine(sat_root);
+         delete sat_root;
+         SparseNullarySpace* sat_sol = sat_engine.next();
+         if (sat_sol == nullptr) {
+           std::cerr << "ERROR: Nullary sat table produced no solution"
+                     << std::endl;
+           return false;
+         }
+         delete sat_sol;
+
+         TupleSet unsat(0);
+         unsat.finalize(EPK_SPARSE);
+         SparseNullarySpace* unsat_root = new SparseNullarySpace(unsat);
+         DFS<SparseNullarySpace> unsat_engine(unsat_root);
+         delete unsat_root;
+         SparseNullarySpace* unsat_sol = unsat_engine.next();
+         const bool ok = (unsat_sol == nullptr);
+         if (!ok)
+           std::cerr << "ERROR: Nullary empty table unexpectedly satisfiable"
+                     << std::endl;
+         delete unsat_sol;
+         return ok;
+       }
+     };
+
+     /// Sparse incremental smoke test for repeated and mixed delta updates
+     class SparseTupleSetIncrementalDelta : public ::Test::Base {
+     public:
+       SparseTupleSetIncrementalDelta(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::IncrementalDelta") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         class SparseDeltaSpace : public Space {
+         public:
+           IntVarArray x;
+           SparseDeltaSpace(const TupleSet& t)
+             : x(*this,2,0,3) {
+             extensional(*this, x, t, true, IPL_DOM, EPK_SPARSE);
+             rel(*this, x[0], IRT_NQ, 0);
+             rel(*this, x[0], IRT_NQ, 1);
+             rel(*this, x[1], IRT_NQ, 3);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           SparseDeltaSpace(SparseDeltaSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space*
+           copy(void) {
+             return new SparseDeltaSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add(IntArgs({0,0})).add(IntArgs({1,1}))
+           .add(IntArgs({2,2})).add(IntArgs({3,3}));
+         ts.finalize(EPK_SPARSE);
+         if (!ts.sparse_support())
+           return false;
+
+         SparseDeltaSpace* root = new SparseDeltaSpace(ts);
+         DFS<SparseDeltaSpace> e(root);
+         delete root;
+
+         SparseDeltaSpace* sol = e.next();
+         if (sol == nullptr)
+           return false;
+         SparseDeltaSpace* extra = e.next();
+         const bool ok = sol->x[0].assigned() && sol->x[1].assigned() &&
+                         (sol->x[0].val() == 2) && (sol->x[1].val() == 2) &&
+                         (extra == nullptr);
+         delete sol;
+         delete extra;
+         return ok;
+       }
+     };
+
+     /// Sparse posting fallback smoke test for negative tuple-set posting
+     class SparseTupleSetNegativeFallback : public ::Test::Base {
+     public:
+       SparseTupleSetNegativeFallback(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::NegativeFallback") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         class SparseNegativeSpace : public Space {
+         public:
+           IntVarArray x;
+           SparseNegativeSpace(const TupleSet& t)
+             : x(*this,2,0,1) {
+             extensional(*this, x, t, false, IPL_DOM, EPK_SPARSE);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           SparseNegativeSpace(SparseNegativeSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space*
+           copy(void) {
+             return new SparseNegativeSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add(IntArgs({0,0})).add(IntArgs({1,1}));
+         ts.finalize(EPK_SPARSE);
+
+         SparseNegativeSpace* root = new SparseNegativeSpace(ts);
+         DFS<SparseNegativeSpace> e(root);
+         delete root;
+
+         int n = 0;
+         while (SparseNegativeSpace* sol = e.next()) {
+           if (sol->x[0].val() == sol->x[1].val()) {
+             delete sol;
+             return false;
+           }
+           n++;
+           delete sol;
+         }
+         return n == 2;
+       }
+     };
+
+     /// Sparse posting fallback smoke test for reified tuple-set posting
+     class SparseTupleSetReifiedFallback : public ::Test::Base {
+     public:
+       SparseTupleSetReifiedFallback(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::ReifiedFallback") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         class SparseReifiedSpace : public Space {
+         public:
+           IntVarArray x;
+           BoolVar b;
+           SparseReifiedSpace(const TupleSet& t)
+             : x(*this,2,0,1), b(*this,0,1) {
+             extensional(*this, x, t, true, Reify(b,RM_EQV), IPL_DOM,
+                         EPK_SPARSE);
+             rel(*this, b, IRT_EQ, 1);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           SparseReifiedSpace(SparseReifiedSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+             b.update(*this,s.b);
+           }
+           virtual Space*
+           copy(void) {
+             return new SparseReifiedSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add(IntArgs({0,0})).add(IntArgs({1,1}));
+         ts.finalize(EPK_SPARSE);
+
+         SparseReifiedSpace* root = new SparseReifiedSpace(ts);
+         DFS<SparseReifiedSpace> e(root);
+         delete root;
+
+         int n = 0;
+         while (SparseReifiedSpace* sol = e.next()) {
+           if (sol->x[0].val() != sol->x[1].val()) {
+             delete sol;
+             return false;
+           }
+           n++;
+           delete sol;
+         }
+         return n == 2;
+       }
+     };
+
      /// %Test with large tuple set
      class TupleSetLarge : public Test {
      protected:
        /// Whether the table is positive or negative
        bool pos;
+       /// Dense/sparse posting mode
+       Gecode::ExtensionalPropKind epk;
        /// Tupleset used for testing
        mutable Gecode::TupleSet t;
      public:
        /// Create and register test
-       TupleSetLarge(double prob, bool p)
-         : Test("Extensional::TupleSet::" + str(p) + "::Large",
-                5,1,5,true,Gecode::IPL_DOM), pos(p), t(5) {
+       TupleSetLarge(double prob, bool p, Gecode::ExtensionalPropKind epk0)
+         : Test("Extensional::TupleSet::" + extensional_kind_name(epk0) +
+                "::" + str(p) + "::Large",
+                5,1,5,true,Gecode::IPL_DOM),
+           pos(p), epk(epk0), t(5) {
          using namespace Gecode;
 
          CpltAssignment ass(5, IntSet(1, 5));
@@ -589,7 +993,7 @@ namespace Test { namespace Int {
            }
            ass.next(_rand);
          }
-         t.finalize();
+         t.finalize(epk);
        }
        /// %Test whether \a x is solution
        virtual bool solution(const Assignment& x) const {
@@ -607,13 +1011,13 @@ namespace Test { namespace Int {
        /// Post constraint on \a x
        virtual void post(Gecode::Space& home, Gecode::IntVarArray& x) {
          using namespace Gecode;
-         extensional(home, x, t, pos, ipl);
+         extensional(home, x, t, pos, ipl, epk);
        }
        /// Post reified constraint on \a x for \a r
        virtual void post(Gecode::Space& home, Gecode::IntVarArray& x,
                          Gecode::Reify r) {
          using namespace Gecode;
-         extensional(home, x, t, pos, r, ipl);
+         extensional(home, x, t, pos, r, ipl, epk);
        }
      };
 
@@ -622,13 +1026,16 @@ namespace Test { namespace Int {
      protected:
        /// Whether the table is positive or negative
        bool pos;
+       /// Dense/sparse posting mode
+       Gecode::ExtensionalPropKind epk;
        /// Tupleset used for testing
        mutable Gecode::TupleSet t;
      public:
        /// Create and register test
-       TupleSetBool(double prob, bool p)
-         : Test("Extensional::TupleSet::" + str(p) + "::Bool",
-                5,0,1,true), pos(p), t(5) {
+       TupleSetBool(double prob, bool p, Gecode::ExtensionalPropKind epk0)
+         : Test("Extensional::TupleSet::" + extensional_kind_name(epk0) +
+                "::" + str(p) + "::Bool",
+                5,0,1,true), pos(p), epk(epk0), t(5) {
          using namespace Gecode;
 
          CpltAssignment ass(5, IntSet(0, 1));
@@ -640,7 +1047,7 @@ namespace Test { namespace Int {
            }
            ass.next(_rand);
          }
-         t.finalize();
+         t.finalize(epk);
        }
        /// %Test whether \a x is solution
        virtual bool solution(const Assignment& x) const {
@@ -662,7 +1069,7 @@ namespace Test { namespace Int {
          BoolVarArgs y(x.size());
          for (int i = x.size(); i--; )
            y[i] = channel(home, x[i]);
-         extensional(home, y, t, pos, ipl);
+         extensional(home, y, t, pos, ipl, epk);
        }
        /// Post reified constraint on \a x for \a r
        virtual void post(Gecode::Space& home, Gecode::IntVarArray& x,
@@ -671,7 +1078,7 @@ namespace Test { namespace Int {
          BoolVarArgs y(x.size());
          for (int i = x.size(); i--; )
            y[i] = channel(home, x[i]);
-         extensional(home, y, t, pos, r, ipl);
+         extensional(home, y, t, pos, r, ipl, epk);
        }
      };
 
@@ -679,7 +1086,8 @@ namespace Test { namespace Int {
      class TupleSetTestSize {
      public:
        /// Perform creation and registration
-       TupleSetTestSize(int size, bool pos, Gecode::Support::RandomGenerator& rand) {
+       TupleSetTestSize(int size, bool pos, Gecode::ExtensionalPropKind epk,
+                        Gecode::Support::RandomGenerator& rand) {
          using namespace Gecode;
          /// Find the arity needed for creating sufficient number of tuples
          int arity = 2;
@@ -698,15 +1106,17 @@ namespace Test { namespace Int {
            ts.add(tuple);
            ass.next(rand);
          }
-         ts.finalize();
+         ts.finalize(epk);
          assert(ts.tuples() == size);
          // Create and register test
          (void) new TupleSetTest(std::to_string(size),pos,IntSet(0,4),ts,
-                                 size <= 128);
+                                 size <= 128, epk);
        }
      };
 
-     Gecode::TupleSet randomTupleSet(int n, int min, int max, double prob, Gecode::Support::RandomGenerator& rand) {
+     Gecode::TupleSet randomTupleSet(int n, int min, int max, double prob,
+                                     Gecode::ExtensionalPropKind epk,
+                                     Gecode::Support::RandomGenerator& rand) {
        using namespace Gecode;
        TupleSet t(n);
        CpltAssignment ass(n, IntSet(min, max));
@@ -718,7 +1128,7 @@ namespace Test { namespace Int {
          }
          ass.next(rand);
        }
-       t.finalize();
+       t.finalize(epk);
        return t;
      }
 
@@ -735,7 +1145,8 @@ namespace Test { namespace Int {
          Gecode::Support::RandomGenerator rand(42);
 
          using namespace Gecode;
-         for (bool pos : { false, true }) {
+         for (ExtensionalPropKind epk : { EPK_DENSE, EPK_SPARSE }) {
+           for (bool pos : { false, true }) {
            {
              TupleSet ts(4);
              ts.add({2, 1, 2, 4}).add({2, 2, 1, 4})
@@ -743,25 +1154,25 @@ namespace Test { namespace Int {
                .add({3, 3, 3, 2}).add({5, 1, 4, 4})
                .add({2, 5, 1, 5}).add({4, 3, 5, 1})
                .add({1, 5, 2, 5}).add({5, 3, 3, 2})
-               .finalize();
-             (void) new TupleSetTest("A",pos,IntSet(0,6),ts,true);
+               .finalize(epk);
+             (void) new TupleSetTest("A",pos,IntSet(0,6),ts,true,epk);
            }
            {
              TupleSet ts(4);
-             ts.finalize();
-             (void) new TupleSetTest("Empty",pos,IntSet(1,2),ts,true);
+             ts.finalize(epk);
+             (void) new TupleSetTest("Empty",pos,IntSet(1,2),ts,true,epk);
            }
            {
              TupleSet ts(4);
              for (int n=1024*16; n--; )
                ts.add({1,2,3,4});
-             ts.finalize();
-             (void) new TupleSetTest("Assigned",pos,IntSet(1,4),ts,true);
+             ts.finalize(epk);
+             (void) new TupleSetTest("Assigned",pos,IntSet(1,4),ts,true,epk);
            }
            {
              TupleSet ts(1);
-             ts.add({1}).add({2}).add({3}).finalize();
-             (void) new TupleSetTest("Single",pos,IntSet(-4,4),ts,true);
+             ts.add({1}).add({2}).add({3}).finalize(epk);
+             (void) new TupleSetTest("Single",pos,IntSet(-4,4),ts,true,epk);
            }
            {
              int m = Gecode::Int::Limits::min;
@@ -769,8 +1180,8 @@ namespace Test { namespace Int {
              ts.add({m+0,m+1,m+2}).add({m+4,m+1,m+3})
                .add({m+2,m+3,m+0}).add({m+2,m+3,m+0})
                .add({m+1,m+2,m+5}).add({m+2,m+3,m+0})
-               .add({m+3,m+6,m+5}).finalize();
-             (void) new TupleSetTest("Min",pos,IntSet(m,m+7),ts,true);
+               .add({m+3,m+6,m+5}).finalize(epk);
+             (void) new TupleSetTest("Min",pos,IntSet(m,m+7),ts,true,epk);
            }
            {
              int M = Gecode::Int::Limits::max;
@@ -778,8 +1189,8 @@ namespace Test { namespace Int {
              ts.add({M-0,M-1,M-2}).add({M-4,M-1,M-3})
                .add({M-2,M-3,M-0}).add({M-2,M-3,M-0})
                .add({M-1,M-2,M-5}).add({M-2,M-3,M-0})
-               .add({M-3,M-6,M-5}).finalize();
-             (void) new TupleSetTest("Max",pos,IntSet(M-7,M),ts,true);
+               .add({M-3,M-6,M-5}).finalize(epk);
+             (void) new TupleSetTest("Max",pos,IntSet(M-7,M),ts,true,epk);
            }
            {
              int m = Gecode::Int::Limits::min;
@@ -787,34 +1198,41 @@ namespace Test { namespace Int {
              TupleSet ts(3);
              ts.add({M-0,m+1,M-2}).add({m+4,M-1,M-3})
                .add({m+2,M-3,m+0}).add({M-2,M-3,M-0})
-               .finalize();
+               .finalize(epk);
              (void) new TupleSetTest("MinMax",pos,
                                      IntSet(IntArgs({m,m+1,m+4,M-3,M-2,M})),
-                                     ts,true);
+                                     ts,true,epk);
            }
            {
              TupleSet ts(7);
-             for (int i = 0; i < 10000; i++) {
+             const int triangle_tuples = (epk == EPK_SPARSE) ? 2000 : 10000;
+             for (int i = 0; i < triangle_tuples; i++) {
                IntArgs tuple(7);
                for (int j = 0; j < 7; j++) {
                  tuple[j] = rand(j+1);
                }
                ts.add(tuple);
              }
-             ts.finalize();
-             (void) new RandomTupleSetTest("Triangle",pos,IntSet(0,6),ts);
+             ts.finalize(epk);
+             (void) new RandomTupleSetTest("Triangle",pos,IntSet(0,6),ts,epk);
            }
            {
              for (int i = 0; i <= 64*6; i+=32)
-               (void) new TupleSetTestSize(i, pos, rand);
+               (void) new TupleSetTestSize(i, pos, epk, rand);
            }
            {
+             const double prob_small = (epk == EPK_SPARSE) ? 0.01 : 0.05;
+             const double prob_large = (epk == EPK_SPARSE) ? 0.005 : 0.05;
              (void) new RandomTupleSetTest("Rand(10,-1,2)", pos,
                                            IntSet(-1,2),
-                                           randomTupleSet(10, -1, 2, 0.05, rand));
+                                           randomTupleSet(10, -1, 2, prob_small,
+                                                          epk, rand),
+                                           epk);
              (void) new RandomTupleSetTest("Rand(5,-10,10)", pos,
                                            IntSet(-10,10),
-                                           randomTupleSet(5, -10, 10, 0.05, rand));
+                                           randomTupleSet(5, -10, 10, prob_large,
+                                                          epk, rand),
+                                           epk);
            }
            {
              TupleSet t(5);
@@ -827,8 +1245,8 @@ namespace Test { namespace Int {
                ass.next(rand);
              }
              t.add({2,2,4,3,4});
-             t.finalize();
-             (void) new TupleSetTest("FewLast",pos,IntSet(1,4),t,false);
+             t.finalize(epk);
+             (void) new TupleSetTest("FewLast",pos,IntSet(1,4),t,false,epk);
            }
            {
              TupleSet t(4);
@@ -838,8 +1256,8 @@ namespace Test { namespace Int {
                ass.next(rand);
              }
              t.add({2,-1,3,4});
-             t.finalize();
-             (void) new TupleSetTest("FewMiddle",pos,IntSet(-1,6),t,false);
+             t.finalize(epk);
+             (void) new TupleSetTest("FewMiddle",pos,IntSet(-1,6),t,false,epk);
            }
            {
              TupleSet t(10);
@@ -855,12 +1273,13 @@ namespace Test { namespace Int {
              }
              t.add({1,1,1,1,1,1,1,1,1,1});
              t.add({1,2,3,4,4,2,1,2,3,3});
-             t.finalize();
-             (void) new RandomTupleSetTest("FewHuge",pos,IntSet(1,4),t);
+             t.finalize(epk);
+             (void) new RandomTupleSetTest("FewHuge",pos,IntSet(1,4),t,epk);
            }
-           (void) new TupleSetBase(pos);
-           (void) new TupleSetLarge(0.05,pos);
-           (void) new TupleSetBool(0.3,pos);
+           (void) new TupleSetBase(pos,epk);
+           (void) new TupleSetLarge(0.05,pos,epk);
+           (void) new TupleSetBool(0.3,pos,epk);
+           }
          }
        }
      };
@@ -896,6 +1315,13 @@ namespace Test { namespace Int {
      RegOpt ro7(static_cast<int>(USHRT_MAX));
 
      InglenookCrashReproducer inglenook_crash_reproducer;
+     SparseTupleSetFallback sparse_tuple_set_fallback;
+     SparseTupleSetFallbackTernary sparse_tuple_set_fallback_ternary;
+     SparseTupleSetFallbackHighArity sparse_tuple_set_fallback_high_arity;
+     SparseTupleSetFallbackNullary sparse_tuple_set_fallback_nullary;
+     SparseTupleSetIncrementalDelta sparse_tuple_set_incremental_delta;
+     SparseTupleSetNegativeFallback sparse_tuple_set_negative_fallback;
+     SparseTupleSetReifiedFallback sparse_tuple_set_reified_fallback;
      //@}
 
    }

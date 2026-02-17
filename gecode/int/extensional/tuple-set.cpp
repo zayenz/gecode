@@ -37,6 +37,8 @@
 
 #include <gecode/int.hh>
 #include <algorithm>
+#include <limits>
+#include <vector>
 
 namespace Gecode { namespace Int { namespace Extensional {
 
@@ -100,7 +102,7 @@ namespace Gecode {
    *
    */
   void
-  TupleSet::Data::finalize(void) {
+  TupleSet::Data::finalize(ExtensionalPropKind epk) {
     using namespace Int::Extensional;
     assert(!finalized());
     // Mark as finalized
@@ -139,7 +141,10 @@ namespace Gecode {
       key = static_cast<std::size_t>(n_tuples);
       cmb_hash(key, arity);
       // Copy into now possibly smaller area
-      int* new_td = heap.alloc<int>(n_tuples*arity);
+      const unsigned long n_tcells =
+        static_cast<unsigned long>(n_tuples) *
+        static_cast<unsigned long>(arity);
+      int* new_td = heap.alloc<int>(n_tcells);
       for (int t=0; t<n_tuples; t++) {
         for (int a=0; a<arity; a++) {
           new_td[t*arity+a] = tuple[t][a];
@@ -153,6 +158,7 @@ namespace Gecode {
     
     // Only now compute how many tuples are needed!
     n_words = BitSetData::data(static_cast<unsigned int>(n_tuples));
+    sparse = false;
 
     // Compute range information
     {
@@ -185,15 +191,69 @@ namespace Gecode {
           }
         }
       }
+      const unsigned long long n_support_entries64 =
+        static_cast<unsigned long long>(n_words) *
+        static_cast<unsigned long long>(n_vals);
+      const unsigned long long n_support_bits =
+        n_support_entries64 *
+        static_cast<unsigned long long>(BitSetData::bpb);
+      const unsigned long long n_support_ones =
+        static_cast<unsigned long long>(arity) *
+        static_cast<unsigned long long>(n_tuples);
+      const bool support_overflow =
+        (n_support_entries64 >
+         static_cast<unsigned long long>(std::numeric_limits<unsigned int>::max()));
+      // Prefer sparse representation for very large and very sparse tables.
+      const unsigned long long sparse_bytes_threshold =
+        256ULL * 1024ULL * 1024ULL;
+      const bool support_large =
+        (n_support_entries64 >
+         sparse_bytes_threshold /
+         static_cast<unsigned long long>(sizeof(BitSetData)));
+      const bool support_very_sparse =
+        (n_support_bits > 0ULL) && (n_support_ones * 100ULL < n_support_bits);
+      const bool auto_sparse =
+        support_overflow || (support_large && support_very_sparse);
+      switch (epk) {
+      case EPK_AUTO:
+        sparse = auto_sparse;
+        break;
+      case EPK_DENSE:
+        if (support_overflow)
+          throw Int::OutOfLimits("TupleSet::finalize()");
+        sparse = false;
+        break;
+      case EPK_SPARSE:
+        sparse = true;
+        break;
+      default:
+        GECODE_NEVER;
+      }
+      const bool build_sparse = sparse;
+      const bool build_dense =
+        !support_overflow &&
+        ((epk == EPK_DENSE) || !sparse || !support_large);
       /*
        * Pass 2: allocate memory and fill data structures
        */
       // Allocate memory for ranges
       Range* cr = range = heap.alloc<Range>(n_ranges);
-      // Allocate and initialize memory for supports
-      BitSetData* cs = support = heap.alloc<BitSetData>(n_words * n_vals);
-      for (unsigned int i=0; i<n_vals * n_words; i++)
-        cs[i].init();
+      // Allocate and initialize memory for supports unless sparse mode is active.
+      support = nullptr;
+      sparse_n_vals = 0U;
+      sparse_offsets = nullptr;
+      sparse_tuples = nullptr;
+      sparse_tv = nullptr;
+      BitSetData* cs = nullptr;
+      unsigned int n_support_entries_u32 = 0U;
+      if (build_dense) {
+        assert((n_words == 0U) ||
+               (n_vals <= std::numeric_limits<unsigned int>::max() / n_words));
+        n_support_entries_u32 = n_words * n_vals;
+        cs = support = heap.alloc<BitSetData>(n_support_entries_u32);
+        for (unsigned int i=0; i<n_support_entries_u32; i++)
+          cs[i].init();
+      }
       for (int a=0; a<arity; a++) {
         // Set range pointer
         vd[a].r = cr;
@@ -223,9 +283,11 @@ namespace Gecode {
         // Set support pointer and set bits
         for (unsigned int i=0U; i<vd[a].n; i++) {
           vd[a].r[i].s = cs;
-          cs += n_words * vd[a].r[i].width();
+          vd[a].r[i].sparse_base = 0U;
+          if (build_dense)
+            cs += n_words * vd[a].r[i].width();
         }
-        {
+        if (build_dense) {
           int j=0;
           for (int i=0; i<n_tuples; i++) {
             while (tuple[i][a] > vd[a].r[j].max)
@@ -236,7 +298,60 @@ namespace Gecode {
           }
         }
       }
-      assert(cs == support + n_words * n_vals);
+      if (build_sparse) {
+        // Build sparse support lists indexed by (position,value).
+        sparse_n_vals = n_vals;
+        sparse_offsets = heap.alloc<unsigned int>(sparse_n_vals+1U);
+        for (unsigned int i=0U; i<=sparse_n_vals; i++)
+          sparse_offsets[i] = 0U;
+
+        unsigned int gid_base = 0U;
+        for (int a=0; a<arity; a++) {
+          for (unsigned int i=0U; i<vd[a].n; i++) {
+            vd[a].r[i].sparse_base = gid_base;
+            gid_base += vd[a].r[i].width();
+          }
+        }
+        assert(gid_base == sparse_n_vals);
+
+        const unsigned long long n_tcells64 =
+          static_cast<unsigned long long>(n_tuples) *
+          static_cast<unsigned long long>(arity);
+        if (n_tcells64 >
+            static_cast<unsigned long long>(std::numeric_limits<unsigned int>::max()))
+          throw Int::OutOfLimits("TupleSet::finalize()");
+        const unsigned int n_tcells = static_cast<unsigned int>(n_tcells64);
+
+        sparse_tv = heap.alloc<unsigned int>(n_tcells);
+        for (int i=0; i<n_tuples; i++) {
+          const unsigned int tid = tuple2idx(tuple[i]);
+          for (int a=0; a<arity; a++) {
+            const unsigned int r = vd[a].start(tuple[i][a]);
+            const unsigned int gid =
+              vd[a].r[r].sparse_base +
+              static_cast<unsigned int>(tuple[i][a] - vd[a].r[r].min);
+            sparse_tv[tid*arity+a] = gid;
+            sparse_offsets[gid+1U]++;
+          }
+        }
+
+        for (unsigned int i=1U; i<=sparse_n_vals; i++)
+          sparse_offsets[i] += sparse_offsets[i-1U];
+
+        sparse_tuples = heap.alloc<unsigned int>(n_tcells);
+        unsigned int* next = r.alloc<unsigned int>(sparse_n_vals);
+        for (unsigned int i=0U; i<sparse_n_vals; i++)
+          next[i] = sparse_offsets[i];
+        for (int i=0; i<n_tuples; i++) {
+          const unsigned int tid = tuple2idx(tuple[i]);
+          for (int a=0; a<arity; a++) {
+            const unsigned int gid = sparse_tv[tid*arity+a];
+            sparse_tuples[next[gid]++] = tid;
+          }
+        }
+      }
+      if (build_dense)
+        assert(cs == support + n_support_entries_u32);
       assert(cr == range + n_ranges);
     }
     if ((min < Int::Limits::min) || (max > Int::Limits::max))
@@ -257,6 +372,9 @@ namespace Gecode {
     heap.rfree(vd);
     heap.rfree(range);
     heap.rfree(support);
+    heap.rfree(sparse_offsets);
+    heap.rfree(sparse_tuples);
+    heap.rfree(sparse_tv);
   }
 
 
@@ -444,6 +562,78 @@ namespace Gecode {
     finalize();
   } 
 
+  DFA
+  TupleSet::dfa(void) const {
+    if (!*this)
+      throw Int::UninitializedTupleSet("TupleSet::dfa()");
+    if (!finalized())
+      throw Int::NotYetFinalized("TupleSet::dfa()");
+
+    const int a = arity();
+    const int n = tuples();
+
+    if (n == 0) {
+      DFA::Transition t[1];
+      t[0] = DFA::Transition(-1,0,0);
+      int f[1] = {-1};
+      return DFA(0,t,f,false);
+    }
+
+    const unsigned long long max_transitions =
+      static_cast<unsigned long long>(n) *
+      static_cast<unsigned long long>(a);
+    if (max_transitions >
+        static_cast<unsigned long long>(std::numeric_limits<int>::max()-1))
+      throw Int::OutOfLimits("TupleSet::dfa()");
+
+    std::vector<DFA::Transition> transitions;
+    transitions.reserve(static_cast<std::size_t>(max_transitions + 1ULL));
+    std::vector<int> finals;
+    finals.reserve(2);
+
+    if (a == 0) {
+      finals.push_back(0);
+    } else {
+      const int final_state = 1;
+      int next_state = 2;
+      std::vector<int> state_at_depth(static_cast<std::size_t>(a),0);
+      std::vector<int> prev_prefix(static_cast<std::size_t>(a-1),0);
+      bool has_prev = false;
+
+      for (int i=0; i<n; i++) {
+        Tuple c = (*this)[i];
+
+        int lcp = 0;
+        if (has_prev) {
+          while ((lcp < a-1) && (prev_prefix[lcp] == c[lcp]))
+            lcp++;
+        }
+
+        for (int d=lcp; d<a-1; d++) {
+          if (next_state == std::numeric_limits<int>::max())
+            throw Int::OutOfLimits("TupleSet::dfa()");
+          const int from = state_at_depth[d];
+          const int to = next_state++;
+          transitions.push_back(DFA::Transition(from,c[d],to));
+          state_at_depth[d+1] = to;
+        }
+
+        transitions.push_back
+          (DFA::Transition(state_at_depth[a-1],c[a-1],final_state));
+
+        for (int d=0; d<a-1; d++)
+          prev_prefix[d] = c[d];
+        has_prev = true;
+      }
+
+      finals.push_back(final_state);
+    }
+
+    transitions.push_back(DFA::Transition(-1,0,0));
+    finals.push_back(-1);
+    return DFA(0,&transitions[0],&finals[0],false);
+  }
+
   bool
   TupleSet::equal(const TupleSet& t) const {
     assert(tuples() == t.tuples());
@@ -473,4 +663,3 @@ namespace Gecode {
 }
 
 // STATISTICS: int-prop
-

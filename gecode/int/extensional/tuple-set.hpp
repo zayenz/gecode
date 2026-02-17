@@ -49,7 +49,10 @@ namespace Gecode {
   forceinline const TupleSet::BitSetData*
   TupleSet::Range::supports(unsigned int n_words, int n) const {
     assert((min <= n) && (n <= max));
-    return s + n_words * static_cast<unsigned int>(n - min);
+    const unsigned long offset =
+      static_cast<unsigned long>(n_words) *
+      static_cast<unsigned long>(n - min);
+    return s + offset;
   }
 
   
@@ -64,7 +67,9 @@ namespace Gecode {
       min(Int::Limits::max), max(Int::Limits::min), key(0),
       td(heap.alloc<int>(n_initial_free * a)),
       vd(heap.alloc<ValueData>(a)),
-      range(nullptr), support(nullptr) {
+      range(nullptr), support(nullptr), sparse(false),
+      sparse_n_vals(0U), sparse_offsets(nullptr),
+      sparse_tuples(nullptr), sparse_tv(nullptr) {
   }
   
   forceinline bool
@@ -152,10 +157,10 @@ namespace Gecode {
   }
 
   forceinline void
-  TupleSet::finalize(void) {
+  TupleSet::finalize(ExtensionalPropKind epk) {
     Data* d = static_cast<Data*>(object());
     if (!d->finalized())
-      d->finalize();
+      d->finalize(epk);
   }
 
   forceinline bool
@@ -228,6 +233,57 @@ namespace Gecode {
     return data().key;
   }
 
+  forceinline bool
+  TupleSet::dense_support(void) const {
+    return (data().support != nullptr) || (data().n_tuples == 0);
+  }
+
+  forceinline bool
+  TupleSet::sparse_support(void) const {
+    return data().sparse;
+  }
+
+  forceinline unsigned int
+  TupleSet::sparse_values(void) const {
+    return data().sparse_n_vals;
+  }
+
+  forceinline const unsigned int*
+  TupleSet::sparse_tuple_value_ids(void) const {
+    return data().sparse_tv;
+  }
+
+  forceinline bool
+  TupleSet::sparse_support(int p, int n,
+                           const unsigned int*& b,
+                           const unsigned int*& e,
+                           unsigned int& gid) const {
+    const Data& d = data();
+    if ((d.sparse_offsets == nullptr) ||
+        (d.sparse_tuples == nullptr) ||
+        (d.sparse_n_vals == 0U))
+      return false;
+    if ((p < 0) || (p >= d.arity))
+      return false;
+    const ValueData& v = d.vd[p];
+    unsigned int l = 0U, h = v.n;
+    while (l < h) {
+      const unsigned int m = l + ((h-l) >> 1);
+      if (n < v.r[m].min)
+        h = m;
+      else if (n > v.r[m].max)
+        l = m+1U;
+      else {
+        gid = v.r[m].sparse_base +
+          static_cast<unsigned int>(n - v.r[m].min);
+        b = d.sparse_tuples + d.sparse_offsets[gid];
+        e = d.sparse_tuples + d.sparse_offsets[gid+1U];
+        return true;
+      }
+    }
+    return false;
+  }
+
 
   template<class Char, class Traits>
   std::basic_ostream<Char,Traits>&
@@ -287,4 +343,3 @@ namespace Gecode {
 }
 
 // STATISTICS: int-prop
-

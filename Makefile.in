@@ -1512,6 +1512,10 @@ $(FLATZINC_GENSRC:%.cpp=%$(SBJSUFFIX)): gecode/flatzinc/%$(SBJSUFFIX): gecode/fl
 	@GECODE_BUILD_FLATZINC_FLAG@ \
 	@COMPILESBJ@$@ @CXXIN@$<
 
+# Generated FlatZinc sources include parser.tab.hpp; make dependency explicit for parallel builds.
+gecode/flatzinc/parser.tab$(OBJSUFFIX) gecode/flatzinc/lexer.yy$(OBJSUFFIX): gecode/flatzinc/parser.tab.hpp
+gecode/flatzinc/parser.tab$(SBJSUFFIX) gecode/flatzinc/lexer.yy$(SBJSUFFIX): gecode/flatzinc/parser.tab.hpp
+
 #
 # DLL Targets
 #

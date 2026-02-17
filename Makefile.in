@@ -1336,21 +1336,6 @@ makecompletedmessage:
 	@echo make install
 	@echo
 
-# ugly hack by Gr�goire Dooms to call a target on a contribs after evaluating all the variables in this Makefile.
-# used as make contribs:cpgraph:doc or make contribs:cpgraph:Makefile.in
-.PHONY: contribs\:%
-contribs\:%:
-	$(MAKE) -C $(shell echo $@ | sed 's/\(contribs:[^:]*\):.*/\1/;s+:+/+') $(shell echo $@ | sed 's/contribs:[^:]*:\(.*\)/\1/;s+:+/+')
-
-# less ugly hack by Guido Tack to call a target
-# Just give ICD (in-contrib-dir) and ICT (in-contrib-target) as arguments
-# to make incontrib
-ICT=
-ICD=
-.PHONY: incontrib
-incontrib:
-	$(MAKE) -C contribs/$(ICD) $(ICT)
-
 compilesubdirs:
 	@for_subdirs="$(subdirs)"; for i in $$for_subdirs; do \
 	  if test -f $$i/Makefile; then \
@@ -1526,6 +1511,10 @@ $(FLATZINC_GENSRC:%.cpp=%$(SBJSUFFIX)): gecode/flatzinc/%$(SBJSUFFIX): gecode/fl
 	$(CXX) $(CXXFLAGS) $(QT_CPPFLAGS) \
 	@GECODE_BUILD_FLATZINC_FLAG@ \
 	@COMPILESBJ@$@ @CXXIN@$<
+
+# Generated FlatZinc sources include parser.tab.hpp; make dependency explicit for parallel builds.
+gecode/flatzinc/parser.tab$(OBJSUFFIX) gecode/flatzinc/lexer.yy$(OBJSUFFIX): gecode/flatzinc/parser.tab.hpp
+gecode/flatzinc/parser.tab$(SBJSUFFIX) gecode/flatzinc/lexer.yy$(SBJSUFFIX): gecode/flatzinc/parser.tab.hpp
 
 #
 # DLL Targets

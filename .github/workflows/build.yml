@@ -16,6 +16,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install Ubuntu build deps
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y flex bison libgmp-dev libmpfr-dev
+
+    - name: Stabilize generated configure script timestamp
+      shell: bash
+      run: touch configure
+
     - name: Configure
       shell: bash
       run: ./configure
@@ -28,14 +39,22 @@ jobs:
       shell: bash
       run: make check
 
-  build-cmake:
+  build-cmake-unix:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest]
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install Ubuntu build deps
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y flex bison libgmp-dev libmpfr-dev
 
     - name: Create Build Environment
       run: cmake -E make_directory ${{github.workspace}}/build
@@ -43,9 +62,99 @@ jobs:
     - name: Configure CMake
       shell: bash
       working-directory: ${{github.workspace}}/build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+      run: >
+        cmake $GITHUB_WORKSPACE
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 
     - name: Build
       working-directory: ${{github.workspace}}/build
       shell: bash
       run: cmake --build . --config $BUILD_TYPE
+
+    - name: Check
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --build . --config $BUILD_TYPE --target check
+
+  build-cmake-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: shared
+            build_shared: ON
+            build_static: OFF
+          - name: static
+            build_shared: OFF
+            build_static: ON
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Perl
+      uses: shogo82148/actions-setup-perl@v1
+
+    - name: Create Build Environment
+      shell: pwsh
+      run: cmake -E make_directory "${{ github.workspace }}\\build"
+
+    - name: Configure CMake
+      shell: pwsh
+      run: >
+        cmake -S "${{ github.workspace }}" -B "${{ github.workspace }}\\build"
+        -G "Visual Studio 17 2022" -A x64
+        -DGECODE_ENABLE_QT=OFF
+        -DGECODE_ENABLE_GIST=OFF
+        -DGECODE_ENABLE_MPFR=OFF
+        -DGECODE_BUILD_SHARED=${{ matrix.build_shared }}
+        -DGECODE_BUILD_STATIC=${{ matrix.build_static }}
+
+    - name: Build
+      shell: pwsh
+      run: cmake --build "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }}
+
+    - name: Build test binary
+      shell: pwsh
+      run: cmake --build "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }} --target gecode-test
+
+  build-autoconf-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: >-
+          autoconf
+          automake
+          bison
+          flex
+          gcc
+          make
+          m4
+          libtool
+          perl
+          mingw-w64-ucrt-x86_64-gcc
+          mingw-w64-ucrt-x86_64-gmp
+          mingw-w64-ucrt-x86_64-mpfr
+
+    - name: Stabilize generated configure script timestamp
+      shell: msys2 {0}
+      run: touch configure
+
+    - name: Configure
+      shell: msys2 {0}
+      run: CC=gcc CXX=g++ ./configure --with-host-os=Windows --disable-qt --disable-gist --disable-mpfr
+
+    - name: Build
+      shell: msys2 {0}
+      run: make test -j4
+
+    - name: Check
+      shell: msys2 {0}
+      run: make check

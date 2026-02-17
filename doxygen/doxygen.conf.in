@@ -498,7 +498,6 @@ EXCLUDE_SYMLINKS       = NO
 EXCLUDE_PATTERNS       = \
 	*.svn/* \
 	*moc_* \
-	*contribs/* \
 	*gecode/gist/standalone-example/* \
 	*gecode/third-party/* \
 	*gecode/flatzinc/exampleplugin/* \

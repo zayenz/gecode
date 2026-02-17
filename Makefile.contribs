@@ -78,7 +78,7 @@ contribdirs:
 	@autoconf
 	@autoheader
 	@mv gecode/support/config.hpp.in config.hpp.in.1
-	@perl misc/fixautoheader.perl < config.hpp.in.1 \
+	@uv run --script misc/fixautoheader.py < config.hpp.in.1 \
 	      > gecode/support/config.hpp.in
 	@rm config.hpp.in.1
 	@echo done.

@@ -728,7 +728,7 @@ RESCOMP
 HAVE_RC
 CXXCPP
 RUNENVIRONMENT
-PROG_PERL
+PROG_UV
 PROG_SED
 PROG_MAKE
 PROG_TAR
@@ -4112,15 +4112,15 @@ fi
  if test "${PROG_SED}x" = "x"; then
     as_fn_error $? "In order to compile Gecode, you need the sed tool." "$LINENO" 5
  fi
-# Extract the first word of "perl", so it can be a program name with args.
-set dummy perl; ac_word=$2
+# Extract the first word of "uv", so it can be a program name with args.
+set dummy uv; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
-if ${ac_cv_prog_PROG_PERL+:} false; then :
+if ${ac_cv_prog_PROG_UV+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  if test -n "$PROG_PERL"; then
-  ac_cv_prog_PROG_PERL="$PROG_PERL" # Let the user override the test.
+  if test -n "$PROG_UV"; then
+  ac_cv_prog_PROG_UV="$PROG_UV" # Let the user override the test.
 else
 as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
 for as_dir in $PATH
@@ -4129,7 +4129,7 @@ do
   test -z "$as_dir" && as_dir=.
     for ac_exec_ext in '' $ac_executable_extensions; do
   if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
-    ac_cv_prog_PROG_PERL="ok"
+    ac_cv_prog_PROG_UV="ok"
     $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
     break 2
   fi
@@ -4139,18 +4139,18 @@ IFS=$as_save_IFS
 
 fi
 fi
-PROG_PERL=$ac_cv_prog_PROG_PERL
-if test -n "$PROG_PERL"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PROG_PERL" >&5
-$as_echo "$PROG_PERL" >&6; }
+PROG_UV=$ac_cv_prog_PROG_UV
+if test -n "$PROG_UV"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PROG_UV" >&5
+$as_echo "$PROG_UV" >&6; }
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 fi
 
 
- if test "${PROG_PERL}x" = "x"; then
-    as_fn_error $? "In order to compile Gecode, you need perl." "$LINENO" 5
+ if test "${PROG_UV}x" = "x"; then
+    as_fn_error $? "In order to compile Gecode, you need uv." "$LINENO" 5
  fi
 
 case $host_os in
@@ -14787,4 +14787,3 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-

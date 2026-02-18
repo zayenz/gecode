@@ -866,6 +866,103 @@ namespace Test { namespace Int {
        }
      };
 
+     /// Sparse incremental test for assigned-variable advisor updates
+     class SparseTupleSetIncrementalAssign : public ::Test::Base {
+     public:
+       SparseTupleSetIncrementalAssign(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::IncrementalAssign") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         class SparseAssignSpace : public Space {
+         public:
+           IntVarArray x;
+           SparseAssignSpace(const TupleSet& t)
+             : x(*this,2,0,3) {
+             extensional(*this, x, t, true, IPL_DOM, EPK_SPARSE);
+             rel(*this, x[0], IRT_EQ, 2);
+             rel(*this, x[1], IRT_NQ, 1);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           SparseAssignSpace(SparseAssignSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space*
+           copy(void) {
+             return new SparseAssignSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add(IntArgs({0,0})).add(IntArgs({1,1}))
+           .add(IntArgs({2,1})).add(IntArgs({3,3}));
+         ts.finalize(EPK_SPARSE);
+         if (!ts.sparse_support())
+           return false;
+
+         SparseAssignSpace* root = new SparseAssignSpace(ts);
+         DFS<SparseAssignSpace> e(root);
+         delete root;
+         SparseAssignSpace* sol = e.next();
+         const bool ok = (sol == nullptr);
+         delete sol;
+         return ok;
+       }
+     };
+
+     /// Sparse incremental test for BoolView specialization
+     class SparseTupleSetIncrementalBool : public ::Test::Base {
+     public:
+       SparseTupleSetIncrementalBool(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::IncrementalBool") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         class SparseBoolSpace : public Space {
+         public:
+           BoolVarArray x;
+           SparseBoolSpace(const TupleSet& t)
+             : x(*this,2,0,1) {
+             extensional(*this, x, t, true, IPL_DOM, EPK_SPARSE);
+             rel(*this, x[0], IRT_NQ, 0);
+             branch(*this, x, BOOL_VAR_NONE(), BOOL_VAL_MIN());
+           }
+           SparseBoolSpace(SparseBoolSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space*
+           copy(void) {
+             return new SparseBoolSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add(IntArgs({0,1})).add(IntArgs({1,0}));
+         ts.finalize(EPK_SPARSE);
+         if (!ts.sparse_support())
+           return false;
+
+         SparseBoolSpace* root = new SparseBoolSpace(ts);
+         DFS<SparseBoolSpace> e(root);
+         delete root;
+
+         SparseBoolSpace* sol = e.next();
+         if (sol == nullptr)
+           return false;
+         SparseBoolSpace* extra = e.next();
+         const bool ok = sol->x[0].assigned() && sol->x[1].assigned() &&
+                         (sol->x[0].val() == 1) && (sol->x[1].val() == 0) &&
+                         (extra == nullptr);
+         delete sol;
+         delete extra;
+         return ok;
+       }
+     };
+
      /// Sparse posting fallback smoke test for negative tuple-set posting
      class SparseTupleSetNegativeFallback : public ::Test::Base {
      public:
@@ -1320,6 +1417,8 @@ namespace Test { namespace Int {
      SparseTupleSetFallbackHighArity sparse_tuple_set_fallback_high_arity;
      SparseTupleSetFallbackNullary sparse_tuple_set_fallback_nullary;
      SparseTupleSetIncrementalDelta sparse_tuple_set_incremental_delta;
+     SparseTupleSetIncrementalAssign sparse_tuple_set_incremental_assign;
+     SparseTupleSetIncrementalBool sparse_tuple_set_incremental_bool;
      SparseTupleSetNegativeFallback sparse_tuple_set_negative_fallback;
      SparseTupleSetReifiedFallback sparse_tuple_set_reified_fallback;
      //@}

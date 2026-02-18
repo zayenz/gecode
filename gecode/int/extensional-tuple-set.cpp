@@ -152,13 +152,35 @@ namespace Gecode { namespace Int { namespace Extensional {
       }
     }
 
+    unsigned int
+    tuple_gid(unsigned int tid, int a) const {
+      const unsigned long long idx =
+        static_cast<unsigned long long>(tid) *
+        static_cast<unsigned long long>(x.size()) +
+        static_cast<unsigned long long>(a);
+      const unsigned int gid = tv[idx];
+      assert(gid < n_vals);
+      return gid;
+    }
+
+    void
+    deactivate_value_support(int i, int n) {
+      const unsigned int* b = nullptr;
+      const unsigned int* e = nullptr;
+      unsigned int gid = 0U;
+      if (ts.sparse_support(i,n,b,e,gid)) {
+        for (const unsigned int* t=b; t<e; t++)
+          deactivate_tuple(*t);
+      }
+    }
+
     void
     deactivate_for_domain(int i, const View& xv) {
       unsigned int p = 0U;
       while (p < active_limit) {
         const unsigned int tid = active_ids[p];
-        TupleSet::Tuple t = ts[static_cast<int>(tid)];
-        if (!xv.in(t[i])) {
+        const unsigned int gid = tuple_gid(tid,i);
+        if (!xv.in(gid_val[gid])) {
           deactivate_tuple(tid);
         } else {
           p++;
@@ -168,21 +190,24 @@ namespace Gecode { namespace Int { namespace Extensional {
 
     void
     deactivate_removed_values(int i, const View& xv, const Delta& d) {
+      if (xv.assigned()) {
+        deactivate_for_domain(i,xv);
+        return;
+      }
       if (xv.any(d) || (xv.width(d) > xv.size())) {
         deactivate_for_domain(i,xv);
         return;
       }
+      if (xv.min(d) == xv.max(d)) {
+        const int n = xv.min(d);
+        if (!xv.in(n))
+          deactivate_value_support(i,n);
+        return;
+      }
       int n = xv.min(d);
       while (true) {
-        if (!xv.in(n)) {
-          const unsigned int* b = nullptr;
-          const unsigned int* e = nullptr;
-          unsigned int gid = 0U;
-          if (ts.sparse_support(i,n,b,e,gid)) {
-            for (const unsigned int* t=b; t<e; t++)
-              deactivate_tuple(*t);
-          }
-        }
+        if (!xv.in(n))
+          deactivate_value_support(i,n);
         if (n == xv.max(d))
           break;
         n++;
@@ -237,6 +262,10 @@ namespace Gecode { namespace Int { namespace Extensional {
           continue;
         if (x[i].assigned())
           continue;
+        if (p_rm[i] == 1U) {
+          GECODE_ME_CHECK(x[i].nq(home,rm[i][0]));
+          continue;
+        }
         Support::quicksort(rm[i], static_cast<int>(p_rm[i]));
         unsigned int j = 1U;
         for (unsigned int k=1U; k<p_rm[i]; k++)
@@ -387,19 +416,24 @@ namespace Gecode { namespace Int { namespace Extensional {
     }
 
     virtual ExecStatus
-    advise(Space&, Advisor& a, const Delta& d) {
+    advise(Space& home, Advisor& a0, const Delta& d) {
       if (active_limit == 0U)
         return ES_FAILED;
 
-      if (in_propagate)
-        return ES_FIX;
-
-      SparseAdvisor& sa = static_cast<SparseAdvisor&>(a);
+      SparseAdvisor& sa = static_cast<SparseAdvisor&>(a0);
       View xv = sa.view();
+      if (in_propagate)
+        return xv.assigned() ? home.ES_FIX_DISPOSE(c,sa) : ES_FIX;
+
       const int i = sa.index();
 
-      (void) d;
-      deactivate_for_domain(i,xv);
+      if (xv.assigned()) {
+        deactivate_for_domain(i,xv);
+        if (active_limit == 0U)
+          return ES_FAILED;
+        return home.ES_NOFIX_DISPOSE(c,sa);
+      }
+      deactivate_removed_values(i,xv,d);
 
       if (active_limit == 0U)
         return ES_FAILED;

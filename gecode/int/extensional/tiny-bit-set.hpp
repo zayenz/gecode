@@ -43,7 +43,7 @@ namespace Gecode { namespace Int { namespace Extensional {
    */
   template<unsigned int sz>
   forceinline
-  TinyBitSet<sz>::TinyBitSet(Space&, unsigned int n) {
+  TinyBitSet<sz>::TinyBitSet(Space&, unsigned int n, bool) {
     assert(n <= sz);
     /// Set the active bits
       for (unsigned int i=0U; i<n; i++)

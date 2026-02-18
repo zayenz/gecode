@@ -238,15 +238,19 @@ namespace Gecode { namespace Int { namespace Extensional {
   protected:
     /// Limit
     IndexType _limit;
+    /// Initial number of words
+    IndexType _capacity;
     /// Indices
     IndexType* _index;
     /// Words
     BitSetData* _bits;
+    /// Reverse map from word index to active position+1 (optional)
+    IndexType* _pos;
     /// Replace the \a i th word with \a w, decrease \a limit if \a w is zero
     void replace_and_decrease(IndexType i, BitSetData w);
   public:
     /// Initialize bit set for a number of words \a n
-    BitSet(Space& home, unsigned int n);
+    BitSet(Space& home, unsigned int n, bool aligned=false);
     /// Initialize during cloning
     template<class OldIndexType>
     BitSet(Space& home, const BitSet<OldIndexType>& bs);
@@ -327,7 +331,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     BitSetData _bits[_size];
   public:
     /// Initialize sparse bit set for a number of words \a n
-    TinyBitSet(Space& home, unsigned int n);
+    TinyBitSet(Space& home, unsigned int n, bool aligned=false);
     /// Initialize during cloning
     template<unsigned int largersize>
     TinyBitSet(Space& home, const TinyBitSet<largersize>& tbs);

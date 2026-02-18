@@ -1558,7 +1558,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       assert(!table.empty());
     }
     PosCompactCompressed(Home home, ViewArray<View>& x, const TupleSet& ts)
-      : Base(home,ts), status(MULTIPLE), table(home,ts.words()) {
+      : Base(home,ts), status(MULTIPLE), table(home,ts.words(),true) {
       setup(home,table,x);
     }
 
@@ -1806,7 +1806,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       assert(!table.empty());
     }
     NegCompactCompressed(Home home, ViewArray<View>& x, const TupleSet& ts)
-      : Base(home,ts), table(home,ts.words()) {
+      : Base(home,ts), table(home,ts.words(),true) {
       setup(home,table,x);
     }
 
@@ -2026,7 +2026,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     }
     ReCompactCompressed(Home home, ViewArray<View>& x, const TupleSet& ts,
                         CtrlView b0)
-      : Base(home,ts), table(home,ts.words()), b(b0), y(x) {
+      : Base(home,ts), table(home,ts.words(),true), b(b0), y(x) {
       b.subscribe(home,*this,PC_BOOL_VAL);
       setup(home,table,x);
     }

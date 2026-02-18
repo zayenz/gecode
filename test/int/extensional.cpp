@@ -62,6 +62,8 @@ namespace Test { namespace Int {
          return "Dense";
        case Gecode::EPK_SPARSE:
          return "Sparse";
+       case Gecode::EPK_DENSE_COMPRESSED:
+         return "DenseCompressed";
        case Gecode::EPK_AUTO:
          return "Auto";
        default:
@@ -1063,11 +1065,11 @@ namespace Test { namespace Int {
        }
      };
 
-     /// Sparse tuplesets should no longer materialize dense support by default
+     /// Sparse/compressed tuplesets should materialize only requested support
      class SparseTupleSetSingleRepresentation : public ::Test::Base {
      public:
        SparseTupleSetSingleRepresentation(void)
-         : ::Test::Base("Extensional::TupleSet::Sparse::SingleRepresentation") {}
+         : ::Test::Base("Extensional::TupleSet::Support::SingleRepresentation") {}
 
        virtual bool run(void) {
          using namespace Gecode;
@@ -1081,6 +1083,30 @@ namespace Test { namespace Int {
          }
          if (ts.dense_support()) {
            std::cerr << "ERROR: Dense support unexpectedly materialized"
+                     << std::endl;
+           return false;
+         }
+         if (ts.dense_compressed_support()) {
+           std::cerr << "ERROR: Compressed support unexpectedly materialized"
+                     << std::endl;
+           return false;
+         }
+
+         TupleSet tc(2);
+         for (int i=0; i<100; i++)
+           tc.add(IntArgs({i, (i*7) % 100}));
+         tc.finalize(EPK_DENSE_COMPRESSED);
+         if (!tc.dense_compressed_support()) {
+           std::cerr << "ERROR: Compressed support not available" << std::endl;
+           return false;
+         }
+         if (tc.dense_support()) {
+           std::cerr << "ERROR: Dense support unexpectedly materialized"
+                     << std::endl;
+           return false;
+         }
+         if (tc.sparse_support()) {
+           std::cerr << "ERROR: Sparse support unexpectedly materialized"
                      << std::endl;
            return false;
          }
@@ -1422,7 +1448,8 @@ namespace Test { namespace Int {
          Gecode::Support::RandomGenerator rand(42);
 
          using namespace Gecode;
-         for (ExtensionalPropKind epk : { EPK_DENSE, EPK_SPARSE }) {
+         for (ExtensionalPropKind epk :
+                { EPK_DENSE, EPK_SPARSE, EPK_DENSE_COMPRESSED }) {
            for (bool pos : { false, true }) {
            {
              TupleSet ts(4);
@@ -1482,7 +1509,7 @@ namespace Test { namespace Int {
            }
            {
              TupleSet ts(7);
-             const int triangle_tuples = (epk == EPK_SPARSE) ? 2000 : 10000;
+             const int triangle_tuples = (epk == EPK_DENSE) ? 10000 : 2000;
              for (int i = 0; i < triangle_tuples; i++) {
                IntArgs tuple(7);
                for (int j = 0; j < 7; j++) {
@@ -1498,8 +1525,8 @@ namespace Test { namespace Int {
                (void) new TupleSetTestSize(i, pos, epk, rand);
            }
            {
-             const double prob_small = (epk == EPK_SPARSE) ? 0.01 : 0.05;
-             const double prob_large = (epk == EPK_SPARSE) ? 0.005 : 0.05;
+             const double prob_small = (epk == EPK_DENSE) ? 0.05 : 0.01;
+             const double prob_large = (epk == EPK_DENSE) ? 0.05 : 0.005;
              (void) new RandomTupleSetTest("Rand(10,-1,2)", pos,
                                            IntSet(-1,2),
                                            randomTupleSet(10, -1, 2, prob_small,

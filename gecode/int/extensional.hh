@@ -270,19 +270,40 @@ namespace Gecode { namespace Int { namespace Extensional {
     void clear_mask(BitSetData* mask) const;
     /// Add \b to \a mask
     void add_to_mask(const BitSetData* b, BitSetData* mask) const;
+    /// Add aligned compressed support list to \a mask
+    void add_to_mask_aligned(const TupleSet::CSupportWord* b,
+                             const TupleSet::CSupportWord* e,
+                             BitSetData* mask) const;
     /// Intersect with \a mask, sparse mask if \a sparse is true
     template<bool sparse>
     void intersect_with_mask(const BitSetData* mask);
+    /// Intersect with aligned compressed support list
+    void intersect_with_mask_aligned(const TupleSet::CSupportWord* b,
+                                     const TupleSet::CSupportWord* e);
     /// Intersect with the "or" of \a and \a b
     void intersect_with_masks(const BitSetData* a, const BitSetData* b);
+    /// Intersect with the "or" of two aligned compressed support lists
+    void intersect_with_masks_aligned(const TupleSet::CSupportWord* ab,
+                                      const TupleSet::CSupportWord* ae,
+                                      const TupleSet::CSupportWord* bb,
+                                      const TupleSet::CSupportWord* be);
     /// Check if \a has a non-empty intersection with the set
     bool intersects(const BitSetData* b) const;
+    /// Check if aligned compressed support list intersects with the set
+    bool intersects_aligned(const TupleSet::CSupportWord* b,
+                            const TupleSet::CSupportWord* e) const;
     /// Perform "nand" with \a b
     void nand_with_mask(const BitSetData* b);
+    /// Perform "nand" with aligned compressed support list
+    void nand_with_mask_aligned(const TupleSet::CSupportWord* b,
+                                const TupleSet::CSupportWord* e);
     /// Return the number of ones
     unsigned long long int ones(void) const;
     /// Return the number of ones after intersection with \a b
     unsigned long long int ones(const BitSetData* b) const;
+    /// Return the number of ones after intersection with aligned support list
+    unsigned long long int ones_aligned(const TupleSet::CSupportWord* b,
+                                        const TupleSet::CSupportWord* e) const;
     /// Return an upper bound on the number of bits
     unsigned long long int bits(void) const;
     /// Return the number of required bit set words
@@ -325,21 +346,42 @@ namespace Gecode { namespace Int { namespace Extensional {
     void clear_mask(BitSetData* mask);
     /// Add \b to \a mask
     void add_to_mask(const BitSetData* b, BitSetData* mask) const;
+    /// Add aligned compressed support list to \a mask
+    void add_to_mask_aligned(const TupleSet::CSupportWord* b,
+                             const TupleSet::CSupportWord* e,
+                             BitSetData* mask) const;
     /// Intersect with \a mask, sparse mask if \a sparse is true
     template<bool sparse>
     void intersect_with_mask(const BitSetData* mask);
+    /// Intersect with aligned compressed support list
+    void intersect_with_mask_aligned(const TupleSet::CSupportWord* b,
+                                     const TupleSet::CSupportWord* e);
     /// Intersect with the "or" of \a and \a b
     void intersect_with_masks(const BitSetData* a, const BitSetData* b);
+    /// Intersect with the "or" of two aligned compressed support lists
+    void intersect_with_masks_aligned(const TupleSet::CSupportWord* ab,
+                                      const TupleSet::CSupportWord* ae,
+                                      const TupleSet::CSupportWord* bb,
+                                      const TupleSet::CSupportWord* be);
     /// Check if \a has a non-empty intersection with the set
     bool intersects(const BitSetData* b);
+    /// Check if aligned compressed support list intersects with the set
+    bool intersects_aligned(const TupleSet::CSupportWord* b,
+                            const TupleSet::CSupportWord* e);
     /// Perform "nand" with \a b
     void nand_with_mask(const BitSetData* b);
+    /// Perform "nand" with aligned compressed support list
+    void nand_with_mask_aligned(const TupleSet::CSupportWord* b,
+                                const TupleSet::CSupportWord* e);
     /// Perform "nand" with and the "or" of \a a and \a b
     void nand_with_masks(const BitSetData* a, const BitSetData* b);
     /// Return the number of ones
     unsigned long long int ones(void) const;
     /// Return the number of ones after intersection with \a b
     unsigned long long int ones(const BitSetData* b) const;
+    /// Return the number of ones after intersection with aligned support list
+    unsigned long long int ones_aligned(const TupleSet::CSupportWord* b,
+                                        const TupleSet::CSupportWord* e) const;
     /// Return an upper bound on the number of bits
     unsigned long long int bits(void) const;
     /// Return the number of required bit set words
@@ -574,6 +616,10 @@ namespace Gecode { namespace Int { namespace Extensional {
   /// Post function for positive compact table propagator
   template<class View>
   ExecStatus postposcompact(Home home, ViewArray<View>& x, const TupleSet& ts);
+  /// Post function for positive compact table with compressed supports
+  template<class View>
+  ExecStatus postposcompact_compressed(Home home, ViewArray<View>& x,
+                                       const TupleSet& ts);
 
   /**
    * \brief Domain consistent negative extensional propagator
@@ -629,6 +675,10 @@ namespace Gecode { namespace Int { namespace Extensional {
   /// Post function for compact table propagator
   template<class View>
   ExecStatus postnegcompact(Home home, ViewArray<View>& x, const TupleSet& ts);
+  /// Post function for negative compact table with compressed supports
+  template<class View>
+  ExecStatus postnegcompact_compressed(Home home, ViewArray<View>& x,
+                                       const TupleSet& ts);
 
 
   /// Domain consistent reified extensional propagator
@@ -676,6 +726,10 @@ namespace Gecode { namespace Int { namespace Extensional {
   template<class View, class CtrlView, ReifyMode rm>
   ExecStatus postrecompact(Home home, ViewArray<View>& x, const TupleSet& ts,
                            CtrlView b);
+  /// Post function for reified compact table with compressed supports
+  template<class View, class CtrlView, ReifyMode rm>
+  ExecStatus postrecompact_compressed(Home home, ViewArray<View>& x,
+                                      const TupleSet& ts, CtrlView b);
 
 }}}
 

@@ -156,9 +156,10 @@ namespace Gecode {
       td = new_td;
     }
     
-    // Only now compute how many tuples are needed!
+    // Only now compute how many words are needed!
     n_words = BitSetData::data(static_cast<unsigned int>(n_tuples));
     sparse = false;
+    support_repr = SR_NONE;
 
     // Compute range information
     {
@@ -194,56 +195,99 @@ namespace Gecode {
       const unsigned long long n_support_entries64 =
         static_cast<unsigned long long>(n_words) *
         static_cast<unsigned long long>(n_vals);
-      const unsigned long long n_support_bits =
-        n_support_entries64 *
-        static_cast<unsigned long long>(BitSetData::bpb);
+      const unsigned long long n_tcells64 =
+        static_cast<unsigned long long>(n_tuples) *
+        static_cast<unsigned long long>(arity);
       const unsigned long long n_support_ones =
         static_cast<unsigned long long>(arity) *
         static_cast<unsigned long long>(n_tuples);
-      const bool support_overflow =
+      const bool dense_possible =
         (n_support_entries64 >
+         static_cast<unsigned long long>(std::numeric_limits<unsigned int>::max()))
+        ? false : true;
+      const bool sparse_possible =
+        (n_tcells64 <=
          static_cast<unsigned long long>(std::numeric_limits<unsigned int>::max()));
-      // Prefer sparse representation for very large and very sparse tables.
-      const unsigned long long sparse_bytes_threshold =
-        256ULL * 1024ULL * 1024ULL;
-      const bool support_large =
-        (n_support_entries64 >
-         sparse_bytes_threshold /
-         static_cast<unsigned long long>(sizeof(BitSetData)));
-      const bool support_very_sparse =
-        (n_support_bits > 0ULL) && (n_support_ones * 100ULL < n_support_bits);
-      const bool auto_sparse =
-        support_overflow || (support_large && support_very_sparse);
+      const bool compressed_possible = sparse_possible;
+      const unsigned long long dense_bytes =
+        n_support_entries64 *
+        static_cast<unsigned long long>(sizeof(BitSetData));
+      const unsigned long long sparse_bytes_est =
+        (n_tcells64 * 2ULL + static_cast<unsigned long long>(n_vals + 1U)) *
+        static_cast<unsigned long long>(sizeof(unsigned int));
+      const unsigned long long compressed_entries_est = n_support_ones;
+      const unsigned long long compressed_bytes_est =
+        static_cast<unsigned long long>(n_vals + 1U) *
+          static_cast<unsigned long long>(sizeof(unsigned int)) +
+        compressed_entries_est *
+          static_cast<unsigned long long>(sizeof(CSupportWord));
+
+      // Keep dense for small dense payloads, otherwise choose between sparse and
+      // compressed with a mild bias towards compressed when similarly sized.
+      const unsigned long long dense_small_threshold =
+        64ULL * 1024ULL * 1024ULL;
+      const unsigned int compressed_bias_percent = 20U;
+
+      SupportRepresentation selected = SR_NONE;
       switch (epk) {
       case EPK_AUTO:
-        sparse = auto_sparse;
+        if (dense_possible && (dense_bytes <= dense_small_threshold)) {
+          selected = SR_DENSE;
+          break;
+        }
+        if (sparse_possible && compressed_possible) {
+          const unsigned long long sparse_biased =
+            sparse_bytes_est +
+            (sparse_bytes_est * compressed_bias_percent) / 100ULL;
+          selected = (compressed_bytes_est <= sparse_biased) ?
+            SR_DENSE_COMPRESSED : SR_SPARSE;
+        } else if (compressed_possible) {
+          selected = SR_DENSE_COMPRESSED;
+        } else if (sparse_possible) {
+          selected = SR_SPARSE;
+        } else if (dense_possible) {
+          selected = SR_DENSE;
+        } else {
+          throw Int::OutOfLimits("TupleSet::finalize()");
+        }
         break;
       case EPK_DENSE:
-        if (support_overflow)
+        if (!dense_possible)
           throw Int::OutOfLimits("TupleSet::finalize()");
-        sparse = false;
+        selected = SR_DENSE;
         break;
       case EPK_SPARSE:
-        sparse = true;
+        if (!sparse_possible)
+          throw Int::OutOfLimits("TupleSet::finalize()");
+        selected = SR_SPARSE;
+        break;
+      case EPK_DENSE_COMPRESSED:
+        if (!compressed_possible)
+          throw Int::OutOfLimits("TupleSet::finalize()");
+        selected = SR_DENSE_COMPRESSED;
         break;
       default:
         GECODE_NEVER;
       }
-      const bool build_sparse = sparse;
-      // Build exactly one support representation: dense or sparse.
-      const bool build_dense =
-        !support_overflow && !sparse;
+      support_repr = selected;
+      sparse = (selected == SR_SPARSE);
+      const bool build_dense = (selected == SR_DENSE);
+      const bool build_sparse = (selected == SR_SPARSE);
+      const bool build_compressed = (selected == SR_DENSE_COMPRESSED);
       /*
        * Pass 2: allocate memory and fill data structures
        */
       // Allocate memory for ranges
       Range* cr = range = heap.alloc<Range>(n_ranges);
-      // Allocate and initialize memory for supports unless sparse mode is active.
+      // Allocate and initialize memory for support data.
       support = nullptr;
       sparse_n_vals = 0U;
       sparse_offsets = nullptr;
       sparse_tuples = nullptr;
       sparse_tv = nullptr;
+      compressed_offsets = nullptr;
+      compressed_words = nullptr;
+      compressed_n_entries = 0U;
       BitSetData* cs = nullptr;
       unsigned int n_support_entries_u32 = 0U;
       if (build_dense) {
@@ -298,13 +342,11 @@ namespace Gecode {
           }
         }
       }
-      if (build_sparse) {
-        // Build sparse support lists indexed by (position,value).
-        sparse_n_vals = n_vals;
-        sparse_offsets = heap.alloc<unsigned int>(sparse_n_vals+1U);
-        for (unsigned int i=0U; i<=sparse_n_vals; i++)
-          sparse_offsets[i] = 0U;
-
+      if (build_sparse || build_compressed) {
+        assert(n_tcells64 <=
+               static_cast<unsigned long long>
+               (std::numeric_limits<unsigned int>::max()));
+        const unsigned int n_tcells = static_cast<unsigned int>(n_tcells64);
         unsigned int gid_base = 0U;
         for (int a=0; a<arity; a++) {
           for (unsigned int i=0U; i<vd[a].n; i++) {
@@ -312,17 +354,13 @@ namespace Gecode {
             gid_base += vd[a].r[i].width();
           }
         }
-        assert(gid_base == sparse_n_vals);
+        assert(gid_base == n_vals);
 
-        const unsigned long long n_tcells64 =
-          static_cast<unsigned long long>(n_tuples) *
-          static_cast<unsigned long long>(arity);
-        if (n_tcells64 >
-            static_cast<unsigned long long>(std::numeric_limits<unsigned int>::max()))
-          throw Int::OutOfLimits("TupleSet::finalize()");
-        const unsigned int n_tcells = static_cast<unsigned int>(n_tcells64);
-
-        sparse_tv = heap.alloc<unsigned int>(n_tcells);
+        unsigned int* tv_tmp = (n_tcells > 0U) ?
+          heap.alloc<unsigned int>(n_tcells) : nullptr;
+        unsigned int* offsets_tmp = heap.alloc<unsigned int>(n_vals+1U);
+        for (unsigned int i=0U; i<=n_vals; i++)
+          offsets_tmp[i] = 0U;
         for (int i=0; i<n_tuples; i++) {
           const unsigned int tid = tuple2idx(tuple[i]);
           for (int a=0; a<arity; a++) {
@@ -330,24 +368,110 @@ namespace Gecode {
             const unsigned int gid =
               vd[a].r[r].sparse_base +
               static_cast<unsigned int>(tuple[i][a] - vd[a].r[r].min);
-            sparse_tv[tid*arity+a] = gid;
-            sparse_offsets[gid+1U]++;
+            tv_tmp[tid*arity+a] = gid;
+            offsets_tmp[gid+1U]++;
           }
         }
 
-        for (unsigned int i=1U; i<=sparse_n_vals; i++)
-          sparse_offsets[i] += sparse_offsets[i-1U];
+        for (unsigned int i=1U; i<=n_vals; i++)
+          offsets_tmp[i] += offsets_tmp[i-1U];
 
-        sparse_tuples = heap.alloc<unsigned int>(n_tcells);
-        unsigned int* next = r.alloc<unsigned int>(sparse_n_vals);
-        for (unsigned int i=0U; i<sparse_n_vals; i++)
-          next[i] = sparse_offsets[i];
-        for (int i=0; i<n_tuples; i++) {
-          const unsigned int tid = tuple2idx(tuple[i]);
-          for (int a=0; a<arity; a++) {
-            const unsigned int gid = sparse_tv[tid*arity+a];
-            sparse_tuples[next[gid]++] = tid;
+        if (build_sparse) {
+          sparse_n_vals = n_vals;
+          sparse_offsets = offsets_tmp;
+          sparse_tv = tv_tmp;
+          sparse_tuples = (n_tcells > 0U) ?
+            heap.alloc<unsigned int>(n_tcells) : nullptr;
+          unsigned int* next = (n_vals > 0U) ?
+            r.alloc<unsigned int>(n_vals) : nullptr;
+          for (unsigned int i=0U; i<n_vals; i++)
+            next[i] = sparse_offsets[i];
+          for (int i=0; i<n_tuples; i++) {
+            const unsigned int tid = tuple2idx(tuple[i]);
+            for (int a=0; a<arity; a++) {
+              const unsigned int gid = sparse_tv[tid*arity+a];
+              sparse_tuples[next[gid]++] = tid;
+            }
           }
+        } else {
+          unsigned int* tuples_by_gid = (n_tcells > 0U) ?
+            heap.alloc<unsigned int>(n_tcells) : nullptr;
+          unsigned int* next = (n_vals > 0U) ?
+            r.alloc<unsigned int>(n_vals) : nullptr;
+          for (unsigned int i=0U; i<n_vals; i++)
+            next[i] = offsets_tmp[i];
+          for (int i=0; i<n_tuples; i++) {
+            const unsigned int tid = tuple2idx(tuple[i]);
+            for (int a=0; a<arity; a++) {
+              const unsigned int gid = tv_tmp[tid*arity+a];
+              tuples_by_gid[next[gid]++] = tid;
+            }
+          }
+          for (unsigned int gid=0U; gid<n_vals; gid++) {
+            const unsigned int begin = offsets_tmp[gid];
+            const unsigned int end = offsets_tmp[gid+1U];
+            const unsigned int len = end - begin;
+            if (len > 1U)
+              Support::quicksort(tuples_by_gid + begin, len);
+          }
+
+          compressed_offsets = heap.alloc<unsigned int>(n_vals+1U);
+          compressed_offsets[0] = 0U;
+          unsigned long long entries64 = 0ULL;
+          for (unsigned int gid=0U; gid<n_vals; gid++) {
+            unsigned int count = 0U;
+            unsigned int last_widx = std::numeric_limits<unsigned int>::max();
+            for (unsigned int p=offsets_tmp[gid]; p<offsets_tmp[gid+1U]; p++) {
+              const unsigned int tid = tuples_by_gid[p];
+              const unsigned int widx = tid / BitSetData::bpb;
+              if (widx != last_widx) {
+                count++;
+                last_widx = widx;
+              }
+            }
+            entries64 += static_cast<unsigned long long>(count);
+            if (entries64 >
+                static_cast<unsigned long long>(std::numeric_limits<unsigned int>::max()))
+              throw Int::OutOfLimits("TupleSet::finalize()");
+            compressed_offsets[gid+1U] = static_cast<unsigned int>(entries64);
+          }
+          compressed_n_entries = static_cast<unsigned int>(entries64);
+          compressed_words = (compressed_n_entries > 0U) ?
+            heap.alloc<CSupportWord>(compressed_n_entries) : nullptr;
+
+          unsigned int out = 0U;
+          for (unsigned int gid=0U; gid<n_vals; gid++) {
+            unsigned int current_widx = std::numeric_limits<unsigned int>::max();
+            BitSetData bits;
+            bits.init(false);
+            const unsigned int begin = offsets_tmp[gid];
+            const unsigned int end = offsets_tmp[gid+1U];
+            for (unsigned int p=begin; p<end; p++) {
+              const unsigned int tid = tuples_by_gid[p];
+              const unsigned int widx = tid / BitSetData::bpb;
+              if (widx != current_widx) {
+                if (current_widx != std::numeric_limits<unsigned int>::max()) {
+                  compressed_words[out].widx = current_widx;
+                  compressed_words[out].bits = bits;
+                  out++;
+                }
+                current_widx = widx;
+                bits.init(false);
+              }
+              bits.set(tid % BitSetData::bpb);
+            }
+            if (current_widx != std::numeric_limits<unsigned int>::max()) {
+              compressed_words[out].widx = current_widx;
+              compressed_words[out].bits = bits;
+              out++;
+            }
+            assert(out == compressed_offsets[gid+1U]);
+          }
+          assert(out == compressed_n_entries);
+
+          heap.rfree(tuples_by_gid);
+          heap.rfree(offsets_tmp);
+          heap.rfree(tv_tmp);
         }
       }
       if (build_dense)
@@ -375,6 +499,8 @@ namespace Gecode {
     heap.rfree(sparse_offsets);
     heap.rfree(sparse_tuples);
     heap.rfree(sparse_tv);
+    heap.rfree(compressed_offsets);
+    heap.rfree(compressed_words);
   }
 
 

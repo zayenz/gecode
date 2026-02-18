@@ -901,33 +901,40 @@ namespace Gecode { namespace Int { namespace Extensional {
     }
   };
 
-  enum SparseDispatch {
-    SD_DENSE,
-    SD_SPARSE
+  enum DispatchKind {
+    DD_DENSE,
+    DD_SPARSE,
+    DD_DENSE_COMPRESSED
   };
 
-  forceinline SparseDispatch
-  sparse_dispatch(const TupleSet& t, ExtensionalPropKind epk) {
+  forceinline DispatchKind
+  dispatch_kind(const TupleSet& t, ExtensionalPropKind epk) {
     switch (epk) {
     case EPK_AUTO:
+      if (t.dense_compressed_support())
+        return DD_DENSE_COMPRESSED;
       if (t.sparse_support())
-        return SD_SPARSE;
+        return DD_SPARSE;
       if (t.dense_support())
-        return SD_DENSE;
+        return DD_DENSE;
       throw OutOfLimits("Int::extensional");
     case EPK_DENSE:
       if (t.dense_support())
-        return SD_DENSE;
+        return DD_DENSE;
       throw OutOfLimits("Int::extensional");
     case EPK_SPARSE:
       if (t.sparse_support())
-        return SD_SPARSE;
+        return DD_SPARSE;
       if (t.dense_support())
-        return SD_DENSE;
+        return DD_DENSE;
+      throw OutOfLimits("Int::extensional");
+    case EPK_DENSE_COMPRESSED:
+      if (t.dense_compressed_support())
+        return DD_DENSE_COMPRESSED;
       throw OutOfLimits("Int::extensional");
     default:
       GECODE_NEVER;
-      return SD_DENSE;
+      return DD_DENSE;
     }
   }
 
@@ -955,8 +962,9 @@ namespace Gecode {
       return;
     }
 
-    if (Int::Extensional::sparse_dispatch(t,epk) ==
-        Int::Extensional::SD_SPARSE) {
+    const Int::Extensional::DispatchKind dk =
+      Int::Extensional::dispatch_kind(t,epk);
+    if (dk == Int::Extensional::DD_SPARSE) {
       ViewArray<IntView> xv(home,x);
       if (pos)
         GECODE_ES_FAIL((Extensional::SparseInc<IntView,true>::post(home,xv,t)));
@@ -966,10 +974,16 @@ namespace Gecode {
     }
 
     ViewArray<IntView> xv(home,x);
-    if (pos)
+    if (dk == Int::Extensional::DD_DENSE_COMPRESSED) {
+      if (pos)
+        GECODE_ES_FAIL((Extensional::postposcompact_compressed<IntView>(home,xv,t)));
+      else
+        GECODE_ES_FAIL((Extensional::postnegcompact_compressed<IntView>(home,xv,t)));
+    } else if (pos) {
       GECODE_ES_FAIL((Extensional::postposcompact<IntView>(home,xv,t)));
-    else
+    } else {
       GECODE_ES_FAIL((Extensional::postnegcompact<IntView>(home,xv,t)));
+    }
   }
 
   void
@@ -1010,8 +1024,9 @@ namespace Gecode {
       return;
     }
 
-    if (Int::Extensional::sparse_dispatch(t,epk) ==
-        Int::Extensional::SD_SPARSE) {
+    const Int::Extensional::DispatchKind dk =
+      Int::Extensional::dispatch_kind(t,epk);
+    if (dk == Int::Extensional::DD_SPARSE) {
       ViewArray<IntView> xv(home,x);
       if (pos) {
         switch (r.mode()) {
@@ -1051,6 +1066,44 @@ namespace Gecode {
     }
 
     ViewArray<IntView> xv(home,x);
+    if (dk == Int::Extensional::DD_DENSE_COMPRESSED) {
+      if (pos) {
+        switch (r.mode()) {
+        case RM_EQV:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<IntView,BoolView,RM_EQV>
+                          (home,xv,t,r.var())));
+          break;
+        case RM_IMP:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<IntView,BoolView,RM_IMP>
+                          (home,xv,t,r.var())));
+          break;
+        case RM_PMI:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<IntView,BoolView,RM_PMI>
+                          (home,xv,t,r.var())));
+          break;
+        default: throw UnknownReifyMode("Int::extensional");
+        }
+      } else {
+        NegBoolView n(r.var());
+        switch (r.mode()) {
+        case RM_EQV:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<IntView,NegBoolView,RM_EQV>
+                          (home,xv,t,n)));
+          break;
+        case RM_IMP:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<IntView,NegBoolView,RM_PMI>
+                          (home,xv,t,n)));
+          break;
+        case RM_PMI:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<IntView,NegBoolView,RM_IMP>
+                          (home,xv,t,n)));
+          break;
+        default: throw UnknownReifyMode("Int::extensional");
+        }
+      }
+      return;
+    }
+
     if (pos) {
       switch (r.mode()) {
       case RM_EQV:
@@ -1109,8 +1162,9 @@ namespace Gecode {
       return;
     }
 
-    if (Int::Extensional::sparse_dispatch(t,epk) ==
-        Int::Extensional::SD_SPARSE) {
+    const Int::Extensional::DispatchKind dk =
+      Int::Extensional::dispatch_kind(t,epk);
+    if (dk == Int::Extensional::DD_SPARSE) {
       ViewArray<BoolView> xv(home,x);
       if (pos)
         GECODE_ES_FAIL((Extensional::SparseInc<BoolView,true>::post(home,xv,t)));
@@ -1120,10 +1174,16 @@ namespace Gecode {
     }
 
     ViewArray<BoolView> xv(home,x);
-    if (pos)
+    if (dk == Int::Extensional::DD_DENSE_COMPRESSED) {
+      if (pos)
+        GECODE_ES_FAIL((Extensional::postposcompact_compressed<BoolView>(home,xv,t)));
+      else
+        GECODE_ES_FAIL((Extensional::postnegcompact_compressed<BoolView>(home,xv,t)));
+    } else if (pos) {
       GECODE_ES_FAIL((Extensional::postposcompact<BoolView>(home,xv,t)));
-    else
+    } else {
       GECODE_ES_FAIL((Extensional::postnegcompact<BoolView>(home,xv,t)));
+    }
   }
 
   void
@@ -1166,8 +1226,9 @@ namespace Gecode {
       return;
     }
 
-    if (Int::Extensional::sparse_dispatch(t,epk) ==
-        Int::Extensional::SD_SPARSE) {
+    const Int::Extensional::DispatchKind dk =
+      Int::Extensional::dispatch_kind(t,epk);
+    if (dk == Int::Extensional::DD_SPARSE) {
       ViewArray<BoolView> xv(home,x);
       if (pos) {
         switch (r.mode()) {
@@ -1207,6 +1268,44 @@ namespace Gecode {
     }
 
     ViewArray<BoolView> xv(home,x);
+    if (dk == Int::Extensional::DD_DENSE_COMPRESSED) {
+      if (pos) {
+        switch (r.mode()) {
+        case RM_EQV:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<BoolView,BoolView,RM_EQV>
+                          (home,xv,t,r.var())));
+          break;
+        case RM_IMP:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<BoolView,BoolView,RM_IMP>
+                          (home,xv,t,r.var())));
+          break;
+        case RM_PMI:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<BoolView,BoolView,RM_PMI>
+                          (home,xv,t,r.var())));
+          break;
+        default: throw UnknownReifyMode("Int::extensional");
+        }
+      } else {
+        NegBoolView n(r.var());
+        switch (r.mode()) {
+        case RM_EQV:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<BoolView,NegBoolView,RM_EQV>
+                          (home,xv,t,n)));
+          break;
+        case RM_IMP:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<BoolView,NegBoolView,RM_PMI>
+                          (home,xv,t,n)));
+          break;
+        case RM_PMI:
+          GECODE_ES_FAIL((Extensional::postrecompact_compressed<BoolView,NegBoolView,RM_IMP>
+                          (home,xv,t,n)));
+          break;
+        default: throw UnknownReifyMode("Int::extensional");
+        }
+      }
+      return;
+    }
+
     if (pos) {
       switch (r.mode()) {
       case RM_EQV:

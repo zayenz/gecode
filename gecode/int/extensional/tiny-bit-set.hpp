@@ -94,11 +94,36 @@ namespace Gecode { namespace Int { namespace Extensional {
   }
 
   template<unsigned int sz>
+  forceinline void
+  TinyBitSet<sz>::add_to_mask_aligned(const TupleSet::CSupportWord* b,
+                                      const TupleSet::CSupportWord* e,
+                                      BitSetData* mask) const {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* s = find_aligned_word(b,e,i);
+      if (s != nullptr)
+        mask[i] = BitSetData::o(mask[i],*s);
+    }
+  }
+
+  template<unsigned int sz>
   template<bool sparse>
   forceinline void
   TinyBitSet<sz>::intersect_with_mask(const BitSetData* mask) {
     for (unsigned int i=0U; i<sz; i++)
       _bits[i] = BitSetData::a(_bits[i], mask[i]);
+  }
+
+  template<unsigned int sz>
+  forceinline void
+  TinyBitSet<sz>::intersect_with_mask_aligned
+  (const TupleSet::CSupportWord* b, const TupleSet::CSupportWord* e) {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* s = find_aligned_word(b,e,i);
+      if (s == nullptr)
+        _bits[i].init(false);
+      else
+        _bits[i] = BitSetData::a(_bits[i],*s);
+    }
   }
 
   template<unsigned int sz>
@@ -111,9 +136,40 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<unsigned int sz>
   forceinline void
+  TinyBitSet<sz>::intersect_with_masks_aligned
+  (const TupleSet::CSupportWord* ab, const TupleSet::CSupportWord* ae,
+   const TupleSet::CSupportWord* bb, const TupleSet::CSupportWord* be) {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* sa = find_aligned_word(ab,ae,i);
+      const BitSetData* sb = find_aligned_word(bb,be,i);
+      BitSetData m;
+      if (sa != nullptr) {
+        m = *sa;
+      } else {
+        m.init(false);
+      }
+      if (sb != nullptr)
+        m = BitSetData::o(m,*sb);
+      _bits[i] = BitSetData::a(_bits[i],m);
+    }
+  }
+
+  template<unsigned int sz>
+  forceinline void
   TinyBitSet<sz>::nand_with_mask(const BitSetData* b) {
     for (unsigned int i=0U; i<sz; i++)
       _bits[i] = BitSetData::a(_bits[i],~(b[i]));
+  }
+
+  template<unsigned int sz>
+  forceinline void
+  TinyBitSet<sz>::nand_with_mask_aligned(const TupleSet::CSupportWord* b,
+                                         const TupleSet::CSupportWord* e) {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* s = find_aligned_word(b,e,i);
+      if (s != nullptr)
+        _bits[i] = BitSetData::a(_bits[i],~(*s));
+    }
   }
 
   template<unsigned int sz>
@@ -134,12 +190,38 @@ namespace Gecode { namespace Int { namespace Extensional {
   }
 
   template<unsigned int sz>
+  forceinline bool
+  TinyBitSet<sz>::intersects_aligned(const TupleSet::CSupportWord* b,
+                                     const TupleSet::CSupportWord* e) {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* s = find_aligned_word(b,e,i);
+      if ((s != nullptr) && !BitSetData::a(_bits[i],*s).none())
+        return true;
+    }
+    return false;
+  }
+
+  template<unsigned int sz>
   forceinline unsigned long long int
   TinyBitSet<sz>::ones(const BitSetData* b) const {
     unsigned long long int o = 0U;
     for (unsigned int i=0U; i<sz; i++)
       o += static_cast<unsigned long long int>
         (BitSetData::a(_bits[i],b[i]).ones());
+    return o;
+  }
+
+  template<unsigned int sz>
+  forceinline unsigned long long int
+  TinyBitSet<sz>::ones_aligned(const TupleSet::CSupportWord* b,
+                               const TupleSet::CSupportWord* e) const {
+    unsigned long long int o = 0U;
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* s = find_aligned_word(b,e,i);
+      if (s != nullptr)
+        o += static_cast<unsigned long long int>
+          (BitSetData::a(_bits[i],*s).ones());
+    }
     return o;
   }
     

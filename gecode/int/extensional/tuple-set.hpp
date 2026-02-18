@@ -67,9 +67,11 @@ namespace Gecode {
       min(Int::Limits::max), max(Int::Limits::min), key(0),
       td(heap.alloc<int>(n_initial_free * a)),
       vd(heap.alloc<ValueData>(a)),
-      range(nullptr), support(nullptr), sparse(false),
+      range(nullptr), support(nullptr), support_repr(SR_NONE), sparse(false),
       sparse_n_vals(0U), sparse_offsets(nullptr),
-      sparse_tuples(nullptr), sparse_tv(nullptr) {
+      sparse_tuples(nullptr), sparse_tv(nullptr),
+      compressed_offsets(nullptr), compressed_words(nullptr),
+      compressed_n_entries(0U) {
   }
   
   forceinline bool
@@ -243,6 +245,11 @@ namespace Gecode {
     return data().sparse;
   }
 
+  forceinline bool
+  TupleSet::dense_compressed_support(void) const {
+    return (data().compressed_offsets != nullptr) || (data().n_tuples == 0);
+  }
+
   forceinline unsigned int
   TupleSet::sparse_values(void) const {
     return data().sparse_n_vals;
@@ -283,6 +290,36 @@ namespace Gecode {
           static_cast<unsigned int>(n - v.r[m].min);
         b = d.sparse_tuples + d.sparse_offsets[gid];
         e = d.sparse_tuples + d.sparse_offsets[gid+1U];
+        return true;
+      }
+    }
+    return false;
+  }
+
+  forceinline bool
+  TupleSet::dense_compressed_support(int p, int n,
+                                     const CSupportWord*& b,
+                                     const CSupportWord*& e,
+                                     unsigned int& gid) const {
+    const Data& d = data();
+    if ((d.compressed_offsets == nullptr) ||
+        (d.compressed_words == nullptr))
+      return false;
+    if ((p < 0) || (p >= d.arity))
+      return false;
+    const ValueData& v = d.vd[p];
+    unsigned int l = 0U, h = v.n;
+    while (l < h) {
+      const unsigned int m = l + ((h-l) >> 1);
+      if (n < v.r[m].min)
+        h = m;
+      else if (n > v.r[m].max)
+        l = m+1U;
+      else {
+        gid = v.r[m].sparse_base +
+          static_cast<unsigned int>(n - v.r[m].min);
+        b = d.compressed_words + d.compressed_offsets[gid];
+        e = d.compressed_words + d.compressed_offsets[gid+1U];
         return true;
       }
     }

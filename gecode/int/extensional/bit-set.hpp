@@ -37,6 +37,23 @@
 
 namespace Gecode { namespace Int { namespace Extensional {
 
+  forceinline const TupleSet::BitSetData*
+  find_aligned_word(const TupleSet::CSupportWord* b,
+                    const TupleSet::CSupportWord* e,
+                    unsigned int widx) {
+    while (b < e) {
+      const TupleSet::CSupportWord* m = b + ((e-b) >> 1);
+      if (widx < m->widx) {
+        e = m;
+      } else if (widx > m->widx) {
+        b = m+1;
+      } else {
+        return &m->bits;
+      }
+    }
+    return nullptr;
+  }
+
   template<class IndexType>
   forceinline unsigned int
   BitSet<IndexType>::limit(void) const {
@@ -163,6 +180,19 @@ namespace Gecode { namespace Int { namespace Extensional {
   }
 
   template<class IndexType>
+  forceinline void
+  BitSet<IndexType>::add_to_mask_aligned(const TupleSet::CSupportWord* b,
+                                         const TupleSet::CSupportWord* e,
+                                         BitSetData* mask) const {
+    assert(_limit > 0U);
+    for (IndexType i=0; i<_limit; i++) {
+      const BitSetData* s = find_aligned_word(b,e,_index[i]);
+      if (s != nullptr)
+        mask[i] = BitSetData::o(mask[i],*s);
+    }
+  }
+
+  template<class IndexType>
   template<bool sparse>
   forceinline void
   BitSet<IndexType>::intersect_with_mask(const BitSetData* mask) {
@@ -185,6 +215,25 @@ namespace Gecode { namespace Int { namespace Extensional {
       }
     }
   }
+
+  template<class IndexType>
+  forceinline void
+  BitSet<IndexType>::intersect_with_mask_aligned
+  (const TupleSet::CSupportWord* b, const TupleSet::CSupportWord* e) {
+    assert(_limit > 0U);
+    for (IndexType i = _limit; i--; ) {
+      assert(!_bits[i].none());
+      const BitSetData* s = find_aligned_word(b,e,_index[i]);
+      BitSetData w;
+      if (s == nullptr) {
+        w.init(false);
+      } else {
+        w = BitSetData::a(_bits[i],*s);
+      }
+      replace_and_decrease(i,w);
+      assert(i == _limit || !_bits[i].none());
+    }
+  }
   
   template<class IndexType>
   forceinline void
@@ -198,6 +247,30 @@ namespace Gecode { namespace Int { namespace Extensional {
       BitSetData w_o = BitSetData::o(a[offset], b[offset]);
       BitSetData w_a = BitSetData::a(w_i,w_o);
       replace_and_decrease(i,w_a);
+      assert(i == _limit || !_bits[i].none());
+    }
+  }
+
+  template<class IndexType>
+  forceinline void
+  BitSet<IndexType>::intersect_with_masks_aligned
+  (const TupleSet::CSupportWord* ab, const TupleSet::CSupportWord* ae,
+   const TupleSet::CSupportWord* bb, const TupleSet::CSupportWord* be) {
+    assert(_limit > 0U);
+    for (IndexType i = _limit; i--; ) {
+      assert(!_bits[i].none());
+      const BitSetData* sa = find_aligned_word(ab,ae,_index[i]);
+      const BitSetData* sb = find_aligned_word(bb,be,_index[i]);
+      BitSetData m;
+      if (sa != nullptr) {
+        m = *sa;
+      } else {
+        m.init(false);
+      }
+      if (sb != nullptr)
+        m = BitSetData::o(m,*sb);
+      BitSetData w = BitSetData::a(_bits[i],m);
+      replace_and_decrease(i,w);
       assert(i == _limit || !_bits[i].none());
     }
   }
@@ -215,11 +288,39 @@ namespace Gecode { namespace Int { namespace Extensional {
   }
 
   template<class IndexType>
+  forceinline void
+  BitSet<IndexType>::nand_with_mask_aligned(const TupleSet::CSupportWord* b,
+                                            const TupleSet::CSupportWord* e) {
+    assert(_limit > 0U);
+    for (IndexType i = _limit; i--; ) {
+      assert(!_bits[i].none());
+      const BitSetData* s = find_aligned_word(b,e,_index[i]);
+      if (s != nullptr) {
+        BitSetData w = BitSetData::a(_bits[i],~(*s));
+        replace_and_decrease(i,w);
+        assert(i == _limit || !_bits[i].none());
+      }
+    }
+  }
+
+  template<class IndexType>
   forceinline bool
   BitSet<IndexType>::intersects(const BitSetData* b) const {
     for (IndexType i=0; i<_limit; i++)
       if (!BitSetData::a(_bits[i],b[_index[i]]).none())
         return true;
+    return false;
+  }
+
+  template<class IndexType>
+  forceinline bool
+  BitSet<IndexType>::intersects_aligned(const TupleSet::CSupportWord* b,
+                                        const TupleSet::CSupportWord* e) const {
+    for (IndexType i=0; i<_limit; i++) {
+      const BitSetData* s = find_aligned_word(b,e,_index[i]);
+      if ((s != nullptr) && !BitSetData::a(_bits[i],*s).none())
+        return true;
+    }
     return false;
   }
     
@@ -230,6 +331,20 @@ namespace Gecode { namespace Int { namespace Extensional {
     for (IndexType i=0; i<_limit; i++)
       o += static_cast<unsigned long long int>
         (BitSetData::a(_bits[i],b[_index[i]]).ones());
+    return o;
+  }
+
+  template<class IndexType>
+  forceinline unsigned long long int
+  BitSet<IndexType>::ones_aligned(const TupleSet::CSupportWord* b,
+                                  const TupleSet::CSupportWord* e) const {
+    unsigned long long int o = 0U;
+    for (IndexType i=0; i<_limit; i++) {
+      const BitSetData* s = find_aligned_word(b,e,_index[i]);
+      if (s != nullptr)
+        o += static_cast<unsigned long long int>
+          (BitSetData::a(_bits[i],*s).ones());
+    }
     return o;
   }
     

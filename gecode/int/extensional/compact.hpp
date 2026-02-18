@@ -1242,6 +1242,979 @@ namespace Gecode { namespace Int { namespace Extensional {
     return ES_OK;
   }
 
+  /*
+   * Compact table with compressed supports
+   *
+   */
+  template<class View, bool pos>
+  class CompactCompressed : public Propagator {
+  protected:
+    typedef TupleSet::Range Range;
+    typedef TupleSet::CSupportWord CSupportWord;
+
+    class CTAdvisor : public ViewAdvisor<View> {
+    public:
+      using ViewAdvisor<View>::view;
+    protected:
+      const Range* _fst;
+      const Range* _lst;
+      int _idx;
+    public:
+      CTAdvisor(Space& home, Propagator& p, Council<CTAdvisor>& c,
+                const TupleSet& ts, View x0, int i)
+        : ViewAdvisor<View>(home,p,c,x0), _fst(ts.fst(i)), _lst(ts.lst(i)),
+          _idx(i) {
+        adjust();
+      }
+      CTAdvisor(Space& home, CTAdvisor& a)
+        : ViewAdvisor<View>(home,a), _fst(a._fst), _lst(a._lst), _idx(a._idx) {}
+      void adjust(void) {
+        if (pos) {
+          {
+            int n = view().min();
+            assert((_fst->min <= n) && (n <= _lst->max));
+            while (n > _fst->max)
+              _fst++;
+          }
+          {
+            int n = view().max();
+            assert((_fst->min <= n) && (n <= _lst->max));
+            while (n < _lst->min)
+              _lst--;
+          }
+        } else {
+          {
+            int n = view().min();
+            while ((_fst <= _lst) && (n > _fst->max))
+              _fst++;
+          }
+          {
+            int n = view().max();
+            while ((_fst <= _lst) && (n < _lst->min))
+              _lst--;
+          }
+        }
+      }
+      int index(void) const {
+        return _idx;
+      }
+      const Range* fst(void) const {
+        return _fst;
+      }
+      const Range* lst(void) const {
+        return _lst;
+      }
+      void dispose(Space& home, Council<CTAdvisor>& c) {
+        (void) ViewAdvisor<View>::dispose(home,c);
+      }
+    };
+
+    class ValidSupports {
+    protected:
+      const TupleSet& ts;
+      ViewRanges<View> xr;
+      int i;
+      int n;
+      const CSupportWord* b;
+      const CSupportWord* e;
+      bool ok;
+      void find(void) {
+        while (xr()) {
+          if (n < xr.min())
+            n = xr.min();
+          if (n > xr.max()) {
+            ++xr;
+            continue;
+          }
+          unsigned int gid = 0U;
+          if (ts.dense_compressed_support(i,n,b,e,gid)) {
+            ok = true;
+            return;
+          }
+          n++;
+        }
+        ok = false;
+      }
+    public:
+      ValidSupports(const CompactCompressed<View,pos>& p, CTAdvisor& a)
+        : ts(p.ts), xr(a.view()), i(a.index()), n(0),
+          b(nullptr), e(nullptr), ok(false) {
+        if (xr()) {
+          n = xr.min();
+          find();
+        }
+      }
+      ValidSupports(const TupleSet& ts0, int i0, View x)
+        : ts(ts0), xr(x), i(i0), n(0),
+          b(nullptr), e(nullptr), ok(false) {
+        if (xr()) {
+          n = xr.min();
+          find();
+        }
+      }
+      void operator ++(void) {
+        n++;
+        find();
+      }
+      bool operator ()(void) const {
+        return ok;
+      }
+      int val(void) const {
+        return n;
+      }
+      const CSupportWord* begin(void) const {
+        return b;
+      }
+      const CSupportWord* end(void) const {
+        return e;
+      }
+    };
+
+    class LostSupports {
+    protected:
+      const CompactCompressed<View,pos>& p;
+      CTAdvisor& a;
+      int l;
+      int h;
+      const CSupportWord* b;
+      const CSupportWord* e;
+      bool ok;
+      void find(void) {
+        while (l <= h) {
+          if (l < a.fst()->min) {
+            l = a.fst()->min;
+          } else if (l > a.lst()->max) {
+            ok = false;
+            return;
+          }
+          unsigned int gid = 0U;
+          if (p.ts.dense_compressed_support(a.index(),l,b,e,gid)) {
+            ok = true;
+            return;
+          }
+          l++;
+        }
+        ok = false;
+      }
+    public:
+      LostSupports(const CompactCompressed<View,pos>& p0, CTAdvisor& a0,
+                   int l0, int h0)
+        : p(p0), a(a0), l(l0), h(h0), b(nullptr), e(nullptr), ok(false) {
+        assert(pos);
+        find();
+      }
+      void operator ++(void) {
+        l++;
+        find();
+      }
+      bool operator ()(void) const {
+        return ok;
+      }
+      const CSupportWord* begin(void) const {
+        return b;
+      }
+      const CSupportWord* end(void) const {
+        return e;
+      }
+    };
+
+    bool all(void) const {
+      Advisors<CTAdvisor> as(c);
+      return !as();
+    }
+    bool atmostone(void) const {
+      Advisors<CTAdvisor> as(c);
+      if (!as())
+        return true;
+      ++as;
+      return !as();
+    }
+
+  protected:
+    const unsigned int n_words;
+    TupleSet ts;
+    Council<CTAdvisor> c;
+
+    CompactCompressed(Space& home, CompactCompressed& p)
+      : Propagator(home,p), n_words(p.n_words), ts(p.ts), c(home) {
+      c.update(home,p.c);
+    }
+    CompactCompressed(Home home, const TupleSet& ts0)
+      : Propagator(home), n_words(ts0.words()), ts(ts0), c(home) {
+      home.notice(*this, AP_DISPOSE);
+    }
+
+    bool supports(CTAdvisor& a, int n,
+                  const CSupportWord*& b,
+                  const CSupportWord*& e) const {
+      unsigned int gid = 0U;
+      return ts.dense_compressed_support(a.index(),n,b,e,gid);
+    }
+
+    template<class Table>
+    void setup(Space& home, Table& table, ViewArray<View>& x) {
+      ModEvent me = ME_INT_BND;
+      Region r;
+      BitSetData* mask = r.alloc<BitSetData>(table.size());
+      for (int i=0; i<x.size(); i++) {
+        table.clear_mask(mask);
+        for (ValidSupports vs(ts,i,x[i]); vs(); ++vs)
+          table.add_to_mask_aligned(vs.begin(),vs.end(),mask);
+        table.template intersect_with_mask<false>(mask);
+        if (table.empty())
+          goto schedule;
+      }
+      for (int i=0; i<x.size(); i++) {
+        if (!x[i].assigned())
+          (void) new (home) CTAdvisor(home,*this,c,ts,x[i],i);
+        else
+          me = ME_INT_VAL;
+      }
+    schedule:
+      View::schedule(home,*this,me);
+    }
+
+    template<class Table>
+    bool full(const Table& table) const {
+      unsigned long long int s = 1U;
+      for (Advisors<CTAdvisor> as(c); as(); ++as) {
+        s *= static_cast<unsigned long long int>(as.advisor().view().size());
+        if (s > table.bits())
+          return false;
+      }
+      return s == table.ones();
+    }
+
+  public:
+    virtual PropCost cost(const Space&, const ModEventDelta&) const {
+      int n = 0;
+      for (Advisors<CTAdvisor> as(c); as() && (n <= 3); ++as)
+        n++;
+      return PropCost::quadratic(PropCost::HI,n);
+    }
+    size_t dispose(Space& home) {
+      home.ignore(*this,AP_DISPOSE);
+      c.dispose(home);
+      ts.~TupleSet();
+      (void) Propagator::dispose(home);
+      return sizeof(*this);
+    }
+  };
+
+  template<class View, class Table>
+  class PosCompactCompressed : public CompactCompressed<View,true> {
+  public:
+    typedef CompactCompressed<View,true> Base;
+    typedef typename Base::ValidSupports ValidSupports;
+    typedef typename Base::CTAdvisor CTAdvisor;
+    typedef typename Base::LostSupports LostSupports;
+    typedef typename Base::CSupportWord CSupportWord;
+
+    using Base::setup;
+    using Base::supports;
+    using Base::all;
+    using Base::atmostone;
+    using Base::c;
+    using Base::ts;
+
+    enum StatusType {
+      SINGLE      = 0,
+      MULTIPLE    = 1,
+      NONE        = 2,
+      PROPAGATING = 3
+    };
+    class Status {
+    protected:
+      ptrdiff_t s;
+    public:
+      Status(StatusType t) : s(t) {}
+      Status(const Status& t) : s(t.s) {}
+      StatusType type(void) const {
+        return static_cast<StatusType>(s & 3);
+      }
+      bool single(CTAdvisor& a) const {
+        if (type() != SINGLE)
+          return false;
+        return reinterpret_cast<CTAdvisor*>(s) == &a;
+      }
+      void touched(CTAdvisor& a) {
+        if (!single(a))
+          s = MULTIPLE;
+      }
+      void none(void) {
+        s = NONE;
+      }
+      void propagating(void) {
+        s = PROPAGATING;
+      }
+    };
+
+    Status status;
+    Table table;
+
+    template<class TableProp>
+    PosCompactCompressed(Space& home, TableProp& p)
+      : Base(home,p), status(NONE), table(home,p.table) {
+      assert(!table.empty());
+    }
+    PosCompactCompressed(Home home, ViewArray<View>& x, const TupleSet& ts)
+      : Base(home,ts), status(MULTIPLE), table(home,ts.words()) {
+      setup(home,table,x);
+    }
+
+    virtual Actor* copy(Space& home) {
+      assert((table.words() > 0U) && (table.width() >= table.words()));
+      if (table.words() <= 4U) {
+        switch (table.width()) {
+        case 0U: GECODE_NEVER; break;
+        case 1U: return new (home) PosCompactCompressed<View,TinyBitSet<1U>>(home,*this);
+        case 2U: return new (home) PosCompactCompressed<View,TinyBitSet<2U>>(home,*this);
+        case 3U: return new (home) PosCompactCompressed<View,TinyBitSet<3U>>(home,*this);
+        case 4U: return new (home) PosCompactCompressed<View,TinyBitSet<4U>>(home,*this);
+        default: break;
+        }
+      }
+      if (std::is_same<Table,BitSet<unsigned char>>::value) {
+        goto copy_char;
+      } else if (std::is_same<Table,BitSet<unsigned short int>>::value) {
+        switch (Gecode::Support::u_type(table.width())) {
+        case Gecode::Support::IT_CHAR: goto copy_char;
+        case Gecode::Support::IT_SHRT: goto copy_short;
+        case Gecode::Support::IT_INT:  GECODE_NEVER;
+        default:                       GECODE_NEVER;
+        }
+      } else {
+        switch (Gecode::Support::u_type(table.width())) {
+        case Gecode::Support::IT_CHAR: goto copy_char;
+        case Gecode::Support::IT_SHRT: goto copy_short;
+        case Gecode::Support::IT_INT:  goto copy_int;
+        default: GECODE_NEVER;
+        }
+      }
+    copy_char:
+      return new (home) PosCompactCompressed<View,BitSet<unsigned char>>(home,*this);
+    copy_short:
+      return new (home) PosCompactCompressed<View,BitSet<unsigned short int>>(home,*this);
+    copy_int:
+      return new (home) PosCompactCompressed<View,BitSet<unsigned int>>(home,*this);
+    }
+
+    static ExecStatus post(Home home, ViewArray<View>& x, const TupleSet& ts) {
+      auto ct = new (home) PosCompactCompressed(home,x,ts);
+      assert((x.size() > 1) && (ts.tuples() > 1));
+      return ct->table.empty() ? ES_FAILED : ES_OK;
+    }
+
+    virtual size_t dispose(Space& home) {
+      (void) Base::dispose(home);
+      return sizeof(*this);
+    }
+
+    virtual void reschedule(Space& home) {
+      if ((status.type() != StatusType::NONE) || all() || table.empty())
+        View::schedule(home,*this,ME_INT_DOM);
+    }
+
+    virtual ExecStatus propagate(Space& home, const ModEventDelta&) {
+      if (table.empty())
+        return ES_FAILED;
+      if (all())
+        return home.ES_SUBSUMED(*this);
+
+      Status touched(status);
+      status.propagating();
+
+      Region r;
+      for (Advisors<CTAdvisor> as(c); as(); ++as) {
+        CTAdvisor& a = as.advisor();
+        View x = a.view();
+
+        if (touched.single(a) || x.assigned())
+          continue;
+
+        if (x.size() == 2) {
+          const CSupportWord* bb = nullptr;
+          const CSupportWord* be = nullptr;
+          bool min_supported =
+            supports(a,x.min(),bb,be) && table.intersects_aligned(bb,be);
+          if (!min_supported) {
+            GECODE_ME_CHECK(x.eq(home,x.max()));
+          } else {
+            bool max_supported =
+              supports(a,x.max(),bb,be) && table.intersects_aligned(bb,be);
+            if (!max_supported)
+              GECODE_ME_CHECK(x.eq(home,x.min()));
+          }
+          if (!x.assigned())
+            a.adjust();
+        } else {
+          int* nq = r.alloc<int>(x.size());
+          unsigned int n_nq = 0U;
+          int last_support = 0;
+          for (ValidSupports vs(*this,a); vs(); ++vs) {
+            if (!table.intersects_aligned(vs.begin(),vs.end()))
+              nq[n_nq++] = vs.val();
+            else
+              last_support = vs.val();
+          }
+          if (n_nq > 0U) {
+            if (n_nq == 1U) {
+              GECODE_ME_CHECK(x.nq(home,nq[0]));
+            } else if (n_nq == x.size() - 1U) {
+              GECODE_ME_CHECK(x.eq(home,last_support));
+              goto noadjust;
+            } else {
+              Iter::Values::Array rnq(nq,n_nq);
+              GECODE_ASSUME(n_nq >= 2U);
+              GECODE_ME_CHECK(x.minus_v(home,rnq,false));
+            }
+            a.adjust();
+          noadjust: ;
+          }
+          r.free();
+        }
+      }
+
+      status.none();
+      assert(!table.empty());
+      return atmostone() ? home.ES_SUBSUMED(*this) : ES_FIX;
+    }
+
+    virtual ExecStatus advise(Space& home, Advisor& a0, const Delta& d) {
+      CTAdvisor& a = static_cast<CTAdvisor&>(a0);
+
+      if (table.empty())
+        return Base::disabled() ? home.ES_NOFIX_DISPOSE(c,a) : ES_FAILED;
+
+      View x = a.view();
+      if (status.type() == StatusType::PROPAGATING)
+        return x.assigned() ? home.ES_FIX_DISPOSE(c,a) : ES_FIX;
+
+      status.touched(a);
+
+      if (x.assigned()) {
+        const CSupportWord* bb = nullptr;
+        const CSupportWord* be = nullptr;
+        if (supports(a,x.val(),bb,be))
+          table.intersect_with_mask_aligned(bb,be);
+        else
+          table.flush();
+        return home.ES_NOFIX_DISPOSE(c,a);
+      }
+
+      if (!x.any(d) && (x.min(d) == x.max(d))) {
+        const CSupportWord* bb = nullptr;
+        const CSupportWord* be = nullptr;
+        if (supports(a,x.min(d),bb,be))
+          table.nand_with_mask_aligned(bb,be);
+        a.adjust();
+      } else if (!x.any(d) && (x.width(d) <= x.size())) {
+        for (LostSupports ls(*this,a,x.min(d),x.max(d)); ls(); ++ls) {
+          table.nand_with_mask_aligned(ls.begin(),ls.end());
+          if (table.empty())
+            return Base::disabled() ? home.ES_NOFIX_DISPOSE(c,a) : ES_FAILED;
+        }
+        a.adjust();
+      } else {
+        a.adjust();
+        if (x.size() == 2) {
+          const CSupportWord* mb = nullptr;
+          const CSupportWord* me = nullptr;
+          const CSupportWord* xb = nullptr;
+          const CSupportWord* xe = nullptr;
+          const bool has_min = supports(a,x.min(),mb,me);
+          const bool has_max = supports(a,x.max(),xb,xe);
+          if (has_min && has_max)
+            table.intersect_with_masks_aligned(mb,me,xb,xe);
+          else if (has_min)
+            table.intersect_with_mask_aligned(mb,me);
+          else if (has_max)
+            table.intersect_with_mask_aligned(xb,xe);
+          else
+            table.flush();
+        } else {
+          Region r;
+          BitSetData* mask = r.alloc<BitSetData>(table.size());
+          table.clear_mask(mask);
+          for (ValidSupports vs(*this,a); vs(); ++vs)
+            table.add_to_mask_aligned(vs.begin(),vs.end(),mask);
+          table.template intersect_with_mask<false>(mask);
+        }
+      }
+
+      if (table.empty())
+        return Base::disabled() ? home.ES_NOFIX_DISPOSE(c,a) : ES_FAILED;
+      return ES_NOFIX;
+    }
+  };
+
+  template<class View>
+  ExecStatus
+  postposcompact_compressed(Home home, ViewArray<View>& x, const TupleSet& ts) {
+    if (ts.tuples() == 0)
+      return (x.size() == 0) ? ES_OK : ES_FAILED;
+
+    for (int i=0; i<x.size(); i++) {
+      TupleSet::Ranges r(ts,i);
+      GECODE_ME_CHECK(x[i].inter_r(home, r, false));
+    }
+    if ((x.size() <= 1) || (ts.tuples() <= 1))
+      return ES_OK;
+
+    switch (ts.words()) {
+    case 0U: GECODE_NEVER; return ES_OK;
+    case 1U: return PosCompactCompressed<View,TinyBitSet<1U>>::post(home,x,ts);
+    case 2U: return PosCompactCompressed<View,TinyBitSet<2U>>::post(home,x,ts);
+    case 3U: return PosCompactCompressed<View,TinyBitSet<3U>>::post(home,x,ts);
+    case 4U: return PosCompactCompressed<View,TinyBitSet<4U>>::post(home,x,ts);
+    default:
+      switch (Gecode::Support::u_type(ts.words())) {
+      case Gecode::Support::IT_CHAR:
+        return PosCompactCompressed<View,BitSet<unsigned char>>::post(home,x,ts);
+      case Gecode::Support::IT_SHRT:
+        return PosCompactCompressed<View,BitSet<unsigned short int>>::post(home,x,ts);
+      case Gecode::Support::IT_INT:
+        return PosCompactCompressed<View,BitSet<unsigned int>>::post(home,x,ts);
+      default:
+        GECODE_NEVER;
+      }
+    }
+    GECODE_NEVER;
+    return ES_OK;
+  }
+
+  template<class View, class Table>
+  class NegCompactCompressed : public CompactCompressed<View,false> {
+  public:
+    typedef CompactCompressed<View,false> Base;
+    typedef typename Base::ValidSupports ValidSupports;
+    typedef typename Base::CTAdvisor CTAdvisor;
+    typedef typename Base::CSupportWord CSupportWord;
+
+    using Base::setup;
+    using Base::full;
+    using Base::supports;
+    using Base::atmostone;
+    using Base::c;
+    using Base::ts;
+
+    Table table;
+
+    template<class TableProp>
+    NegCompactCompressed(Space& home, TableProp& p)
+      : Base(home,p), table(home,p.table) {
+      assert(!table.empty());
+    }
+    NegCompactCompressed(Home home, ViewArray<View>& x, const TupleSet& ts)
+      : Base(home,ts), table(home,ts.words()) {
+      setup(home,table,x);
+    }
+
+    virtual Actor* copy(Space& home) {
+      assert((table.words() > 0U) && (table.width() >= table.words()));
+      if (table.words() <= 4U) {
+        switch (table.width()) {
+        case 0U: GECODE_NEVER; break;
+        case 1U: return new (home) NegCompactCompressed<View,TinyBitSet<1U>>(home,*this);
+        case 2U: return new (home) NegCompactCompressed<View,TinyBitSet<2U>>(home,*this);
+        case 3U: return new (home) NegCompactCompressed<View,TinyBitSet<3U>>(home,*this);
+        case 4U: return new (home) NegCompactCompressed<View,TinyBitSet<4U>>(home,*this);
+        default: break;
+        }
+      }
+      if (std::is_same<Table,BitSet<unsigned char>>::value) {
+        goto copy_char;
+      } else if (std::is_same<Table,BitSet<unsigned short int>>::value) {
+        switch (Gecode::Support::u_type(table.width())) {
+        case Gecode::Support::IT_CHAR: goto copy_char;
+        case Gecode::Support::IT_SHRT: goto copy_short;
+        case Gecode::Support::IT_INT:  GECODE_NEVER;
+        default:                       GECODE_NEVER;
+        }
+      } else {
+        switch (Gecode::Support::u_type(table.width())) {
+        case Gecode::Support::IT_CHAR: goto copy_char;
+        case Gecode::Support::IT_SHRT: goto copy_short;
+        case Gecode::Support::IT_INT:  goto copy_int;
+        default: GECODE_NEVER;
+        }
+      }
+    copy_char:
+      return new (home) NegCompactCompressed<View,BitSet<unsigned char>>(home,*this);
+    copy_short:
+      return new (home) NegCompactCompressed<View,BitSet<unsigned short int>>(home,*this);
+    copy_int:
+      return new (home) NegCompactCompressed<View,BitSet<unsigned int>>(home,*this);
+    }
+
+    static ExecStatus post(Home home, ViewArray<View>& x, const TupleSet& ts) {
+      auto ct = new (home) NegCompactCompressed(home,x,ts);
+      return ct->full(ct->table) ? ES_FAILED : ES_OK;
+    }
+
+    virtual size_t dispose(Space& home) {
+      (void) Base::dispose(home);
+      return sizeof(*this);
+    }
+
+    virtual void reschedule(Space& home) {
+      View::schedule(home,*this,ME_INT_DOM);
+    }
+
+    virtual ExecStatus propagate(Space& home, const ModEventDelta&) {
+#ifndef NDEBUG
+      if (!table.empty()) {
+        for (Advisors<CTAdvisor> as(c); as(); ++as) {
+          ValidSupports vs(*this,as.advisor());
+          assert(vs());
+        }
+      }
+#endif
+      if (table.empty())
+        return home.ES_SUBSUMED(*this);
+
+      unsigned long long int x_size = 1U;
+      unsigned long long int x_max = 1U;
+      for (Advisors<CTAdvisor> as(c); as(); ++as) {
+        unsigned long long int n = as.advisor().view().size();
+        if (n > x_max) {
+          x_size *= x_max;
+          x_max = n;
+        } else {
+          x_size *= n;
+        }
+        if (x_size > table.bits())
+          return ES_FIX;
+      }
+      if (x_size > table.ones())
+        return ES_FIX;
+
+      x_size *= x_max;
+      Region r;
+      for (Advisors<CTAdvisor> as(c); as(); ++as) {
+        assert(!table.empty());
+        CTAdvisor& a = as.advisor();
+        View x = a.view();
+        x_size /= static_cast<unsigned long long int>(x.size());
+        if ((x_size <= table.bits()) && (x_size <= table.ones())) {
+          int* nq = r.alloc<int>(x.size());
+          unsigned int n_nq = 0U;
+          for (ValidSupports vs(*this,a); vs(); ++vs) {
+            if (x_size == table.ones_aligned(vs.begin(),vs.end()))
+              nq[n_nq++] = vs.val();
+          }
+          if (n_nq > 0U) {
+            if (n_nq == 1U) {
+              GECODE_ME_CHECK(x.nq(home,nq[0]));
+            } else {
+              Iter::Values::Array rnq(nq,n_nq);
+              GECODE_ASSUME(n_nq >= 2U);
+              GECODE_ME_CHECK(x.minus_v(home,rnq,false));
+            }
+            if (table.empty())
+              return home.ES_SUBSUMED(*this);
+            a.adjust();
+          }
+          r.free();
+        }
+        x_size *= static_cast<unsigned long long int>(x.size());
+      }
+
+      if (table.ones() == x_size)
+        return ES_FAILED;
+      if (table.empty() || atmostone())
+        return home.ES_SUBSUMED(*this);
+      return ES_FIX;
+    }
+
+    virtual ExecStatus advise(Space& home, Advisor& a0, const Delta&) {
+      CTAdvisor& a = static_cast<CTAdvisor&>(a0);
+      if (table.empty())
+        return home.ES_NOFIX_DISPOSE(c,a);
+
+      View x = a.view();
+      a.adjust();
+      if (x.assigned()) {
+        const CSupportWord* bb = nullptr;
+        const CSupportWord* be = nullptr;
+        if (supports(a,x.val(),bb,be))
+          table.intersect_with_mask_aligned(bb,be);
+        else
+          table.flush();
+        return home.ES_NOFIX_DISPOSE(c,a);
+      }
+
+      ValidSupports vs(*this,a);
+      if (!vs()) {
+        table.flush();
+        return home.ES_NOFIX_DISPOSE(c,a);
+      }
+      Region r;
+      BitSetData* mask = r.alloc<BitSetData>(table.size());
+      table.clear_mask(mask);
+      do {
+        table.add_to_mask_aligned(vs.begin(),vs.end(),mask);
+        ++vs;
+      } while (vs());
+      table.template intersect_with_mask<false>(mask);
+
+      if (table.empty())
+        return home.ES_NOFIX_DISPOSE(c,a);
+      return ES_NOFIX;
+    }
+  };
+
+  template<class View>
+  ExecStatus
+  postnegcompact_compressed(Home home, ViewArray<View>& x, const TupleSet& ts) {
+    if (ts.tuples() == 0)
+      return ES_OK;
+
+    for (int i=0; i<x.size(); i++) {
+      TupleSet::Ranges rs(ts,i);
+      ViewRanges<View> rx(x[i]);
+      if (Iter::Ranges::disjoint(rs,rx))
+        return ES_OK;
+    }
+
+    switch (ts.words()) {
+    case 0U: GECODE_NEVER; return ES_OK;
+    case 1U: return NegCompactCompressed<View,TinyBitSet<1U>>::post(home,x,ts);
+    case 2U: return NegCompactCompressed<View,TinyBitSet<2U>>::post(home,x,ts);
+    case 3U: return NegCompactCompressed<View,TinyBitSet<3U>>::post(home,x,ts);
+    case 4U: return NegCompactCompressed<View,TinyBitSet<4U>>::post(home,x,ts);
+    default:
+      switch (Gecode::Support::u_type(ts.words())) {
+      case Gecode::Support::IT_CHAR:
+        return NegCompactCompressed<View,BitSet<unsigned char>>::post(home,x,ts);
+      case Gecode::Support::IT_SHRT:
+        return NegCompactCompressed<View,BitSet<unsigned short int>>::post(home,x,ts);
+      case Gecode::Support::IT_INT:
+        return NegCompactCompressed<View,BitSet<unsigned int>>::post(home,x,ts);
+      default:
+        GECODE_NEVER;
+      }
+    }
+    GECODE_NEVER;
+    return ES_OK;
+  }
+
+  template<class View, class Table, class CtrlView, ReifyMode rm>
+  class ReCompactCompressed : public CompactCompressed<View,false> {
+  public:
+    typedef CompactCompressed<View,false> Base;
+    typedef typename Base::ValidSupports ValidSupports;
+    typedef typename Base::CTAdvisor CTAdvisor;
+    typedef typename Base::CSupportWord CSupportWord;
+
+    using Base::setup;
+    using Base::full;
+    using Base::supports;
+    using Base::c;
+    using Base::ts;
+
+    Table table;
+    CtrlView b;
+    ViewArray<View> y;
+
+    template<class TableProp>
+    ReCompactCompressed(Space& home, TableProp& p)
+      : Base(home,p), table(home,p.table) {
+      b.update(home,p.b);
+      y.update(home,p.y);
+      assert(!table.empty());
+    }
+    ReCompactCompressed(Home home, ViewArray<View>& x, const TupleSet& ts,
+                        CtrlView b0)
+      : Base(home,ts), table(home,ts.words()), b(b0), y(x) {
+      b.subscribe(home,*this,PC_BOOL_VAL);
+      setup(home,table,x);
+    }
+
+    virtual Actor* copy(Space& home) {
+      assert((table.words() > 0U) && (table.width() >= table.words()));
+      if (table.words() <= 4U) {
+        switch (table.width()) {
+        case 0U: GECODE_NEVER; break;
+        case 1U:
+          return new (home) ReCompactCompressed<View,TinyBitSet<1U>,CtrlView,rm>(home,*this);
+        case 2U:
+          return new (home) ReCompactCompressed<View,TinyBitSet<2U>,CtrlView,rm>(home,*this);
+        case 3U:
+          return new (home) ReCompactCompressed<View,TinyBitSet<3U>,CtrlView,rm>(home,*this);
+        case 4U:
+          return new (home) ReCompactCompressed<View,TinyBitSet<4U>,CtrlView,rm>(home,*this);
+        default: break;
+        }
+      }
+      if (std::is_same<Table,BitSet<unsigned char>>::value) {
+        goto copy_char;
+      } else if (std::is_same<Table,BitSet<unsigned short int>>::value) {
+        switch (Gecode::Support::u_type(table.width())) {
+        case Gecode::Support::IT_CHAR: goto copy_char;
+        case Gecode::Support::IT_SHRT: goto copy_short;
+        case Gecode::Support::IT_INT:  GECODE_NEVER;
+        default:                       GECODE_NEVER;
+        }
+      } else {
+        switch (Gecode::Support::u_type(table.width())) {
+        case Gecode::Support::IT_CHAR: goto copy_char;
+        case Gecode::Support::IT_SHRT: goto copy_short;
+        case Gecode::Support::IT_INT:  goto copy_int;
+        default: GECODE_NEVER;
+        }
+      }
+    copy_char:
+      return new (home) ReCompactCompressed<View,BitSet<unsigned char>,CtrlView,rm>(home,*this);
+    copy_short:
+      return new (home) ReCompactCompressed<View,BitSet<unsigned short int>,CtrlView,rm>(home,*this);
+    copy_int:
+      return new (home) ReCompactCompressed<View,BitSet<unsigned int>,CtrlView,rm>(home,*this);
+    }
+
+    static ExecStatus post(Home home, ViewArray<View>& x, const TupleSet& ts,
+                           CtrlView b) {
+      if (b.one()) {
+        if (rm == RM_PMI)
+          return ES_OK;
+        return postposcompact_compressed(home,x,ts);
+      }
+      if (b.zero()) {
+        if (rm == RM_IMP)
+          return ES_OK;
+        return postnegcompact_compressed(home,x,ts);
+      }
+      (void) new (home) ReCompactCompressed(home,x,ts,b);
+      return ES_OK;
+    }
+
+    virtual size_t dispose(Space& home) {
+      b.cancel(home,*this,PC_BOOL_VAL);
+      (void) Base::dispose(home);
+      return sizeof(*this);
+    }
+
+    virtual void reschedule(Space& home) {
+      View::schedule(home,*this,ME_INT_DOM);
+    }
+
+    virtual ExecStatus propagate(Space& home, const ModEventDelta&) {
+      if (b.one()) {
+        if (rm == RM_PMI)
+          return home.ES_SUBSUMED(*this);
+        TupleSet keep(ts);
+        GECODE_REWRITE(*this,postposcompact_compressed(home(*this),y,keep));
+      }
+      if (b.zero()) {
+        if (rm == RM_IMP)
+          return home.ES_SUBSUMED(*this);
+        TupleSet keep(ts);
+        GECODE_REWRITE(*this,postnegcompact_compressed(home(*this),y,keep));
+      }
+
+      if (table.empty()) {
+        if (rm != RM_PMI)
+          GECODE_ME_CHECK(b.zero_none(home));
+        return home.ES_SUBSUMED(*this);
+      }
+      if (full(table)) {
+        if (rm != RM_IMP)
+          GECODE_ME_CHECK(b.one_none(home));
+        return home.ES_SUBSUMED(*this);
+      }
+      return ES_FIX;
+    }
+
+    virtual ExecStatus advise(Space& home, Advisor& a0, const Delta&) {
+      CTAdvisor& a = static_cast<CTAdvisor&>(a0);
+      if (table.empty() || b.assigned())
+        return home.ES_NOFIX_DISPOSE(c,a);
+
+      View x = a.view();
+      a.adjust();
+      if (x.assigned()) {
+        const CSupportWord* bb = nullptr;
+        const CSupportWord* be = nullptr;
+        if (supports(a,x.val(),bb,be))
+          table.intersect_with_mask_aligned(bb,be);
+        else
+          table.flush();
+        return home.ES_NOFIX_DISPOSE(c,a);
+      }
+
+      ValidSupports vs(*this,a);
+      if (!vs()) {
+        table.flush();
+        return home.ES_NOFIX_DISPOSE(c,a);
+      }
+      Region r;
+      BitSetData* mask = r.alloc<BitSetData>(table.size());
+      table.clear_mask(mask);
+      do {
+        table.add_to_mask_aligned(vs.begin(),vs.end(),mask);
+        ++vs;
+      } while (vs());
+      table.template intersect_with_mask<false>(mask);
+
+      if (table.empty())
+        return home.ES_NOFIX_DISPOSE(c,a);
+      return ES_NOFIX;
+    }
+  };
+
+  template<class View, class CtrlView, ReifyMode rm>
+  ExecStatus
+  postrecompact_compressed(Home home, ViewArray<View>& x, const TupleSet& ts,
+                           CtrlView b) {
+    if (ts.tuples() == 0) {
+      if (x.size() != 0) {
+        if (rm != RM_PMI)
+          GECODE_ME_CHECK(b.zero(home));
+      } else {
+        if (rm != RM_IMP)
+          GECODE_ME_CHECK(b.one(home));
+      }
+      return ES_OK;
+    }
+    for (int i=0; i<x.size(); i++) {
+      TupleSet::Ranges rs(ts,i);
+      ViewRanges<View> rx(x[i]);
+      if (Iter::Ranges::disjoint(rs,rx)) {
+        if (rm != RM_PMI)
+          GECODE_ME_CHECK(b.zero(home));
+        return ES_OK;
+      }
+    }
+
+    switch (ts.words()) {
+    case 0U: GECODE_NEVER; return ES_OK;
+    case 1U:
+      return ReCompactCompressed<View,TinyBitSet<1U>,CtrlView,rm>::post(home,x,ts,b);
+    case 2U:
+      return ReCompactCompressed<View,TinyBitSet<2U>,CtrlView,rm>::post(home,x,ts,b);
+    case 3U:
+      return ReCompactCompressed<View,TinyBitSet<3U>,CtrlView,rm>::post(home,x,ts,b);
+    case 4U:
+      return ReCompactCompressed<View,TinyBitSet<4U>,CtrlView,rm>::post(home,x,ts,b);
+    default:
+      switch (Gecode::Support::u_type(ts.words())) {
+      case Gecode::Support::IT_CHAR:
+        return ReCompactCompressed<View,BitSet<unsigned char>,CtrlView,rm>
+          ::post(home,x,ts,b);
+      case Gecode::Support::IT_SHRT:
+        return ReCompactCompressed<View,BitSet<unsigned short int>,CtrlView,rm>
+          ::post(home,x,ts,b);
+      case Gecode::Support::IT_INT:
+        return ReCompactCompressed<View,BitSet<unsigned int>,CtrlView,rm>
+          ::post(home,x,ts,b);
+      default:
+        GECODE_NEVER;
+      }
+    }
+    GECODE_NEVER;
+    return ES_OK;
+  }
+
 }}}
 
 // STATISTICS: int-prop

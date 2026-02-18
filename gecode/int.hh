@@ -2517,6 +2517,8 @@ namespace Gecode {
     unsigned int sparse_values(void) const;
     /// Return tuple-value sparse ids (size tuples()*arity())
     const unsigned int* sparse_tuple_value_ids(void) const;
+    /// Return sparse support offsets (size sparse_values()+1)
+    const unsigned int* sparse_support_offsets(void) const;
     /// Return sparse support tuple id range for position/value, false if absent
     bool sparse_support(int p, int n,
                         const unsigned int*& b,

@@ -1063,6 +1063,186 @@ namespace Test { namespace Int {
        }
      };
 
+     /// Sparse tuplesets should no longer materialize dense support by default
+     class SparseTupleSetSingleRepresentation : public ::Test::Base {
+     public:
+       SparseTupleSetSingleRepresentation(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::SingleRepresentation") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         TupleSet ts(2);
+         for (int i=0; i<100; i++)
+           ts.add(IntArgs({i, (i*3) % 100}));
+         ts.finalize(EPK_SPARSE);
+         if (!ts.sparse_support()) {
+           std::cerr << "ERROR: Sparse support not available" << std::endl;
+           return false;
+         }
+         if (ts.dense_support()) {
+           std::cerr << "ERROR: Dense support unexpectedly materialized"
+                     << std::endl;
+           return false;
+         }
+         return true;
+       }
+     };
+
+     /// Sparse negative should fail if all combinations are forbidden
+     class SparseTupleSetNegativeFail : public ::Test::Base {
+     public:
+       SparseTupleSetNegativeFail(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::NegativeFail") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class NegativeFailSpace : public Space {
+         public:
+           IntVarArray x;
+           NegativeFailSpace(const TupleSet& t)
+             : x(*this,2,0,1) {
+             extensional(*this, x, t, false, IPL_DOM, EPK_SPARSE);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           NegativeFailSpace(NegativeFailSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new NegativeFailSpace(*this);
+           }
+         };
+         TupleSet ts(2);
+         ts.add(IntArgs({0,0})).add(IntArgs({0,1}))
+           .add(IntArgs({1,0})).add(IntArgs({1,1}));
+         ts.finalize(EPK_SPARSE);
+         if (ts.dense_support())
+           return false;
+         NegativeFailSpace* root = new NegativeFailSpace(ts);
+         DFS<NegativeFailSpace> e(root);
+         delete root;
+         NegativeFailSpace* sol = e.next();
+         const bool ok = (sol == nullptr);
+         delete sol;
+         return ok;
+       }
+     };
+
+     /// Sparse negative should prune values whose completions are all forbidden
+     class SparseTupleSetNegativePrune : public ::Test::Base {
+     public:
+       SparseTupleSetNegativePrune(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::NegativePrune") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class NegativePruneSpace : public Space {
+         public:
+           IntVarArray x;
+           NegativePruneSpace(const TupleSet& t)
+             : x(*this,2,0,1) {
+             extensional(*this, x, t, false, IPL_DOM, EPK_SPARSE);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           NegativePruneSpace(NegativePruneSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new NegativePruneSpace(*this);
+           }
+         };
+         TupleSet ts(2);
+         ts.add(IntArgs({0,0})).add(IntArgs({0,1}));
+         ts.finalize(EPK_SPARSE);
+         if (ts.dense_support())
+           return false;
+         NegativePruneSpace* root = new NegativePruneSpace(ts);
+         DFS<NegativePruneSpace> e(root);
+         delete root;
+
+         int n = 0;
+         while (NegativePruneSpace* sol = e.next()) {
+           if (sol->x[0].val() != 1) {
+             delete sol;
+             return false;
+           }
+           n++;
+           delete sol;
+         }
+         return n == 2;
+       }
+     };
+
+     /// Sparse reified posting should support all reify modes for positive/negative
+     class SparseTupleSetReifiedModes : public ::Test::Base {
+     public:
+       SparseTupleSetReifiedModes(void)
+         : ::Test::Base("Extensional::TupleSet::Sparse::ReifiedModes") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class ReifModeSpace : public Space {
+         public:
+           IntVarArray x;
+           BoolVar b;
+           ReifModeSpace(const TupleSet& t, bool pos, ReifyMode rm, int bv)
+             : x(*this,2,0,1), b(*this,0,1) {
+             extensional(*this, x, t, pos, Reify(b,rm), IPL_DOM, EPK_SPARSE);
+             rel(*this, b, IRT_EQ, bv);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           ReifModeSpace(ReifModeSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+             b.update(*this,s.b);
+           }
+           virtual Space* copy(void) {
+             return new ReifModeSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add(IntArgs({0,0}));
+         ts.finalize(EPK_SPARSE);
+         if (ts.dense_support())
+           return false;
+
+         auto count = [&ts](bool pos, ReifyMode rm, int bv,
+                            bool must_equal) {
+           ReifModeSpace* root = new ReifModeSpace(ts,pos,rm,bv);
+           DFS<ReifModeSpace> e(root);
+           delete root;
+           int n = 0;
+           while (ReifModeSpace* sol = e.next()) {
+             const bool eq = (sol->x[0].val() == 0) && (sol->x[1].val() == 0);
+             if (must_equal != eq) {
+               delete sol;
+               return -1;
+             }
+             n++;
+             delete sol;
+           }
+           return n;
+         };
+
+         if (count(true,RM_EQV,1,true) != 1)
+           return false;
+         if (count(true,RM_EQV,0,false) != 3)
+           return false;
+         if (count(true,RM_IMP,1,true) != 1)
+           return false;
+         if (count(true,RM_PMI,0,false) != 3)
+           return false;
+         if (count(false,RM_EQV,0,true) != 1)
+           return false;
+         if (count(false,RM_EQV,1,false) != 3)
+           return false;
+
+         return true;
+       }
+     };
+
      /// %Test with large tuple set
      class TupleSetLarge : public Test {
      protected:
@@ -1421,6 +1601,10 @@ namespace Test { namespace Int {
      SparseTupleSetIncrementalBool sparse_tuple_set_incremental_bool;
      SparseTupleSetNegativeFallback sparse_tuple_set_negative_fallback;
      SparseTupleSetReifiedFallback sparse_tuple_set_reified_fallback;
+     SparseTupleSetSingleRepresentation sparse_tuple_set_single_representation;
+     SparseTupleSetNegativeFail sparse_tuple_set_negative_fail;
+     SparseTupleSetNegativePrune sparse_tuple_set_negative_prune;
+     SparseTupleSetReifiedModes sparse_tuple_set_reified_modes;
      //@}
 
    }

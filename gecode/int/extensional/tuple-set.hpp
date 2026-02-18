@@ -253,6 +253,11 @@ namespace Gecode {
     return data().sparse_tv;
   }
 
+  forceinline const unsigned int*
+  TupleSet::sparse_support_offsets(void) const {
+    return data().sparse_offsets;
+  }
+
   forceinline bool
   TupleSet::sparse_support(int p, int n,
                            const unsigned int*& b,

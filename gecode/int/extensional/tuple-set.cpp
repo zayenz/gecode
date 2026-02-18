@@ -230,9 +230,9 @@ namespace Gecode {
         GECODE_NEVER;
       }
       const bool build_sparse = sparse;
+      // Build exactly one support representation: dense or sparse.
       const bool build_dense =
-        !support_overflow &&
-        ((epk == EPK_DENSE) || !sparse || !support_large);
+        !support_overflow && !sparse;
       /*
        * Pass 2: allocate memory and fill data structures
        */

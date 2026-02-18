@@ -39,8 +39,8 @@
 
 namespace Gecode { namespace Int { namespace Extensional {
 
-  template<class View>
-  class SparsePosInc : public Propagator {
+  template<class View, bool pos>
+  class SparseInc : public Propagator {
   protected:
     class SparseAdvisor : public ViewAdvisor<View> {
     public:
@@ -64,6 +64,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     ViewArray<View> x;
     TupleSet ts;
     Council<SparseAdvisor> c;
+    int arity;
     unsigned int n_tuples;
     unsigned int n_vals;
     unsigned int* active_ids;
@@ -77,6 +78,14 @@ namespace Gecode { namespace Int { namespace Extensional {
     unsigned char* queued;
     const unsigned int* tv;
     bool in_propagate;
+
+    forceinline const unsigned int*
+    tuple_gids(unsigned int tid) const {
+      const unsigned long long idx =
+        static_cast<unsigned long long>(tid) *
+        static_cast<unsigned long long>(arity);
+      return tv + idx;
+    }
 
     void
     enqueue_zero(unsigned int gid) {
@@ -112,15 +121,21 @@ namespace Gecode { namespace Int { namespace Extensional {
     void
     init_support_counts(void) {
       assert(tv != nullptr);
-      for (unsigned int i=0U; i<n_vals; i++)
-        support_count[i] = 0U;
-      const unsigned long long n_tv =
-        static_cast<unsigned long long>(n_tuples) *
-        static_cast<unsigned long long>(x.size());
-      for (unsigned long long i=0ULL; i<n_tv; i++) {
-        const unsigned int gid = tv[i];
-        assert(gid < n_vals);
-        support_count[gid]++;
+      const unsigned int* offsets = ts.sparse_support_offsets();
+      if (offsets != nullptr) {
+        for (unsigned int i=0U; i<n_vals; i++)
+          support_count[i] = offsets[i+1U] - offsets[i];
+      } else {
+        for (unsigned int i=0U; i<n_vals; i++)
+          support_count[i] = 0U;
+        const unsigned long long n_tv =
+          static_cast<unsigned long long>(n_tuples) *
+          static_cast<unsigned long long>(arity);
+        for (unsigned long long i=0ULL; i<n_tv; i++) {
+          const unsigned int gid = tv[i];
+          assert(gid < n_vals);
+          support_count[gid]++;
+        }
       }
     }
 
@@ -138,27 +153,20 @@ namespace Gecode { namespace Int { namespace Extensional {
       pos_in_active[last_tid] = p;
       active_limit = last;
 
-      for (int a=0; a<x.size(); a++) {
-        const unsigned long long idx =
-          static_cast<unsigned long long>(tid) *
-          static_cast<unsigned long long>(x.size()) +
-          static_cast<unsigned long long>(a);
-        const unsigned int gid = tv[idx];
+      const unsigned int* row = tuple_gids(tid);
+      for (int a=0; a<arity; a++) {
+        const unsigned int gid = row[a];
         assert(gid < n_vals);
         assert(support_count[gid] > 0U);
         support_count[gid]--;
-        if (support_count[gid] == 0U)
+        if (pos && (support_count[gid] == 0U))
           enqueue_zero(gid);
       }
     }
 
     unsigned int
     tuple_gid(unsigned int tid, int a) const {
-      const unsigned long long idx =
-        static_cast<unsigned long long>(tid) *
-        static_cast<unsigned long long>(x.size()) +
-        static_cast<unsigned long long>(a);
-      const unsigned int gid = tv[idx];
+      const unsigned int gid = tuple_gids(tid)[a];
       assert(gid < n_vals);
       return gid;
     }
@@ -169,8 +177,31 @@ namespace Gecode { namespace Int { namespace Extensional {
       const unsigned int* e = nullptr;
       unsigned int gid = 0U;
       if (ts.sparse_support(i,n,b,e,gid)) {
+        if (support_count[gid] == 0U)
+          return;
         for (const unsigned int* t=b; t<e; t++)
           deactivate_tuple(*t);
+      }
+    }
+
+    void
+    deactivate_for_all_domains(void) {
+      unsigned int p = 0U;
+      while (p < active_limit) {
+        const unsigned int tid = active_ids[p];
+        const unsigned int* row = tuple_gids(tid);
+        bool keep = true;
+        for (int i=0; i<arity; i++) {
+          if (!x[i].in(gid_val[row[i]])) {
+            keep = false;
+            break;
+          }
+        }
+        if (keep) {
+          p++;
+        } else {
+          deactivate_tuple(tid);
+        }
       }
     }
 
@@ -291,8 +322,8 @@ namespace Gecode { namespace Int { namespace Extensional {
     }
 
   public:
-    SparsePosInc(Home home, ViewArray<View>& x0, const TupleSet& ts0)
-      : Propagator(home), x(home,x0), ts(ts0), c(home),
+    SparseInc(Home home, ViewArray<View>& x0, const TupleSet& ts0)
+      : Propagator(home), x(home,x0), ts(ts0), c(home), arity(x0.size()),
         n_tuples(static_cast<unsigned int>(ts0.tuples())),
         n_vals(ts0.sparse_values()),
         active_ids(static_cast<Space&>(home).alloc<unsigned int>(n_tuples)),
@@ -317,16 +348,15 @@ namespace Gecode { namespace Int { namespace Extensional {
       init_gid_maps();
       init_support_counts();
 
-      for (int i=0; i<x.size(); i++)
+      for (int i=0; i<arity; i++)
         if (!x[i].assigned())
           (void) new (home) SparseAdvisor(home,*this,c,x[i],i);
 
-      for (int i=0; i<x.size(); i++)
-        deactivate_for_domain(i,x[i]);
+      deactivate_for_all_domains();
     }
 
-    SparsePosInc(Space& home, SparsePosInc<View>& p)
-      : Propagator(home,p), x(), ts(p.ts), c(home),
+    SparseInc(Space& home, SparseInc<View,pos>& p)
+      : Propagator(home,p), x(), ts(p.ts), c(home), arity(p.arity),
         n_tuples(p.n_tuples), n_vals(p.n_vals),
         active_ids(home.alloc<unsigned int>(p.n_tuples)),
         pos_in_active(home.alloc<unsigned int>(p.n_tuples)),
@@ -356,29 +386,63 @@ namespace Gecode { namespace Int { namespace Extensional {
 
     static ExecStatus
     post(Home home, ViewArray<View>& x, const TupleSet& ts) {
-      if (x.size() == 0)
-        return (ts.tuples() == 0) ? ES_FAILED : ES_OK;
-      if (ts.tuples() == 0)
-        return ES_FAILED;
-
-      for (int i=0; i<x.size(); i++) {
-        TupleSet::Ranges r(ts,i);
-        GECODE_ME_CHECK(x[i].inter_r(home, r, false));
+      bool assigned = true;
+      for (int i=0; i<x.size(); i++)
+        if (!x[i].assigned()) {
+          assigned = false;
+          break;
+        }
+      if (assigned) {
+        bool in_table = false;
+        for (int t=0; t<ts.tuples() && !in_table; t++) {
+          TupleSet::Tuple tuple = ts[t];
+          bool same = true;
+          for (int i=0; i<x.size(); i++)
+            if (tuple[i] != x[i].val()) {
+              same = false;
+              break;
+            }
+          in_table = same;
+        }
+        if (pos)
+          return in_table ? ES_OK : ES_FAILED;
+        return in_table ? ES_FAILED : ES_OK;
       }
 
-      if ((x.size() <= 1) || (ts.tuples() <= 1))
+      if (pos) {
+        if (x.size() == 0)
+          return (ts.tuples() == 0) ? ES_FAILED : ES_OK;
+        if (ts.tuples() == 0)
+          return ES_FAILED;
+
+        for (int i=0; i<x.size(); i++) {
+          TupleSet::Ranges r(ts,i);
+          GECODE_ME_CHECK(x[i].inter_r(home, r, false));
+        }
+
+        if ((x.size() <= 1) || (ts.tuples() <= 1))
+          return ES_OK;
+
+        SparseInc<View,pos>* p = new (home) SparseInc<View,pos>(home,x,ts);
+        if (p->active_limit == 0U)
+          return ES_FAILED;
+        View::schedule(home,*p,ME_INT_DOM);
+        return ES_OK;
+      }
+
+      if (x.size() == 0)
+        return (ts.tuples() == 0) ? ES_OK : ES_FAILED;
+      if (ts.tuples() == 0)
         return ES_OK;
 
-      SparsePosInc<View>* p = new (home) SparsePosInc<View>(home,x,ts);
-      if (p->active_limit == 0U)
-        return ES_FAILED;
+      SparseInc<View,pos>* p = new (home) SparseInc<View,pos>(home,x,ts);
       View::schedule(home,*p,ME_INT_DOM);
       return ES_OK;
     }
 
     virtual Actor*
     copy(Space& home) {
-      return new (home) SparsePosInc<View>(home,*this);
+      return new (home) SparseInc<View,pos>(home,*this);
     }
 
     virtual PropCost
@@ -401,24 +465,101 @@ namespace Gecode { namespace Int { namespace Extensional {
 
     virtual ExecStatus
     propagate(Space& home, const ModEventDelta&) {
+      if (pos) {
+        if (active_limit == 0U)
+          return ES_FAILED;
+
+        in_propagate = true;
+        ExecStatus es = process_zero_queue(home);
+        in_propagate = false;
+        if (es != ES_OK)
+          return es;
+
+        if (active_limit == 0U)
+          return ES_FAILED;
+        return all_assigned() ? home.ES_SUBSUMED(*this) : ES_FIX;
+      }
+
       if (active_limit == 0U)
+        return home.ES_SUBSUMED(*this);
+
+      const unsigned long long cap_all =
+        static_cast<unsigned long long>(active_limit);
+      unsigned long long all = 1ULL;
+      for (int i=0; i<x.size(); i++) {
+        const unsigned long long sz = static_cast<unsigned long long>(x[i].size());
+        if ((all > cap_all) || ((sz > 0ULL) && (all > cap_all / sz))) {
+          all = cap_all + 1ULL;
+          break;
+        }
+        all *= sz;
+      }
+      if (all == cap_all)
         return ES_FAILED;
 
+      Region r;
       in_propagate = true;
-      ExecStatus es = process_zero_queue(home);
-      in_propagate = false;
-      if (es != ES_OK)
-        return es;
+      for (int i=0; i<x.size(); i++) {
+        if (x[i].assigned())
+          continue;
+        const unsigned long long cap =
+          static_cast<unsigned long long>(active_limit);
+        unsigned long long other = 1ULL;
+        for (int j=0; j<x.size(); j++) {
+          if (j == i)
+            continue;
+          const unsigned long long sz =
+            static_cast<unsigned long long>(x[j].size());
+          if ((other > cap) || ((sz > 0ULL) && (other > cap / sz))) {
+            other = cap + 1ULL;
+            break;
+          }
+          other *= sz;
+        }
+        if (other > cap)
+          continue;
 
-      if (active_limit == 0U)
-        return ES_FAILED;
-      return all_assigned() ? home.ES_SUBSUMED(*this) : ES_FIX;
+        int* rm = r.alloc<int>(x[i].size());
+        unsigned int n_rm = 0U;
+        for (const TupleSet::Range* rg=ts.fst(i); rg<=ts.lst(i); rg++) {
+          int v = rg->min;
+          while (true) {
+            const unsigned int gid =
+              rg->sparse_base + static_cast<unsigned int>(v-rg->min);
+            assert(gid < n_vals);
+            if (x[i].in(v) &&
+                (support_count[gid] ==
+                 static_cast<unsigned int>(other)))
+              rm[n_rm++] = v;
+            if (v == rg->max)
+              break;
+            v++;
+          }
+        }
+        if (n_rm == 0U)
+          continue;
+        if (n_rm == 1U) {
+          GECODE_ME_CHECK(x[i].nq(home,rm[0]));
+        } else {
+          Iter::Values::Array iv(rm,n_rm);
+          GECODE_ASSUME(n_rm >= 2U);
+          GECODE_ME_CHECK(x[i].minus_v(home,iv,false));
+        }
+        deactivate_for_domain(i,x[i]);
+        if (active_limit == 0U) {
+          in_propagate = false;
+          return home.ES_SUBSUMED(*this);
+        }
+        r.free();
+      }
+      in_propagate = false;
+      return ES_FIX;
     }
 
     virtual ExecStatus
     advise(Space& home, Advisor& a0, const Delta& d) {
       if (active_limit == 0U)
-        return ES_FAILED;
+        return pos ? ES_FAILED : ES_NOFIX;
 
       SparseAdvisor& sa = static_cast<SparseAdvisor&>(a0);
       View xv = sa.view();
@@ -430,45 +571,363 @@ namespace Gecode { namespace Int { namespace Extensional {
       if (xv.assigned()) {
         deactivate_for_domain(i,xv);
         if (active_limit == 0U)
-          return ES_FAILED;
+          return pos ? ES_FAILED : home.ES_NOFIX_DISPOSE(c,sa);
         return home.ES_NOFIX_DISPOSE(c,sa);
       }
       deactivate_removed_values(i,xv,d);
 
       if (active_limit == 0U)
-        return ES_FAILED;
+        return pos ? ES_FAILED : ES_NOFIX;
       return ES_NOFIX;
     }
   };
 
-  forceinline bool
-  use_sparse_backend(const TupleSet& t, bool pos, bool reified,
-                     ExtensionalPropKind epk) {
-    if (!pos || reified) {
-      if (epk == EPK_SPARSE) {
-        // Sparse negative/reified posting is not implemented yet.
-        // Fall back to dense only if available.
-        if (t.dense_support())
-          return false;
-        throw OutOfLimits("Int::extensional");
+  template<class View, class CtrlView, ReifyMode rm>
+  class SparseReifInc : public Propagator {
+  protected:
+    class SparseAdvisor : public ViewAdvisor<View> {
+    public:
+      using ViewAdvisor<View>::view;
+    protected:
+      int i;
+    public:
+      SparseAdvisor(Space& home, Propagator& p, Council<SparseAdvisor>& c,
+                    View x0, int i0)
+        : ViewAdvisor<View>(home,p,c,x0), i(i0) {}
+      SparseAdvisor(Space& home, SparseAdvisor& a)
+        : ViewAdvisor<View>(home,a), i(a.i) {}
+      int index(void) const {
+        return i;
       }
-      return false;
+      void dispose(Space& home, Council<SparseAdvisor>& c) {
+        (void) ViewAdvisor<View>::dispose(home,c);
+      }
+    };
+
+    ViewArray<View> x;
+    CtrlView b;
+    TupleSet ts;
+    Council<SparseAdvisor> c;
+    int arity;
+    unsigned int n_tuples;
+    unsigned int n_vals;
+    unsigned int* active_ids;
+    unsigned int* pos_in_active;
+    unsigned int active_limit;
+    int* gid_val;
+    const unsigned int* tv;
+    bool in_propagate;
+
+    forceinline const unsigned int*
+    tuple_gids(unsigned int tid) const {
+      const unsigned long long idx =
+        static_cast<unsigned long long>(tid) *
+        static_cast<unsigned long long>(arity);
+      return tv + idx;
     }
 
+    unsigned int
+    tuple_gid(unsigned int tid, int a) const {
+      const unsigned int gid = tuple_gids(tid)[a];
+      assert(gid < n_vals);
+      return gid;
+    }
+
+    void
+    init_gid_values(void) {
+      for (unsigned int i=0U; i<n_vals; i++)
+        gid_val[i] = 0;
+      for (int a=0; a<x.size(); a++) {
+        for (const TupleSet::Range* r=ts.fst(a); r<=ts.lst(a); r++) {
+          int n = r->min;
+          while (true) {
+            const unsigned int gid =
+              r->sparse_base + static_cast<unsigned int>(n-r->min);
+            assert(gid < n_vals);
+            gid_val[gid] = n;
+            if (n == r->max)
+              break;
+            n++;
+          }
+        }
+      }
+    }
+
+    void
+    deactivate_tuple(unsigned int tid) {
+      if (tid >= n_tuples)
+        return;
+      const unsigned int p = pos_in_active[tid];
+      if ((p >= active_limit) || (active_ids[p] != tid))
+        return;
+
+      const unsigned int last = active_limit - 1U;
+      const unsigned int last_tid = active_ids[last];
+      active_ids[p] = last_tid;
+      pos_in_active[last_tid] = p;
+      active_limit = last;
+    }
+
+    void
+    deactivate_value_support(int i, int n) {
+      const unsigned int* begin = nullptr;
+      const unsigned int* end = nullptr;
+      unsigned int gid = 0U;
+      if (ts.sparse_support(i,n,begin,end,gid))
+        for (const unsigned int* t=begin; t<end; t++)
+          deactivate_tuple(*t);
+    }
+
+    void
+    deactivate_for_domain(int i, const View& xv) {
+      unsigned int p = 0U;
+      while (p < active_limit) {
+        const unsigned int tid = active_ids[p];
+        const unsigned int gid = tuple_gid(tid,i);
+        if (!xv.in(gid_val[gid]))
+          deactivate_tuple(tid);
+        else
+          p++;
+      }
+    }
+
+    void
+    deactivate_removed_values(int i, const View& xv, const Delta& d) {
+      if (xv.assigned()) {
+        deactivate_for_domain(i,xv);
+        return;
+      }
+      if (xv.any(d) || (xv.width(d) > xv.size())) {
+        deactivate_for_domain(i,xv);
+        return;
+      }
+      if (xv.min(d) == xv.max(d)) {
+        const int n = xv.min(d);
+        if (!xv.in(n))
+          deactivate_value_support(i,n);
+        return;
+      }
+      int n = xv.min(d);
+      while (true) {
+        if (!xv.in(n))
+          deactivate_value_support(i,n);
+        if (n == xv.max(d))
+          break;
+        n++;
+      }
+    }
+
+    void
+    deactivate_for_all_domains(void) {
+      unsigned int p = 0U;
+      while (p < active_limit) {
+        const unsigned int tid = active_ids[p];
+        const unsigned int* row = tuple_gids(tid);
+        bool keep = true;
+        for (int i=0; i<arity; i++) {
+          if (!x[i].in(gid_val[row[i]])) {
+            keep = false;
+            break;
+          }
+        }
+        if (keep) {
+          p++;
+        } else {
+          deactivate_tuple(tid);
+        }
+      }
+    }
+
+  public:
+    static ExecStatus
+    post_pos(Home home, ViewArray<View>& x, const TupleSet& ts) {
+      return SparseInc<View,true>::post(home,x,ts);
+    }
+
+    static ExecStatus
+    post_neg(Home home, ViewArray<View>& x, const TupleSet& ts) {
+      return SparseInc<View,false>::post(home,x,ts);
+    }
+
+    SparseReifInc(Home home, ViewArray<View>& x0, const TupleSet& ts0, CtrlView b0)
+      : Propagator(home), x(home,x0), b(b0), ts(ts0), c(home),
+        arity(x0.size()),
+        n_tuples(static_cast<unsigned int>(ts0.tuples())),
+        n_vals(ts0.sparse_values()),
+        active_ids(static_cast<Space&>(home).alloc<unsigned int>(n_tuples)),
+        pos_in_active(static_cast<Space&>(home).alloc<unsigned int>(n_tuples)),
+        active_limit(n_tuples),
+        gid_val(static_cast<Space&>(home).alloc<int>(n_vals)),
+        tv(ts0.sparse_tuple_value_ids()),
+        in_propagate(false) {
+      assert(tv != nullptr);
+      for (unsigned int i=0U; i<n_tuples; i++) {
+        active_ids[i] = i;
+        pos_in_active[i] = i;
+      }
+      init_gid_values();
+
+      b.subscribe(home,*this,PC_BOOL_VAL);
+      for (int i=0; i<arity; i++)
+        if (!x[i].assigned())
+          (void) new (home) SparseAdvisor(home,*this,c,x[i],i);
+
+      deactivate_for_all_domains();
+    }
+
+    SparseReifInc(Space& home, SparseReifInc<View,CtrlView,rm>& p)
+      : Propagator(home,p), x(), b(), ts(p.ts), c(home),
+        arity(p.arity),
+        n_tuples(p.n_tuples), n_vals(p.n_vals),
+        active_ids(home.alloc<unsigned int>(p.n_tuples)),
+        pos_in_active(home.alloc<unsigned int>(p.n_tuples)),
+        active_limit(p.active_limit),
+        gid_val(home.alloc<int>(p.n_vals)),
+        tv(ts.sparse_tuple_value_ids()),
+        in_propagate(false) {
+      x.update(home,p.x);
+      b.update(home,p.b);
+      c.update(home,p.c);
+      for (unsigned int i=0U; i<n_tuples; i++) {
+        active_ids[i] = p.active_ids[i];
+        pos_in_active[i] = p.pos_in_active[i];
+      }
+      for (unsigned int i=0U; i<n_vals; i++)
+        gid_val[i] = p.gid_val[i];
+    }
+
+    static ExecStatus
+    post(Home home, ViewArray<View>& x, const TupleSet& ts, CtrlView b) {
+      if (b.one()) {
+        if (rm == RM_PMI)
+          return ES_OK;
+        return SparseInc<View,true>::post(home,x,ts);
+      }
+      if (b.zero()) {
+        if (rm == RM_IMP)
+          return ES_OK;
+        return SparseInc<View,false>::post(home,x,ts);
+      }
+      SparseReifInc<View,CtrlView,rm>* p =
+        new (home) SparseReifInc<View,CtrlView,rm>(home,x,ts,b);
+      View::schedule(home,*p,ME_INT_DOM);
+      return ES_OK;
+    }
+
+    virtual Actor*
+    copy(Space& home) {
+      return new (home) SparseReifInc<View,CtrlView,rm>(home,*this);
+    }
+
+    virtual PropCost
+    cost(const Space&, const ModEventDelta&) const {
+      return PropCost::quadratic(PropCost::HI,x.size());
+    }
+
+    virtual void
+    reschedule(Space& home) {
+      View::schedule(home,*this,ME_INT_DOM);
+    }
+
+    virtual size_t
+    dispose(Space& home) {
+      c.dispose(home);
+      b.cancel(home,*this,PC_BOOL_VAL);
+      ts.~TupleSet();
+      (void) Propagator::dispose(home);
+      return sizeof(*this);
+    }
+
+    virtual ExecStatus
+    propagate(Space& home, const ModEventDelta&) {
+      if (b.one()) {
+        if (rm == RM_PMI)
+          return home.ES_SUBSUMED(*this);
+        TupleSet keep(ts);
+        GECODE_REWRITE(*this,post_pos(home(*this),x,keep));
+      }
+      if (b.zero()) {
+        if (rm == RM_IMP)
+          return home.ES_SUBSUMED(*this);
+        TupleSet keep(ts);
+        GECODE_REWRITE(*this,post_neg(home(*this),x,keep));
+      }
+
+      if (active_limit == 0U) {
+        if (rm != RM_PMI)
+          GECODE_ME_CHECK(b.zero_none(home));
+        return home.ES_SUBSUMED(*this);
+      }
+
+      const unsigned long long cap_all =
+        static_cast<unsigned long long>(active_limit);
+      unsigned long long all = 1ULL;
+      for (int i=0; i<x.size(); i++) {
+        const unsigned long long sz = static_cast<unsigned long long>(x[i].size());
+        if ((all > cap_all) || ((sz > 0ULL) && (all > cap_all / sz))) {
+          all = cap_all + 1ULL;
+          break;
+        }
+        all *= sz;
+      }
+      if (all == cap_all) {
+        if (rm != RM_IMP)
+          GECODE_ME_CHECK(b.one_none(home));
+        return home.ES_SUBSUMED(*this);
+      }
+      return ES_FIX;
+    }
+
+    virtual ExecStatus
+    advise(Space& home, Advisor& a0, const Delta& d) {
+      SparseAdvisor& sa = static_cast<SparseAdvisor&>(a0);
+      if (b.assigned())
+        return home.ES_NOFIX_DISPOSE(c,sa);
+
+      if (active_limit == 0U)
+        return ES_NOFIX;
+
+      View xv = sa.view();
+      if (in_propagate)
+        return xv.assigned() ? home.ES_FIX_DISPOSE(c,sa) : ES_FIX;
+
+      const int i = sa.index();
+      if (xv.assigned()) {
+        deactivate_for_domain(i,xv);
+        return home.ES_NOFIX_DISPOSE(c,sa);
+      }
+      deactivate_removed_values(i,xv,d);
+      return ES_NOFIX;
+    }
+  };
+
+  enum SparseDispatch {
+    SD_DENSE,
+    SD_SPARSE
+  };
+
+  forceinline SparseDispatch
+  sparse_dispatch(const TupleSet& t, ExtensionalPropKind epk) {
     switch (epk) {
     case EPK_AUTO:
-      return t.sparse_support();
+      if (t.sparse_support())
+        return SD_SPARSE;
+      if (t.dense_support())
+        return SD_DENSE;
+      throw OutOfLimits("Int::extensional");
     case EPK_DENSE:
-      return false;
+      if (t.dense_support())
+        return SD_DENSE;
+      throw OutOfLimits("Int::extensional");
     case EPK_SPARSE:
       if (t.sparse_support())
-        return true;
+        return SD_SPARSE;
       if (t.dense_support())
-        return false;
+        return SD_DENSE;
       throw OutOfLimits("Int::extensional");
     default:
       GECODE_NEVER;
-      return false;
+      return SD_DENSE;
     }
   }
 
@@ -496,13 +955,15 @@ namespace Gecode {
       return;
     }
 
-    if (Int::Extensional::use_sparse_backend(t,pos,false,epk)) {
+    if (Int::Extensional::sparse_dispatch(t,epk) ==
+        Int::Extensional::SD_SPARSE) {
       ViewArray<IntView> xv(home,x);
-      GECODE_ES_FAIL((Extensional::SparsePosInc<IntView>::post(home,xv,t)));
+      if (pos)
+        GECODE_ES_FAIL((Extensional::SparseInc<IntView,true>::post(home,xv,t)));
+      else
+        GECODE_ES_FAIL((Extensional::SparseInc<IntView,false>::post(home,xv,t)));
       return;
     }
-    if (!t.dense_support())
-      throw OutOfLimits("Int::extensional");
 
     ViewArray<IntView> xv(home,x);
     if (pos)
@@ -549,9 +1010,45 @@ namespace Gecode {
       return;
     }
 
-    (void) Int::Extensional::use_sparse_backend(t,pos,true,epk);
-    if (!t.dense_support())
-      throw OutOfLimits("Int::extensional");
+    if (Int::Extensional::sparse_dispatch(t,epk) ==
+        Int::Extensional::SD_SPARSE) {
+      ViewArray<IntView> xv(home,x);
+      if (pos) {
+        switch (r.mode()) {
+        case RM_EQV:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<IntView,BoolView,RM_EQV>
+                          ::post(home,xv,t,r.var())));
+          break;
+        case RM_IMP:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<IntView,BoolView,RM_IMP>
+                          ::post(home,xv,t,r.var())));
+          break;
+        case RM_PMI:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<IntView,BoolView,RM_PMI>
+                          ::post(home,xv,t,r.var())));
+          break;
+        default: throw UnknownReifyMode("Int::extensional");
+        }
+      } else {
+        NegBoolView n(r.var());
+        switch (r.mode()) {
+        case RM_EQV:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<IntView,NegBoolView,RM_EQV>
+                          ::post(home,xv,t,n)));
+          break;
+        case RM_IMP:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<IntView,NegBoolView,RM_PMI>
+                          ::post(home,xv,t,n)));
+          break;
+        case RM_PMI:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<IntView,NegBoolView,RM_IMP>
+                          ::post(home,xv,t,n)));
+          break;
+        default: throw UnknownReifyMode("Int::extensional");
+        }
+      }
+      return;
+    }
 
     ViewArray<IntView> xv(home,x);
     if (pos) {
@@ -612,13 +1109,15 @@ namespace Gecode {
       return;
     }
 
-    if (Int::Extensional::use_sparse_backend(t,pos,false,epk)) {
+    if (Int::Extensional::sparse_dispatch(t,epk) ==
+        Int::Extensional::SD_SPARSE) {
       ViewArray<BoolView> xv(home,x);
-      GECODE_ES_FAIL((Extensional::SparsePosInc<BoolView>::post(home,xv,t)));
+      if (pos)
+        GECODE_ES_FAIL((Extensional::SparseInc<BoolView,true>::post(home,xv,t)));
+      else
+        GECODE_ES_FAIL((Extensional::SparseInc<BoolView,false>::post(home,xv,t)));
       return;
     }
-    if (!t.dense_support())
-      throw OutOfLimits("Int::extensional");
 
     ViewArray<BoolView> xv(home,x);
     if (pos)
@@ -667,9 +1166,45 @@ namespace Gecode {
       return;
     }
 
-    (void) Int::Extensional::use_sparse_backend(t,pos,true,epk);
-    if (!t.dense_support())
-      throw OutOfLimits("Int::extensional");
+    if (Int::Extensional::sparse_dispatch(t,epk) ==
+        Int::Extensional::SD_SPARSE) {
+      ViewArray<BoolView> xv(home,x);
+      if (pos) {
+        switch (r.mode()) {
+        case RM_EQV:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<BoolView,BoolView,RM_EQV>
+                          ::post(home,xv,t,r.var())));
+          break;
+        case RM_IMP:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<BoolView,BoolView,RM_IMP>
+                          ::post(home,xv,t,r.var())));
+          break;
+        case RM_PMI:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<BoolView,BoolView,RM_PMI>
+                          ::post(home,xv,t,r.var())));
+          break;
+        default: throw UnknownReifyMode("Int::extensional");
+        }
+      } else {
+        NegBoolView n(r.var());
+        switch (r.mode()) {
+        case RM_EQV:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<BoolView,NegBoolView,RM_EQV>
+                          ::post(home,xv,t,n)));
+          break;
+        case RM_IMP:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<BoolView,NegBoolView,RM_PMI>
+                          ::post(home,xv,t,n)));
+          break;
+        case RM_PMI:
+          GECODE_ES_FAIL((Extensional::SparseReifInc<BoolView,NegBoolView,RM_IMP>
+                          ::post(home,xv,t,n)));
+          break;
+        default: throw UnknownReifyMode("Int::extensional");
+        }
+      }
+      return;
+    }
 
     ViewArray<BoolView> xv(home,x);
     if (pos) {

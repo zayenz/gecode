@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 Tree = Dict[str, Union[str, List[object]]]
@@ -22,13 +23,22 @@ def uid() -> str:
     return "".join(m.groups())
 
 
+def iter_files(root: Path):
+    with os.scandir(root) as entries:
+        for entry in entries:
+            if entry.is_dir(follow_symlinks=False):
+                yield from iter_files(Path(entry.path))
+            elif entry.is_file(follow_symlinks=False):
+                yield Path(entry.path)
+
+
 def find_files(extension: str, ftype: str, files: Dict[str, Tuple[str, str, str]], source_tree: Tree, header_tree: Tree) -> None:
-    cmd = f"find . -name '*.{extension}' -type f"
-    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    assert proc.stdout is not None
-    for f in proc.stdout:
-        f = f.rstrip("\n")
-        filename = os.path.basename(f)
+    for path_obj in iter_files(Path(".")):
+        if path_obj.suffix != f".{extension}":
+            continue
+        rel_path = os.path.relpath(path_obj, ".").replace(os.sep, "/")
+        f = f"./{rel_path}"
+        filename = path_obj.name
 
         dirs = f.split("/")
         if dirs:
@@ -50,7 +60,6 @@ def find_files(extension: str, ftype: str, files: Dict[str, Tuple[str, str, str]
 
         tree_p[filename] = ""
         files[f] = (uid(), filename, ftype)
-    proc.wait()
 
 
 def print_group(g: str, gid: str, tree_p: Tree, path: str, files: Dict[str, Tuple[str, str, str]]) -> None:

@@ -8,10 +8,12 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
+from typing import Iterable, Sequence
 
 
-def cmd_lines(cmd: str):
-    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+def cmd_lines(argv: Sequence[str]) -> Iterable[str]:
+    proc = subprocess.Popen(list(argv), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     assert proc.stdout is not None
     for line in proc.stdout:
         yield line
@@ -21,7 +23,7 @@ def cmd_lines(cmd: str):
 def parse_help_options(executable: str):
     prop: list[str] = []
     model: list[str] = []
-    for line in cmd_lines(f"{executable} -help 2>&1"):
+    for line in cmd_lines([executable, "-help"]):
         if "-propagation (" in line:
             s = line.split("-propagation (", 1)[1].split(")", 1)[0].replace(" ", "")
             prop = s.split(",") if s else []
@@ -35,7 +37,7 @@ def main() -> int:
     tests: dict[str, str] = {}
     block_size = 40
 
-    for line in cmd_lines("./test/test -list"):
+    for line in cmd_lines(["./test/test", "-list"]):
         tests[line.rstrip("\n")] = ""
 
     size = 0
@@ -45,10 +47,11 @@ def main() -> int:
     targets = size / block_size
 
     examples: list[str] = []
-    for x in cmd_lines("find ./examples -maxdepth 1 -type f ! -name '*.*'"):
-        x = x.rstrip("\n")
-        filename = os.path.basename(x)
-        prop, model = parse_help_options(x)
+    for entry in os.scandir(Path("./examples")):
+        if not entry.is_file() or "." in entry.name:
+            continue
+        filename = entry.name
+        prop, model = parse_help_options(entry.path)
         if len(prop) == 0:
             if len(model) == 0:
                 examples.append(filename)

@@ -105,3 +105,7 @@ examples/sudoku-advanced
 examples/tsp
 examples/warehouses
 examples/word-square
+
+# Ignore build tree outputs (version metadata lives in top-level
+# gecode-version.m4).
+build/

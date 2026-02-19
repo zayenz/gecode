@@ -693,8 +693,6 @@ enable_set_vars
 LINKSET
 enable_float_vars
 LINKFLOAT
-ENABLEDOCDOCSET
-ENABLEDOCCHM
 GECODE_DOXYGEN_TAGFILE
 ENABLEDOCSEARCH
 GECODE_DOXYGEN_DOT
@@ -841,8 +839,6 @@ enable_gcc_visibility
 enable_doc_dot
 enable_doc_search
 enable_doc_tagfile
-enable_doc_chm
-enable_doc_docset
 with_vis
 enable_float_vars
 enable_set_vars
@@ -1517,9 +1513,6 @@ Optional Features:
   --enable-doc-dot        enable graphs in documentation [default=yes]
   --enable-doc-search     enable documentation search engine [default=no]
   --enable-doc-tagfile    generate doxygen tagfile [default=yes]
-  --enable-doc-chm        build compressed html documentation [default=yes on
-                          Windows]
-  --enable-doc-docset     build docset documentation for XCode [default=no]
   --enable-float-vars     build float variable library (implies
                           --enable-int-vars) [default=yes]
   --enable-set-vars       build finite set library (implies --enable-int-vars)
@@ -13025,76 +13018,6 @@ printf "%s\n" "yes" >&6; }
 printf "%s\n" "no" >&6; }
 
    fi
-   # Check whether --enable-doc-chm was given.
-if test ${enable_doc_chm+y}
-then :
-  enableval=$enable_doc_chm;
-fi
-
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether to build compressed html documentation" >&5
-printf %s "checking whether to build compressed html documentation... " >&6; }
-   case $host_os in
-    windows*)
-           if test "${enable_doc_chm:-yes}" = "yes"; then
-          { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-               ENABLEDOCCHM="yes"
-
-                  ENABLEDOCSEARCH="no"
-
-           else
-               { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-               ENABLEDOCCHM="no"
-
-           fi
-    ;;
-    *)
-           if test "${enable_doc_chm:-no}" = "yes"; then
-          as_fn_error $? "building chms is only supported on Windows." "$LINENO" 5
-           else
-               { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-               ENABLEDOCCHM="no"
-
-           fi
-    ;;
-   esac
-   # Check whether --enable-doc-docset was given.
-if test ${enable_doc_docset+y}
-then :
-  enableval=$enable_doc_docset;
-fi
-
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether to build docset documentation for XCode" >&5
-printf %s "checking whether to build docset documentation for XCode... " >&6; }
-   case $host_os in
-    darwin*)
-           if test "${enable_doc_docset:-no}" = "yes"; then
-          { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-               ENABLEDOCDOCSET="yes"
-
-                  ENABLEDOCSEARCH="no"
-
-           else
-               { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-               ENABLEDOCDOCSET="no"
-
-           fi
-    ;;
-    *)
-           if test "${enable_doc_docset:-no}" = "yes"; then
-          as_fn_error $? "building docsets is only supported on Mac OS X." "$LINENO" 5
-           else
-               { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-               ENABLEDOCDOCSET="no"
-
-           fi
-    ;;
-   esac
 
 
 
@@ -13880,7 +13803,7 @@ fi
 
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether to build with support for CPProfiler" >&5
 printf %s "checking whether to build with support for CPProfiler... " >&6; }
-  if test "${enable_cpprofiler:-no}" = "yes"; then
+  if test "${enable_cpprofiler:-yes}" = "yes"; then
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
     enable_cpprofiler=yes

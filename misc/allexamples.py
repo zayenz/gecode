@@ -8,35 +8,41 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
+from typing import Iterable, Sequence
 
 
-def run_cmd_lines(cmd: str):
-    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+def run_cmd_lines(argv: Sequence[str]) -> Iterable[str]:
+    proc = subprocess.Popen(list(argv), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     assert proc.stdout is not None
     for line in proc.stdout:
         yield line
     proc.wait()
 
 
-def runexample(directory: str, filename: str) -> None:
+def runexample(executable: Path, display_name: str, args: list[str]) -> None:
     sys.stdout.write("------------------------------------------------------------\n")
-    sys.stdout.write(f"Running {filename}\n")
-    cmd = f"{directory}/examples/{filename} -time 120000 2>&1"
-    for line in run_cmd_lines(cmd):
+    if args:
+        sys.stdout.write(f"Running {display_name} {' '.join(args)}\n")
+    else:
+        sys.stdout.write(f"Running {display_name}\n")
+    for line in run_cmd_lines([str(executable), *args, "-time", "120000"]):
         sys.stdout.write(line)
     sys.stdout.write("------------------------------------------------------------\n")
 
 
 def main() -> int:
     directory = sys.argv[1] if len(sys.argv) > 1 else ""
-    find_cmd = f"find {directory}/examples -maxdepth 1 -type f ! -name '*.*'"
-    for x in run_cmd_lines(find_cmd):
-        x = x.rstrip("\n")
-        filename = os.path.basename(x)
+    examples_dir = Path(f"{directory}/examples")
+    for entry in os.scandir(examples_dir):
+        if not entry.is_file() or "." in entry.name:
+            continue
+        executable = Path(entry.path)
+        filename = executable.name
 
         prop: list[str] = []
         model: list[str] = []
-        for line in run_cmd_lines(f"{x} -help 2>&1"):
+        for line in run_cmd_lines([str(executable), "-help"]):
             if "-propagation (" in line:
                 l1 = line
                 l1 = l1.split("-propagation (", 1)[1]
@@ -52,17 +58,17 @@ def main() -> int:
 
         if len(prop) == 0:
             if len(model) == 0:
-                runexample(directory, filename)
+                runexample(executable, filename, [])
             else:
                 for m in model:
-                    runexample(directory, f"{filename} -model {m}")
+                    runexample(executable, filename, ["-model", m])
         else:
             for p in prop:
                 if len(model) == 0:
-                    runexample(directory, f"{filename} -propagation {p}")
+                    runexample(executable, filename, ["-propagation", p])
                 else:
                     for m in model:
-                        runexample(directory, f"{filename} -propagation {p} -model {m}")
+                        runexample(executable, filename, ["-propagation", p, "-model", m])
     return 0
 
 

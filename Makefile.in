@@ -1847,8 +1847,6 @@ doxygen.conf: $(top_srcdir)/doxygen/doxygen.conf.in config.status
 # Documentation
 #
 
-export ENABLEDOCCHM	= @ENABLEDOCCHM@
-export ENABLEDOCDOCSET	= @ENABLEDOCDOCSET@
 ENABLEDOCSEARCH = @ENABLEDOCSEARCH@
 
 .PHONY: doc
@@ -1879,51 +1877,6 @@ stat.hh: $(ALLGECODEHDR:%=$(top_srcdir)/%) $(ALLSRC:%=$(top_srcdir)/%) \
 	$(UVRUN) $(top_srcdir)/misc/genstatistics.py $^ > stat.hh
 
 
-ifeq "@ENABLEDOCCHM@" "yes"
-
-DOCTARGET=GecodeReference.chm
-
-header.html: $(top_srcdir)/misc/doxygen/header.html doxygen.conf
-	grep -v '<form.*form>' < $< > $@
-doxygen.conf.use: doxygen.conf
-	(echo "GENERATE_HTMLHELP = YES"; \
-	 echo "SEARCHENGINE = NO";\
-	 echo "HAVE_DOT = @GECODE_DOXYGEN_DOT@") | \
-		cat $< - > $@
-
-doc: $(ALLGECODEHDR:%=$(top_srcdir)/%) $(VARIMPHDR) \
-	$(ALLSRC:%=$(top_srcdir)/%) $(DOCSRC)
-	mkdir -p doc/html
-	cp -f $(top_srcdir)/misc/doxygen/back.png \
-	$(top_srcdir)/misc/doxygen/gecode-logo-100.png doc/html
-	doxygen doxygen.conf.use
-	mv doc/html/GecodeReference.chm GecodeReference.chm
-
-else
-ifeq "@ENABLEDOCDOCSET@" "yes"
-
-DOCTARGET=org.gecode.@VERSION@.docset
-
-header.html: $(top_srcdir)/misc/doxygen/header.html doxygen.conf
-	grep -v '<form.*form>' < $< > $@
-doxygen.conf.use: doxygen.conf
-	(echo "SEARCHENGINE = NO";\
-	 echo "HAVE_DOT = @GECODE_DOXYGEN_DOT@";\
-	 echo "GENERATE_DOCSET = YES";\
-	 echo "DOCSET_BUNDLE_ID = org.gecode.@VERSION@";\
-	 echo "DOCSET_FEEDNAME = Gecode") | \
-		cat $< - > $@
-
-doc: $(ALLGECODEHDR:%=$(top_srcdir)/%) $(VARIMPHDR) \
-	$(ALLSRC:%=$(top_srcdir)/%) $(DOCSRC)
-	mkdir -p doc/html
-	cp -f $(top_srcdir)/misc/doxygen/back.png \
-	$(top_srcdir)/misc/doxygen/gecode-logo-100.png doc/html
-	doxygen doxygen.conf.use
-	cd doc/html && make
-	mv doc/html/$(DOCTARGET) .
-
-else
 DOCTARGET=doc/html
 
 ifeq "@ENABLEDOCSEARCH@" "yes"
@@ -1931,8 +1884,7 @@ ifeq "@ENABLEDOCSEARCH@" "yes"
 header.html: $(top_srcdir)/misc/doxygen/header.html doxygen.conf
 	cat < $< > $@
 doxygen.conf.use: doxygen.conf
-	(echo "GENERATE_HTMLHELP = NO"; \
-	 echo "SEARCHENGINE = YES"; \
+	(echo "SEARCHENGINE = YES"; \
 	 echo "SERVER_BASED_SEARCH = YES"; \
 	 echo "HAVE_DOT = @GECODE_DOXYGEN_DOT@") | \
 		cat $< - > $@
@@ -1941,14 +1893,13 @@ else
 header.html: $(top_srcdir)/misc/doxygen/header.html doxygen.conf
 	grep -v '<form.*form>' < $< > $@
 doxygen.conf.use: doxygen.conf
-	(echo "GENERATE_HTMLHELP = NO"; \
-	 echo "SEARCHENGINE = NO"; \
+	(echo "SEARCHENGINE = NO"; \
 	 echo "HAVE_DOT = @GECODE_DOXYGEN_DOT@") | \
 		cat $< - > $@
 
 endif
 
-doc: $(ALLGECODEHDR:%=$(top_srcdir)/%) $(VARIMPHDR) \
+doc: mkcompiledirs $(ALLGECODEHDR:%=$(top_srcdir)/%) $(VARIMPHDR) \
 	$(ALLSRC:%=$(top_srcdir)/%) $(DOCSRC)
 	mkdir -p doc/html
 	cp -f $(top_srcdir)/misc/doxygen/back.png \
@@ -1961,9 +1912,6 @@ ifeq "@ENABLEDOCSEARCH@" "yes"
 	sed -e 's|<div class="qindex">|<div><div class="qindex">|' \
 	  doc/html/search2.php > doc/html/search.php
 	rm doc/html/search2.php
-endif
-
-endif
 endif
 
 #
@@ -2116,7 +2064,7 @@ veryclean: clean
 	$(RMF) $(EXAMPLEEXE)
 	$(RMF) $(TESTEXE)
 	$(RMF) $(FLATZINCEXE)
-	$(RMF) doc GecodeReference.chm ChangeLog
+	$(RMF) doc ChangeLog
 	$(RMF) $(ALLOBJ:%$(OBJSUFFIX)=%.gcno) $(TESTOBJ:%$(OBJSUFFIX)=%.gcno)
 	$(RMF) $(ALLOBJ:%$(OBJSUFFIX)=%.gcda) $(TESTOBJ:%$(OBJSUFFIX)=%.gcda)
 

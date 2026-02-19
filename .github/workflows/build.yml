@@ -7,22 +7,6 @@ env:
   BUILD_TYPE: Release
 
 jobs:
-  guard-build-script-refs:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Ensure no stale Perl script references remain in active build paths
-      shell: bash
-      run: |
-        ! rg -n "genvarimp\\.perl|misc/genrc\\.perl" \
-          CMakeLists.txt \
-          cmake/GenerateVarImp.cmake \
-          Makefile.in \
-          misc/genrc.py
-        ! rg -n "PROG_PERL" configure.ac configure.ac.in configure
-
   build-autoconf:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -141,9 +125,9 @@ jobs:
       shell: pwsh
       run: cmake --build "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }}
 
-    - name: Build test binary
+    - name: Check
       shell: pwsh
-      run: cmake --build "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }} --target gecode-test
+      run: cmake --build "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }} --target check
 
   build-autoconf-windows:
     runs-on: windows-latest

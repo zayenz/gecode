@@ -61,6 +61,8 @@ option(GECODE_REGENERATE_VARIMP "Regenerate checked-in var-imp headers during bu
 set(GECODE_FREELIST32_SIZE_MAX "" CACHE STRING "Max freelist size on 32-bit platforms")
 set(GECODE_FREELIST64_SIZE_MAX "" CACHE STRING "Max freelist size on 64-bit platforms")
 set(GECODE_WITH_VIS "" CACHE STRING "Additional .vis files (comma-separated)")
+set(GECODE_LIB_PREFIX "" CACHE STRING "User-defined prefix for generated library basenames")
+set(GECODE_LIB_SUFFIX "" CACHE STRING "User-defined suffix for generated library basenames")
 
 # Compatibility aliases (temporary)
 if(GECODE_USED_ENABLE_THREADS_ALIAS)
@@ -181,57 +183,30 @@ string(REGEX MATCHALL "[^\n]*\n" CONFIG
 #undef PACKAGE_VERSION
 ")
 
-# Pull package info from configure.ac to keep one version source of truth.
-file(READ configure.ac LINES)
-string(REPLACE ";" "<semi>" LINES "${LINES}")
-string(REGEX MATCHALL "[^\n]*\n" LINES "${LINES}")
-set(ah_command FALSE)
-foreach(line "${EXTRA_CONFIG}" ${LINES})
-  string(REPLACE ";" "" line "${line}")
-  if(ah_command)
-    # keep collecting
-  elseif(line MATCHES "AC_INIT\\(([^,]*), *([^,]*), *([^)]*)\\)")
-    set(PACKAGE ${CMAKE_MATCH_1})
-    set(VERSION ${CMAKE_MATCH_2})
-    set(PACKAGE_BUGREPORT ${CMAKE_MATCH_3})
-    message(STATUS "Got VERSION=${VERSION} from configure.ac")
-  elseif(line MATCHES "ac_gecode_soversion=(.*)\n")
-    set(GECODE_SOVERSION "${CMAKE_MATCH_1}")
-  elseif(line MATCHES "ac_gecode_flatzincversion=(.*)\n")
-    set(GECODE_FLATZINC_VERSION "${CMAKE_MATCH_1}")
-  elseif(line MATCHES "AH_BOTTOM\\(\\[(.*)")
-    set(ah_command bottom)
-    set(line "${CMAKE_MATCH_1}")
-  elseif(line MATCHES "AH_VERBATIM[^,]+,(.*)")
-    set(ah_command verbatim)
-    set(line "${CMAKE_MATCH_1}")
-  endif()
-
-  if(ah_command)
-    set(saved_ah_command ${ah_command})
-    if(line MATCHES "^\\[(.*)")
-      set(line "${CMAKE_MATCH_1}")
-    endif()
-    if(line MATCHES "\\]\\)")
-      set(ah_command FALSE)
-      string(REPLACE "])" "" line "${line}")
-    endif()
-    string(REGEX MATCHALL "[^\n]*\n" sublines "${line}")
-    set(config_add "")
-    foreach(subline ${sublines})
-      set(config_add ${config_add} "${subline}")
-    endforeach()
-    if(saved_ah_command STREQUAL "verbatim")
-      set(CONFIG ${config_add} ${CONFIG})
-    else()
-      set(CONFIG ${CONFIG} "\n" ${config_add})
-    endif()
-  endif()
-endforeach()
-
-if(NOT DEFINED GECODE_SOVERSION)
-  set(GECODE_SOVERSION 51)
+set(GECODE_VERSION_METADATA_FILE "${CMAKE_CURRENT_SOURCE_DIR}/gecode-version.m4")
+if(NOT EXISTS "${GECODE_VERSION_METADATA_FILE}")
+  message(FATAL_ERROR "Missing version metadata file: ${GECODE_VERSION_METADATA_FILE}")
 endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+  "${GECODE_VERSION_METADATA_FILE}")
+file(READ "${GECODE_VERSION_METADATA_FILE}" GECODE_VERSION_METADATA)
+
+function(gecode_extract_version_metadata macro_name output_var)
+  string(REGEX MATCH "m4_define\\(\\[${macro_name}\\], *\\[([^]]+)\\]\\)" _match
+    "${GECODE_VERSION_METADATA}")
+  if(NOT _match)
+    message(FATAL_ERROR
+      "Could not parse ${macro_name} from ${GECODE_VERSION_METADATA_FILE}")
+  endif()
+  set(${output_var} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+endfunction()
+
+gecode_extract_version_metadata("GECODE_M4_VERSION" VERSION)
+gecode_extract_version_metadata("GECODE_M4_SOVERSION" GECODE_SOVERSION)
+gecode_extract_version_metadata("GECODE_M4_FLATZINC_VERSION" GECODE_FLATZINC_VERSION)
+
+set(PACKAGE "GECODE")
+set(PACKAGE_BUGREPORT "users@gecode.org")
 
 set(PACKAGE_NAME ${PACKAGE})
 string(TOLOWER ${PACKAGE} PACKAGE_TARNAME)
@@ -246,8 +221,8 @@ if(VERSION MATCHES "(.*)\\.(.*)\\.(.*)")
     "${CMAKE_MATCH_1} * 100000 + ${CMAKE_MATCH_2} * 100 + ${CMAKE_MATCH_3}")
 endif()
 
-set(GECODE_DLL_USERPREFIX "")
-set(GECODE_DLL_USERSUFFIX "")
+set(GECODE_DLL_USERPREFIX "${GECODE_LIB_PREFIX}")
+set(GECODE_DLL_USERSUFFIX "${GECODE_LIB_SUFFIX}")
 if(GECODE_ENABLE_INT_VARS)
   set(GECODE_HAS_INT_VARS "/**/")
 endif()
@@ -484,6 +459,7 @@ endif()
 function(add_gecode_component_library lib)
   string(TOUPPER ${lib} libupper)
   set(sources ${GECODE_${libupper}_SOURCES})
+  set(component_output_name "${GECODE_LIB_PREFIX}gecode${lib}${GECODE_LIB_SUFFIX}")
   if(lib STREQUAL "float" AND NOT (GECODE_ENABLE_MPFR AND MPFR_FOUND))
     # Keep in sync with Make behavior: skip empty MPFR-only source when MPFR is absent.
     list(REMOVE_ITEM sources "gecode/float/rounding.cpp")
@@ -506,7 +482,7 @@ function(add_gecode_component_library lib)
       target_compile_options(gecode${lib}_shared PRIVATE ${GECODE_VISIBILITY_COMPILE_OPTION})
     endif()
     set_target_properties(gecode${lib}_shared PROPERTIES
-      OUTPUT_NAME gecode${lib}
+      OUTPUT_NAME "${component_output_name}"
       VERSION ${GECODE_PROJECT_VERSION}
       SOVERSION ${GECODE_SOVERSION})
     add_dependencies(gecode${lib}_shared gecode-varimp-gen)
@@ -528,7 +504,8 @@ function(add_gecode_component_library lib)
     if(GECODE_VISIBILITY_COMPILE_OPTION)
       target_compile_options(gecode${lib}_static PRIVATE ${GECODE_VISIBILITY_COMPILE_OPTION})
     endif()
-    set_target_properties(gecode${lib}_static PROPERTIES OUTPUT_NAME gecode${lib})
+    set_target_properties(gecode${lib}_static PROPERTIES
+      OUTPUT_NAME "${component_output_name}")
     add_dependencies(gecode${lib}_static gecode-varimp-gen)
     list(APPEND GECODE_INSTALL_TARGETS gecode${lib}_static)
     list(APPEND GECODE_EXPORT_TARGETS gecode${lib}_static)
@@ -716,10 +693,18 @@ if(GECODE_CAN_BUILD_TESTS)
   endforeach()
 
   add_test(NAME test COMMAND gecode-test ${GECODE_CHECK_ARGS})
-  add_custom_target(check
-    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$"
-    DEPENDS gecode-test
-    USES_TERMINAL)
+  get_property(GECODE_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+  if(GECODE_IS_MULTI_CONFIG)
+    add_custom_target(check
+      COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$" -C $<CONFIG>
+      DEPENDS gecode-test
+      USES_TERMINAL)
+  else()
+    add_custom_target(check
+      COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$"
+      DEPENDS gecode-test
+      USES_TERMINAL)
+  endif()
 else()
   message(WARNING "Skipping gecode-test/check targets because required modules are disabled")
   add_custom_target(check

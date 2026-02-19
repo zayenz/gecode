@@ -7,11 +7,7 @@ constraint-based systems and applications. Gecode provides a
 constraint solver with state-of-the-art performance while being
 modular and extensible.
 
-[master](https://github.com/Gecode/gecode/tree/master):
-[![Build Status master](https://api.travis-ci.org/Gecode/gecode.svg?branch=master)](https://travis-ci.org/Gecode/gecode)
-
-[develop](https://github.com/Gecode/gecode/tree/develop):
-[![Build Status develop](https://api.travis-ci.org/Gecode/gecode.svg?branch=develop)](https://travis-ci.org/Gecode/gecode)
+[![CI](https://github.com/Gecode/gecode/actions/workflows/build.yml/badge.svg)](https://github.com/Gecode/gecode/actions/workflows/build.yml)
 
 ## Getting All the Info You Need...
 
@@ -27,31 +23,50 @@ Gecode comes with
 
 CMake now exposes options aligned with the Autoconf build switches.
 The minimum required CMake version is 3.21.
-Qt discovery uses CMake packages (Qt6 or Qt5).
-For Autoconf, `--enable-qt` now targets Qt 5/Qt 6 via `qmake`/`moc`
-discovery; if suitable Qt tools are unavailable, Qt (and therefore Gist)
-is disabled automatically.
+`configure.ac` is the canonical autoconf source, and `configure` is generated
+from it.
+Version metadata shared by autoconf and CMake lives in `gecode-version.m4`.
+`build/` is reserved for generated build outputs.
 
-| Configure switch | CMake option | Default |
-|---|---|---|
-| `--enable-shared` | `GECODE_BUILD_SHARED` | `ON` |
-| `--enable-static` | `GECODE_BUILD_STATIC` | `OFF` |
-| `--enable-thread` | `GECODE_ENABLE_THREAD` | `ON` |
-| `--enable-qt` | `GECODE_ENABLE_QT` | `ON` |
-| `--enable-gist` | `GECODE_ENABLE_GIST` | `ON` |
-| `--enable-cpprofiler` | `GECODE_ENABLE_CPPROFILER` | `ON` |
-| `--enable-cbs` | `GECODE_ENABLE_CBS` | `OFF` |
-| `--enable-examples` | `GECODE_ENABLE_EXAMPLES` | `ON` |
-| `--enable-search` | `GECODE_ENABLE_SEARCH` | `ON` |
-| `--enable-int-vars` | `GECODE_ENABLE_INT_VARS` | `ON` |
-| `--enable-set-vars` | `GECODE_ENABLE_SET_VARS` | `ON` |
-| `--enable-float-vars` | `GECODE_ENABLE_FLOAT_VARS` | `ON` |
-| `--enable-minimodel` | `GECODE_ENABLE_MINIMODEL` | `ON` |
-| `--enable-driver` | `GECODE_ENABLE_DRIVER` | `ON` |
-| `--enable-flatzinc` | `GECODE_ENABLE_FLATZINC` | `ON` |
+| Autoconf switch | CMake option / mechanism | Status | Notes |
+|---|---|---|---|
+| `--enable-shared` | `GECODE_BUILD_SHARED` | Supported directly | Default `ON` |
+| `--enable-static` | `GECODE_BUILD_STATIC` | Supported directly | Default `OFF` |
+| `--enable-thread` | `GECODE_ENABLE_THREAD` | Supported directly | Default `ON` |
+| `--enable-osx-unfair-mutex` | `GECODE_ENABLE_OSX_UNFAIR_MUTEX` | Supported directly | Default `ON` |
+| `--enable-qt` | `GECODE_ENABLE_QT` | Supported directly | Qt5/Qt6 package discovery |
+| `--enable-gist` | `GECODE_ENABLE_GIST` | Supported directly | Disabled automatically if Qt is unavailable |
+| `--enable-cpprofiler` | `GECODE_ENABLE_CPPROFILER` | Supported directly | Default `ON` |
+| `--enable-cbs` | `GECODE_ENABLE_CBS` | Supported directly | Default `OFF` |
+| `--enable-examples` | `GECODE_ENABLE_EXAMPLES` | Supported directly | Default `ON` |
+| `--enable-search` | `GECODE_ENABLE_SEARCH` | Supported directly | Default `ON` |
+| `--enable-int-vars` | `GECODE_ENABLE_INT_VARS` | Supported directly | Default `ON` |
+| `--enable-set-vars` | `GECODE_ENABLE_SET_VARS` | Supported directly | Default `ON` |
+| `--enable-float-vars` | `GECODE_ENABLE_FLOAT_VARS` | Supported directly | Default `ON` |
+| `--enable-minimodel` | `GECODE_ENABLE_MINIMODEL` | Supported directly | Default `ON` |
+| `--enable-driver` | `GECODE_ENABLE_DRIVER` | Supported directly | Default `ON` |
+| `--enable-flatzinc` | `GECODE_ENABLE_FLATZINC` | Supported directly | Default `ON` |
+| `--enable-mpfr` | `GECODE_ENABLE_MPFR` | Supported directly | Default `ON`; uses `find_package(MPFR)` |
+| `--enable-allocator` | `GECODE_ENABLE_ALLOCATOR` | Supported directly | Default `ON` |
+| `--enable-audit` | `GECODE_ENABLE_AUDIT` | Supported directly | Default `OFF` |
+| `--enable-gcc-visibility` | `GECODE_ENABLE_GCC_VISIBILITY` | Supported directly | Default `ON` |
+| `--with-freelist32-size-max` | `GECODE_FREELIST32_SIZE_MAX` | Supported directly | Cache string |
+| `--with-freelist64-size-max` | `GECODE_FREELIST64_SIZE_MAX` | Supported directly | Cache string |
+| `--with-vis` | `GECODE_WITH_VIS` | Supported directly | Comma-separated list |
+| `--with-lib-prefix` | `GECODE_LIB_PREFIX` | Supported directly | Prefixes generated library basenames |
+| `--with-lib-suffix` | `GECODE_LIB_SUFFIX` | Supported directly | Suffixes generated library basenames |
+| `--enable-debug` | `CMAKE_BUILD_TYPE=Debug` (or multi-config `Debug`) | Mapped to native CMake mechanism | Use standard CMake build-type workflows |
+| `--enable-profile` | Toolchain/CMake compile+link flags | Mapped to native CMake mechanism | Configure profiling via standard compiler flags |
+| `--enable-gcov` | Toolchain/CMake coverage flags | Mapped to native CMake mechanism | Configure coverage instrumentation via compiler/linker flags |
+| `--with-mpfr-include`, `--with-mpfr-lib` | `CMAKE_PREFIX_PATH`, `MPFR_ROOT`, toolchain include/link paths | Mapped to native CMake mechanism | Use CMake package and toolchain discovery |
+| `--with-gmp-include`, `--with-gmp-lib` | Toolchain include/link paths | Mapped to native CMake mechanism | GMP is resolved through MPFR/toolchain linkage |
+| `--with-host-os` | None | Not supported in CMake | Generator/toolchain already determine host/target platform |
+| `--with-compiler-vendor` | None | Not supported in CMake | Compiler is selected through toolchain and generator |
+| `--with-sdk`, `--with-macosx-version-min`, `--with-architectures` | None | Not supported in CMake | Use native CMake/macOS toolchain settings |
+| `--enable-framework` | None | Not supported in CMake | No framework-bundle generator path is implemented |
+| `--enable-resource` | None | Not supported in CMake | No autoconf-style resource toggle in CMake |
+| `--enable-doc-dot`, `--enable-doc-search`, `--enable-doc-tagfile` | None | Not supported in CMake | No parity layer for doxygen doc toggles |
 
-Additional parity-oriented options are available for advanced features,
-including MPFR, allocator/audit toggles, visibility, and freelist sizes.
 By default, CMake uses checked-in `gecode/kernel/var-type.hpp` and
 `gecode/kernel/var-imp.hpp`; regeneration is opt-in via
 `-DGECODE_REGENERATE_VARIMP=ON`.

@@ -932,7 +932,7 @@ dnl   AC_GECODE_DOC_SWITCHES
 dnl
 dnl Description:
 dnl   Produces the configure switches --enable-doc-search,
-dnl   --enable-doc-chm, and --enable-doc-tagfile.
+dnl   and --enable-doc-tagfile.
 dnl
 dnl Authors:
 dnl   Guido Tack <tack@gecode.org>
@@ -982,54 +982,6 @@ AC_DEFUN([AC_GECODE_DOC_SWITCHES],
      AC_MSG_RESULT(no)
      AC_SUBST(GECODE_DOXYGEN_TAGFILE, [])
    fi
-   AC_ARG_ENABLE([doc-chm],
-     AS_HELP_STRING([--enable-doc-chm],
-    [build compressed html documentation @<:@default=yes on Windows@:>@]))
-   AC_MSG_CHECKING(whether to build compressed html documentation)
-   case $host_os in
-    windows*)
-           if test "${enable_doc_chm:-yes}" = "yes"; then
-          AC_MSG_RESULT(yes)
-               AC_SUBST(ENABLEDOCCHM, "yes")
-                  AC_SUBST(ENABLEDOCSEARCH, "no")
-           else
-               AC_MSG_RESULT(no)
-               AC_SUBST(ENABLEDOCCHM, "no")
-           fi
-    ;;
-    *)
-           if test "${enable_doc_chm:-no}" = "yes"; then
-          AC_MSG_ERROR([building chms is only supported on Windows.])
-           else
-               AC_MSG_RESULT(no)
-               AC_SUBST(ENABLEDOCCHM, "no")
-           fi
-    ;;
-   esac
-   AC_ARG_ENABLE([doc-docset],
-     AS_HELP_STRING([--enable-doc-docset],
-    [build docset documentation for XCode @<:@default=no@:>@]))
-   AC_MSG_CHECKING(whether to build docset documentation for XCode)
-   case $host_os in
-    darwin*)
-           if test "${enable_doc_docset:-no}" = "yes"; then
-          AC_MSG_RESULT(yes)
-               AC_SUBST(ENABLEDOCDOCSET, "yes")
-                  AC_SUBST(ENABLEDOCSEARCH, "no")
-           else
-               AC_MSG_RESULT(no)
-               AC_SUBST(ENABLEDOCDOCSET, "no")
-           fi
-    ;;
-    *)
-           if test "${enable_doc_docset:-no}" = "yes"; then
-          AC_MSG_ERROR([building docsets is only supported on Mac OS X.])
-           else
-               AC_MSG_RESULT(no)
-               AC_SUBST(ENABLEDOCDOCSET, "no")
-           fi
-    ;;
-   esac
    ])
 
 dnl Macro:
@@ -1448,7 +1400,7 @@ AC_DEFUN([AC_GECODE_CPPROFILER],
     AS_HELP_STRING([--enable-cpprofiler],
       [build with support for CPProfiler @<:@default=yes@:>@]))
   AC_MSG_CHECKING(whether to build with support for CPProfiler)
-  if test "${enable_cpprofiler:-no}" = "yes"; then
+  if test "${enable_cpprofiler:-yes}" = "yes"; then
     AC_MSG_RESULT(yes)
     AC_SUBST(enable_cpprofiler, yes)
     AC_DEFINE([GECODE_HAS_CPPROFILER],[],[Whether CPProfiler support available])

@@ -33,16 +33,17 @@ dnl OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 dnl WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 dnl
 dnl
+m4_include([gecode-version.m4])
 
 AC_REVISION([$Id$])
 AC_PREREQ([2.69])
-AC_INIT(GECODE, 6.3.0, users@gecode.org)
+AC_INIT([GECODE], GECODE_M4_VERSION, [users@gecode.org])
 AC_CONFIG_HEADERS([gecode/support/config.hpp])
 AC_CONFIG_SRCDIR(gecode/kernel.hh)
 
-ac_gecode_soversion=51
+ac_gecode_soversion=GECODE_M4_SOVERSION
 AC_SUBST(GECODE_SOVERSION, ${ac_gecode_soversion})
-ac_gecode_flatzincversion=1.6
+ac_gecode_flatzincversion=GECODE_M4_FLATZINC_VERSION
 AC_SUBST(GECODE_FLATZINC_VERSION, ${ac_gecode_flatzincversion})
 
 # checks for programs

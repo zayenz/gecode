@@ -1399,9 +1399,17 @@ AC_DEFUN([AC_GECODE_CPPROFILER],
   AC_ARG_ENABLE([cpprofiler],
     AS_HELP_STRING([--enable-cpprofiler],
       [build with support for CPProfiler @<:@default=yes@:>@]))
+  AC_SUBST(LINKCPPROFILER, [])
   AC_MSG_CHECKING(whether to build with support for CPProfiler)
   if test "${enable_cpprofiler:-yes}" = "yes"; then
     AC_MSG_RESULT(yes)
+    if test "${host_os}" = "windows"; then
+      if test "${ac_cv_cxx_compiler_vendor}" = "microsoft"; then
+        AC_SUBST(LINKCPPROFILER, [ws2_32.lib])
+      else
+        AC_SUBST(LINKCPPROFILER, [-lws2_32])
+      fi
+    fi
     AC_SUBST(enable_cpprofiler, yes)
     AC_DEFINE([GECODE_HAS_CPPROFILER],[],[Whether CPProfiler support available])
   else

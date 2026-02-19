@@ -672,6 +672,7 @@ HAVEBISON
 HAVE_FLEXBISON
 HAVEFLEX
 enable_cpprofiler
+LINKCPPROFILER
 enable_cbs
 enable_gist
 enable_qt
@@ -13801,11 +13802,21 @@ then :
   enableval=$enable_cpprofiler;
 fi
 
+
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether to build with support for CPProfiler" >&5
 printf %s "checking whether to build with support for CPProfiler... " >&6; }
   if test "${enable_cpprofiler:-yes}" = "yes"; then
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
+    if test "${host_os}" = "windows"; then
+      if test "${ac_cv_cxx_compiler_vendor}" = "microsoft"; then
+        LINKCPPROFILER=ws2_32.lib
+
+      else
+        LINKCPPROFILER=-lws2_32
+
+      fi
+    fi
     enable_cpprofiler=yes
 
 

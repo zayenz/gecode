@@ -124,7 +124,7 @@ export SOSUFFIX         = @DLL_ARCH@@USERSUFFIX@@SOSUFFIX@
 #
 export RMF		= rm -rf
 export MV		= mv
-export UVRUN		= uv run --script
+export UVRUN		= @PROG_UV@ run --script
 export MANIFEST		= @MANIFEST@ -nologo
 export FIXMANIFEST	= $(UVRUN) $(top_srcdir)/misc/fixmanifest.py $(DLLSUFFIX)
 export RESCOMP		= @RESCOMP@ -n -i$(top_srcdir)

@@ -52,7 +52,7 @@ def main() -> int:
         " *  CAUTION:\n"
         " *    This file has been automatically generated. Do not edit,\n"
         " *    edit the following files instead:\n"
-        f" *     - {dir_}/misc/genrc.perl\n"
+        f" *     - {dir_}/misc/genrc.py\n"
     )
     for src in srcfiles:
         sys.stdout.write(f" *     - {src}\n")

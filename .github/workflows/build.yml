@@ -7,6 +7,22 @@ env:
   BUILD_TYPE: Release
 
 jobs:
+  guard-build-script-refs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Ensure no stale Perl script references remain in active build paths
+      shell: bash
+      run: |
+        ! rg -n "genvarimp\\.perl|misc/genrc\\.perl" \
+          CMakeLists.txt \
+          cmake/GenerateVarImp.cmake \
+          Makefile.in \
+          misc/genrc.py
+        ! rg -n "PROG_PERL" configure.ac configure.ac.in configure
+
   build-autoconf:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -47,10 +63,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        include:
+          - os: macos-latest
+            regenerate_varimp: OFF
+          - os: ubuntu-latest
+            regenerate_varimp: ON
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
 
     - name: Install Ubuntu build deps
       if: runner.os == 'Linux'
@@ -68,6 +91,7 @@ jobs:
       run: >
         cmake $GITHUB_WORKSPACE
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        -DGECODE_REGENERATE_VARIMP=${{ matrix.regenerate_varimp }}
 
     - name: Build
       working-directory: ${{github.workspace}}/build
@@ -95,8 +119,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Setup Perl
-      uses: shogo82148/actions-setup-perl@v1
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
 
     - name: Create Build Environment
       shell: pwsh
@@ -127,6 +151,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
     - name: Setup MSYS2
       uses: msys2/setup-msys2@v2
       with:
@@ -141,10 +168,17 @@ jobs:
           make
           m4
           libtool
-          perl
           mingw-w64-ucrt-x86_64-gcc
           mingw-w64-ucrt-x86_64-gmp
           mingw-w64-ucrt-x86_64-mpfr
+
+    - name: Resolve uv path in MSYS2 shell
+      shell: msys2 {0}
+      run: |
+        UV_DIR="$(cygpath "$USERPROFILE/.local/bin")"
+        echo "UV_DIR=$UV_DIR" >> "$GITHUB_ENV"
+        export PATH="$UV_DIR:$PATH"
+        uv --version
 
     - name: Stabilize generated configure script timestamp
       shell: msys2 {0}
@@ -152,12 +186,18 @@ jobs:
 
     - name: Configure
       shell: msys2 {0}
-      run: CC=gcc CXX=g++ ./configure --with-host-os=Windows --disable-qt --disable-gist --disable-mpfr
+      run: |
+        export PATH="$UV_DIR:$PATH"
+        CC=gcc CXX=g++ ./configure --with-host-os=Windows --disable-qt --disable-gist --disable-mpfr
 
     - name: Build
       shell: msys2 {0}
-      run: make test -j4
+      run: |
+        export PATH="$UV_DIR:$PATH"
+        make test -j4
 
     - name: Check
       shell: msys2 {0}
-      run: make check
+      run: |
+        export PATH="$UV_DIR:$PATH"
+        make check

@@ -55,6 +55,9 @@ including MPFR, allocator/audit toggles, visibility, and freelist sizes.
 By default, CMake uses checked-in `gecode/kernel/var-type.hpp` and
 `gecode/kernel/var-imp.hpp`; regeneration is opt-in via
 `-DGECODE_REGENERATE_VARIMP=ON`.
+Build-time script execution requires `uv` on `PATH`. Gecode does not check
+for Python directly; scripts are always run with `uv run --script ...`.
+When `-DGECODE_REGENERATE_VARIMP=ON` is set, CMake also requires `uv`.
 
 Compatibility aliases are still accepted temporarily:
 `ENABLE_THREADS`, `ENABLE_GIST`, `BUILD_EXAMPLES`, `ENABLE_CPPROFILER`.

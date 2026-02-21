@@ -21,4 +21,42 @@ endif()
 include("${CMAKE_CURRENT_LIST_DIR}/GecodeTargets.cmake")
 
 set(Gecode_VERSION "@GECODE_PROJECT_VERSION@")
+set(Gecode_INCLUDE_DIRS "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@")
+set(Gecode_LIBRARIES Gecode::gecode)
+
+set(_gecode_supported_components
+  support
+  kernel
+  search
+  int
+  set
+  float
+  minimodel
+  driver
+  flatzinc
+  gist)
+
+foreach(_gecode_component IN LISTS _gecode_supported_components)
+  set(_gecode_component_target "Gecode::gecode${_gecode_component}")
+  if(TARGET ${_gecode_component_target})
+    set(_gecode_component_found TRUE)
+  else()
+    set(_gecode_component_found FALSE)
+  endif()
+  set(Gecode_${_gecode_component}_FOUND ${_gecode_component_found})
+  set(Gecode_gecode${_gecode_component}_FOUND ${_gecode_component_found})
+endforeach()
+
+foreach(_gecode_requested_component IN LISTS Gecode_FIND_COMPONENTS)
+  if(NOT DEFINED Gecode_${_gecode_requested_component}_FOUND)
+    set(Gecode_${_gecode_requested_component}_FOUND FALSE)
+  endif()
+endforeach()
+
+unset(_gecode_component)
+unset(_gecode_component_found)
+unset(_gecode_component_target)
+unset(_gecode_requested_component)
+unset(_gecode_supported_components)
+
 check_required_components(Gecode)

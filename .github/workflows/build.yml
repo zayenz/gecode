@@ -94,6 +94,68 @@ jobs:
       shell: bash
       run: cmake --build . --config $BUILD_TYPE --target check
 
+    - name: Install CMake package
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --install . --config $BUILD_TYPE --prefix "$GITHUB_WORKSPACE/install"
+
+    - name: Consumer smoke tests
+      if: matrix.os == 'ubuntu-latest'
+      shell: bash
+      run: |
+        set -euxo pipefail
+
+        prefix="$GITHUB_WORKSPACE/install"
+        work="$RUNNER_TEMP/gecode-consumers"
+        rm -rf "$work"
+        mkdir -p "$work/a" "$work/b" "$work/c"
+
+        cat > "$work/a/CMakeLists.txt" <<'EOF'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_a LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED)
+        message(STATUS "Gecode_VERSION=${Gecode_VERSION}")
+        add_executable(consumer_a main.cpp)
+        target_link_libraries(consumer_a PRIVATE Gecode::gecode)
+        EOF
+        cat > "$work/a/main.cpp" <<'EOF'
+        #include <gecode/support/config.hpp>
+        int main(void) { return 0; }
+        EOF
+
+        cat > "$work/b/CMakeLists.txt" <<'EOF'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_b LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED COMPONENTS driver)
+        add_executable(consumer_b main.cpp)
+        target_link_libraries(consumer_b PRIVATE Gecode::gecodedriver)
+        EOF
+        cat > "$work/b/main.cpp" <<'EOF'
+        int main(void) { return 0; }
+        EOF
+
+        cat > "$work/c/CMakeLists.txt" <<'EOF'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_c LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED COMPONENTS gecodedriver)
+        add_executable(consumer_c main.cpp)
+        target_link_libraries(consumer_c PRIVATE Gecode::gecodedriver)
+        EOF
+        cat > "$work/c/main.cpp" <<'EOF'
+        int main(void) { return 0; }
+        EOF
+
+        cmake -S "$work/a" -B "$work/a/build" -DCMAKE_PREFIX_PATH="$prefix" 2>&1 | tee "$work/a/configure.log"
+        cmake --build "$work/a/build" -j4
+
+        cmake -S "$work/b" -B "$work/b/build" -DCMAKE_PREFIX_PATH="$prefix"
+        cmake --build "$work/b/build" -j4
+
+        cmake -S "$work/c" -B "$work/c/build" -DCMAKE_PREFIX_PATH="$prefix"
+        cmake --build "$work/c/build" -j4
+
+        grep -q "Gecode_VERSION=" "$work/a/configure.log"
+
   build-cmake-windows:
     runs-on: windows-latest
     strategy:
@@ -135,6 +197,67 @@ jobs:
     - name: Check
       shell: pwsh
       run: cmake --build "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }} --target check
+
+    - name: Install CMake package
+      shell: pwsh
+      run: cmake --install "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }} --prefix "${{ github.workspace }}\\install"
+
+    - name: Consumer smoke tests
+      if: matrix.name == 'shared'
+      shell: pwsh
+      run: |
+        $prefix = "${{ github.workspace }}\install"
+        $work = Join-Path $env:RUNNER_TEMP "gecode-consumers-win"
+        if (Test-Path $work) { Remove-Item -Recurse -Force $work }
+        New-Item -ItemType Directory -Force -Path (Join-Path $work "a"), (Join-Path $work "b"), (Join-Path $work "c") | Out-Null
+
+        @'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_a LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED)
+        message(STATUS "Gecode_VERSION=${Gecode_VERSION}")
+        add_executable(consumer_a main.cpp)
+        target_link_libraries(consumer_a PRIVATE Gecode::gecode)
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "a\CMakeLists.txt")
+        @'
+        #include <gecode/support/config.hpp>
+        int main(void) { return 0; }
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "a\main.cpp")
+
+        @'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_b LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED COMPONENTS driver)
+        add_executable(consumer_b main.cpp)
+        target_link_libraries(consumer_b PRIVATE Gecode::gecodedriver)
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "b\CMakeLists.txt")
+        @'
+        int main(void) { return 0; }
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "b\main.cpp")
+
+        @'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_c LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED COMPONENTS gecodedriver)
+        add_executable(consumer_c main.cpp)
+        target_link_libraries(consumer_c PRIVATE Gecode::gecodedriver)
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "c\CMakeLists.txt")
+        @'
+        int main(void) { return 0; }
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "c\main.cpp")
+
+        cmake -S (Join-Path $work "a") -B (Join-Path $work "a\build") -G "Visual Studio 17 2022" -A x64 "-DCMAKE_PREFIX_PATH=$prefix" 2>&1 | Tee-Object -FilePath (Join-Path $work "a\configure.log")
+        cmake --build (Join-Path $work "a\build") --config ${{ env.BUILD_TYPE }}
+
+        cmake -S (Join-Path $work "b") -B (Join-Path $work "b\build") -G "Visual Studio 17 2022" -A x64 "-DCMAKE_PREFIX_PATH=$prefix"
+        cmake --build (Join-Path $work "b\build") --config ${{ env.BUILD_TYPE }}
+
+        cmake -S (Join-Path $work "c") -B (Join-Path $work "c\build") -G "Visual Studio 17 2022" -A x64 "-DCMAKE_PREFIX_PATH=$prefix"
+        cmake --build (Join-Path $work "c\build") --config ${{ env.BUILD_TYPE }}
+
+        if (-not (Select-String -Path (Join-Path $work "a\configure.log") -Pattern "Gecode_VERSION=" -Quiet)) {
+          throw "Gecode_VERSION was not reported during consumer configure."
+        }
 
   build-autoconf-windows:
     runs-on: windows-latest

@@ -38,7 +38,7 @@ Version metadata shared by autoconf and CMake lives in `gecode-version.m4`.
 | `--enable-gist` | `GECODE_ENABLE_GIST` | Supported directly | Disabled automatically if Qt is unavailable |
 | `--enable-cpprofiler` | `GECODE_ENABLE_CPPROFILER` | Supported directly | Default `ON` |
 | `--enable-cbs` | `GECODE_ENABLE_CBS` | Supported directly | Default `OFF` |
-| `--enable-examples` | `GECODE_ENABLE_EXAMPLES` | Supported directly | Default `ON` |
+| `--enable-examples` | `GECODE_ENABLE_EXAMPLES` | Supported directly | Default `ON` for top-level builds, `OFF` for subprojects |
 | `--enable-search` | `GECODE_ENABLE_SEARCH` | Supported directly | Default `ON` |
 | `--enable-int-vars` | `GECODE_ENABLE_INT_VARS` | Supported directly | Default `ON` |
 | `--enable-set-vars` | `GECODE_ENABLE_SET_VARS` | Supported directly | Default `ON` |
@@ -76,6 +76,20 @@ When `-DGECODE_REGENERATE_VARIMP=ON` is set, CMake also requires `uv`.
 
 Compatibility aliases are still accepted temporarily:
 `ENABLE_THREADS`, `ENABLE_GIST`, `BUILD_EXAMPLES`, `ENABLE_CPPROFILER`.
+
+## CMake Package Consumption
+
+For CMake build/install workflows and downstream `find_package(Gecode)` usage,
+see [`docs/cmake-build.md`](docs/cmake-build.md).
+
+Minimal downstream example:
+
+```cmake
+find_package(Gecode CONFIG REQUIRED)
+target_link_libraries(my_target PRIVATE Gecode::gecode)
+```
+
+Use `Gecode_VERSION` from package config for version checks.
 
 ## Download Gecode
 

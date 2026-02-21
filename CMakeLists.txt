@@ -9,6 +9,13 @@ project(GECODE LANGUAGES C CXX)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/misc/cmake_modules)
 
+# Match common CMake defaults: tests are opt-in for subprojects.
+if(PROJECT_IS_TOP_LEVEL)
+  include(CTest)
+elseif(NOT DEFINED BUILD_TESTING)
+  set(BUILD_TESTING OFF)
+endif()
+
 # Keep this preference to preserve existing Gist/OpenGL linkage behavior.
 set(OpenGL_GL_PREFERENCE LEGACY)
 
@@ -34,15 +41,40 @@ if(DEFINED ENABLE_CPPROFILER)
   set(GECODE_USED_ENABLE_CPPROFILER_ALIAS TRUE)
 endif()
 
-option(GECODE_BUILD_SHARED "Build shared libraries" ON)
-option(GECODE_BUILD_STATIC "Build static libraries" OFF)
+set(GECODE_BUILD_SHARED_OR_STATIC_SET_BY_USER FALSE)
+if(DEFINED GECODE_BUILD_SHARED OR DEFINED GECODE_BUILD_STATIC)
+  set(GECODE_BUILD_SHARED_OR_STATIC_SET_BY_USER TRUE)
+endif()
+
+if(NOT DEFINED BUILD_SHARED_LIBS)
+  set(BUILD_SHARED_LIBS ON)
+endif()
+option(BUILD_SHARED_LIBS "Build shared libraries by default" ${BUILD_SHARED_LIBS})
+
+set(GECODE_BUILD_SHARED_DEFAULT ON)
+set(GECODE_BUILD_STATIC_DEFAULT OFF)
+if(NOT GECODE_BUILD_SHARED_OR_STATIC_SET_BY_USER)
+  if(BUILD_SHARED_LIBS)
+    set(GECODE_BUILD_SHARED_DEFAULT ON)
+    set(GECODE_BUILD_STATIC_DEFAULT OFF)
+  else()
+    set(GECODE_BUILD_SHARED_DEFAULT OFF)
+    set(GECODE_BUILD_STATIC_DEFAULT ON)
+  endif()
+endif()
+
+option(GECODE_BUILD_SHARED "Build shared libraries" ${GECODE_BUILD_SHARED_DEFAULT})
+option(GECODE_BUILD_STATIC "Build static libraries" ${GECODE_BUILD_STATIC_DEFAULT})
 
 option(GECODE_ENABLE_THREAD "Enable thread support" ON)
 option(GECODE_ENABLE_QT "Enable Qt support" ON)
 option(GECODE_ENABLE_GIST "Enable Gist" ON)
 option(GECODE_ENABLE_CPPROFILER "Enable CPProfiler support" ON)
 option(GECODE_ENABLE_CBS "Enable counting-based search support" OFF)
-option(GECODE_ENABLE_EXAMPLES "Build examples" ON)
+set(GECODE_ENABLE_EXAMPLES_DEFAULT ${PROJECT_IS_TOP_LEVEL})
+option(GECODE_ENABLE_EXAMPLES "Build examples" ${GECODE_ENABLE_EXAMPLES_DEFAULT})
+set(GECODE_INSTALL_DEFAULT ${PROJECT_IS_TOP_LEVEL})
+option(GECODE_INSTALL "Enable install/export rules" ${GECODE_INSTALL_DEFAULT})
 
 option(GECODE_ENABLE_SEARCH "Build search module" ON)
 option(GECODE_ENABLE_INT_VARS "Build int variables module" ON)
@@ -622,6 +654,17 @@ if(GECODE_ENABLE_FLATZINC)
   endif()
 endif()
 
+# Compatibility aggregate target for downstream projects expecting Gecode::gecode.
+add_library(gecode INTERFACE)
+foreach(component IN ITEMS support kernel search int set float minimodel driver flatzinc gist)
+  if(TARGET gecode${component})
+    target_link_libraries(gecode INTERFACE gecode${component})
+  endif()
+endforeach()
+add_library(Gecode::gecode ALIAS gecode)
+list(APPEND GECODE_INSTALL_TARGETS gecode)
+list(APPEND GECODE_EXPORT_TARGETS gecode)
+
 # ---------------------------------------------------------------------------
 # Executables / tests
 # ---------------------------------------------------------------------------
@@ -631,87 +674,91 @@ if(GECODE_ENABLE_FLATZINC)
   list(APPEND GECODE_INSTALL_TARGETS fzn-gecode)
 endif()
 
-set(GECODE_CAN_BUILD_TESTS TRUE)
-foreach(required search int minimodel driver)
-  if(NOT TARGET gecode${required})
-    set(GECODE_CAN_BUILD_TESTS FALSE)
-  endif()
-endforeach()
-
-if(GECODE_ENABLE_SET_VARS AND NOT TARGET gecodeset)
-  set(GECODE_CAN_BUILD_TESTS FALSE)
-endif()
-if(GECODE_ENABLE_FLOAT_VARS AND NOT TARGET gecodefloat)
-  set(GECODE_CAN_BUILD_TESTS FALSE)
-endif()
-if(GECODE_ENABLE_FLATZINC AND NOT TARGET gecodeflatzinc)
-  set(GECODE_CAN_BUILD_TESTS FALSE)
-endif()
-
-set(GECODE_TEST_SOURCES_SELECTED ${GECODE_TEST_SOURCES})
-if(NOT GECODE_ENABLE_SET_VARS)
-  list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/set(/|\\.cpp)")
-endif()
-if(NOT GECODE_ENABLE_FLOAT_VARS)
-  list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/float(/|\\.cpp)")
-endif()
-if(NOT GECODE_ENABLE_FLATZINC)
-  list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/flatzinc(/|\\.cpp)")
-endif()
-
-if(GECODE_CAN_BUILD_TESTS)
-  add_executable(gecode-test EXCLUDE_FROM_ALL ${GECODE_TEST_SOURCES_SELECTED})
-  set(GECODE_TEST_LINK_LIBS gecodeminimodel)
-  if(GECODE_ENABLE_FLATZINC)
-    list(APPEND GECODE_TEST_LINK_LIBS gecodeflatzinc)
-  endif()
-  target_link_libraries(gecode-test PRIVATE ${GECODE_TEST_LINK_LIBS})
-
-  enable_testing()
-  set(GECODE_CHECK_TESTS
-    Branch::Int::Dense::3
-    Int::Arithmetic::Abs
-    Int::Arithmetic::ArgMax
-    Int::Arithmetic::Max::Nary
-    Int::Cumulative::Man::Fix::0::4
-    Int::Distinct::Random
-    Int::Linear::Bool::Int::Lq
-    Int::MiniModel::LinExpr::Bool::352
-    NoGoods::Queens
-    Search::DFS::Sol::Binary::Nary::Binary::1::1::1)
-  if(GECODE_ENABLE_FLATZINC)
-    list(INSERT GECODE_CHECK_TESTS 1 FlatZinc::magic_square)
-  endif()
-  if(GECODE_ENABLE_SET_VARS)
-    list(APPEND GECODE_CHECK_TESTS
-      Set::Dom::Dom::Gr
-      Set::RelOp::ConstSSI::Union
-      Set::Sequence::SeqU1
-      Set::Wait)
-  endif()
-
-  set(GECODE_CHECK_ARGS -iter 2 -threads 0)
-  foreach(gecode_check_test ${GECODE_CHECK_TESTS})
-    list(APPEND GECODE_CHECK_ARGS -test ${gecode_check_test})
+if(BUILD_TESTING)
+  set(GECODE_CAN_BUILD_TESTS TRUE)
+  foreach(required search int minimodel driver)
+    if(NOT TARGET gecode${required})
+      set(GECODE_CAN_BUILD_TESTS FALSE)
+    endif()
   endforeach()
 
-  add_test(NAME test COMMAND gecode-test ${GECODE_CHECK_ARGS})
-  get_property(GECODE_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-  if(GECODE_IS_MULTI_CONFIG)
-    add_custom_target(check
-      COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$" -C $<CONFIG>
-      DEPENDS gecode-test
-      USES_TERMINAL)
+  if(GECODE_ENABLE_SET_VARS AND NOT TARGET gecodeset)
+    set(GECODE_CAN_BUILD_TESTS FALSE)
+  endif()
+  if(GECODE_ENABLE_FLOAT_VARS AND NOT TARGET gecodefloat)
+    set(GECODE_CAN_BUILD_TESTS FALSE)
+  endif()
+  if(GECODE_ENABLE_FLATZINC AND NOT TARGET gecodeflatzinc)
+    set(GECODE_CAN_BUILD_TESTS FALSE)
+  endif()
+
+  set(GECODE_TEST_SOURCES_SELECTED ${GECODE_TEST_SOURCES})
+  if(NOT GECODE_ENABLE_SET_VARS)
+    list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/set(/|\\.cpp)")
+  endif()
+  if(NOT GECODE_ENABLE_FLOAT_VARS)
+    list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/float(/|\\.cpp)")
+  endif()
+  if(NOT GECODE_ENABLE_FLATZINC)
+    list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/flatzinc(/|\\.cpp)")
+  endif()
+
+  if(GECODE_CAN_BUILD_TESTS)
+    add_executable(gecode-test EXCLUDE_FROM_ALL ${GECODE_TEST_SOURCES_SELECTED})
+    set(GECODE_TEST_LINK_LIBS gecodeminimodel)
+    if(GECODE_ENABLE_FLATZINC)
+      list(APPEND GECODE_TEST_LINK_LIBS gecodeflatzinc)
+    endif()
+    target_link_libraries(gecode-test PRIVATE ${GECODE_TEST_LINK_LIBS})
+
+    set(GECODE_CHECK_TESTS
+      Branch::Int::Dense::3
+      Int::Arithmetic::Abs
+      Int::Arithmetic::ArgMax
+      Int::Arithmetic::Max::Nary
+      Int::Cumulative::Man::Fix::0::4
+      Int::Distinct::Random
+      Int::Linear::Bool::Int::Lq
+      Int::MiniModel::LinExpr::Bool::352
+      NoGoods::Queens
+      Search::DFS::Sol::Binary::Nary::Binary::1::1::1)
+    if(GECODE_ENABLE_FLATZINC)
+      list(INSERT GECODE_CHECK_TESTS 1 FlatZinc::magic_square)
+    endif()
+    if(GECODE_ENABLE_SET_VARS)
+      list(APPEND GECODE_CHECK_TESTS
+        Set::Dom::Dom::Gr
+        Set::RelOp::ConstSSI::Union
+        Set::Sequence::SeqU1
+        Set::Wait)
+    endif()
+
+    set(GECODE_CHECK_ARGS -iter 2 -threads 0)
+    foreach(gecode_check_test ${GECODE_CHECK_TESTS})
+      list(APPEND GECODE_CHECK_ARGS -test ${gecode_check_test})
+    endforeach()
+
+    add_test(NAME test COMMAND gecode-test ${GECODE_CHECK_ARGS})
+    get_property(GECODE_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+    if(GECODE_IS_MULTI_CONFIG)
+      add_custom_target(check
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$" -C $<CONFIG>
+        DEPENDS gecode-test
+        USES_TERMINAL)
+    else()
+      add_custom_target(check
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$"
+        DEPENDS gecode-test
+        USES_TERMINAL)
+    endif()
   else()
+    message(WARNING "Skipping gecode-test/check targets because required modules are disabled")
     add_custom_target(check
-      COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$"
-      DEPENDS gecode-test
-      USES_TERMINAL)
+      COMMAND ${CMAKE_COMMAND} -E echo "Skipping check target because required modules are disabled")
   endif()
 else()
-  message(WARNING "Skipping gecode-test/check targets because required modules are disabled")
   add_custom_target(check
-    COMMAND ${CMAKE_COMMAND} -E echo "Skipping check target because required modules are disabled")
+    COMMAND ${CMAKE_COMMAND} -E echo "Skipping check target because BUILD_TESTING is OFF")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -746,94 +793,96 @@ endif()
 # Installation + CMake package export
 # ---------------------------------------------------------------------------
 include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
+if(GECODE_INSTALL)
+  include(CMakePackageConfigHelpers)
 
-install(TARGETS ${GECODE_INSTALL_TARGETS}
-  EXPORT GecodeTargets
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  install(TARGETS ${GECODE_INSTALL_TARGETS}
+    EXPORT GecodeTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-if(GECODE_ENABLE_FLATZINC)
-  install(FILES ${MZN_SCRIPT} DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
+  if(GECODE_ENABLE_FLATZINC)
+    install(FILES ${MZN_SCRIPT} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
 
-install(DIRECTORY gecode
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  FILES_MATCHING
-    PATTERN "**.hh"
-    PATTERN "**.hpp"
-    PATTERN "LICENSE_1_0.txt"
-    PATTERN "mznlib" EXCLUDE
-    PATTERN "exampleplugin" EXCLUDE
-    PATTERN "standalone-example" EXCLUDE
-    PATTERN "abi*" EXCLUDE)
+  install(DIRECTORY gecode
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING
+      PATTERN "**.hh"
+      PATTERN "**.hpp"
+      PATTERN "LICENSE_1_0.txt"
+      PATTERN "mznlib" EXCLUDE
+      PATTERN "exampleplugin" EXCLUDE
+      PATTERN "standalone-example" EXCLUDE
+      PATTERN "abi*" EXCLUDE)
 
-install(FILES ${PROJECT_BINARY_DIR}/gecode/support/config.hpp
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gecode/support/)
-if(GECODE_REGENERATE_VARIMP)
-  install(FILES ${GECODE_VAR_TYPE_HPP} ${GECODE_VAR_IMP_HPP}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gecode/kernel/)
-endif()
+  install(FILES ${PROJECT_BINARY_DIR}/gecode/support/config.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gecode/support/)
+  if(GECODE_REGENERATE_VARIMP)
+    install(FILES ${GECODE_VAR_TYPE_HPP} ${GECODE_VAR_IMP_HPP}
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/gecode/kernel/)
+  endif()
 
-if(GECODE_ENABLE_FLATZINC)
-  install(DIRECTORY gecode/flatzinc/mznlib/
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/gecode)
+  if(GECODE_ENABLE_FLATZINC)
+    install(DIRECTORY gecode/flatzinc/mznlib/
+      DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/gecode)
 
-  install(FILES ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode.msc
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/solvers)
-  if(GECODE_BUILD_GIST_TARGET)
-    install(FILES ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode-gist.msc
+    install(FILES ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode.msc
       DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/solvers)
+    if(GECODE_BUILD_GIST_TARGET)
+      install(FILES ${PROJECT_BINARY_DIR}/tools/flatzinc/gecode-gist.msc
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/minizinc/solvers)
+    endif()
   endif()
-endif()
 
-set(GECODE_PACKAGE_NEEDS_THREADS OFF)
-if(GECODE_ENABLE_THREAD)
-  set(GECODE_PACKAGE_NEEDS_THREADS ON)
-endif()
-set(GECODE_PACKAGE_NEEDS_MPFR OFF)
-if(GECODE_ENABLE_FLOAT_VARS AND GECODE_ENABLE_MPFR AND MPFR_FOUND AND TARGET MPFR::MPFR)
-  set(GECODE_PACKAGE_NEEDS_MPFR ON)
-endif()
-set(GECODE_PACKAGE_QT_MAJOR "")
-set(GECODE_PACKAGE_QT_COMPONENTS "")
-if(GECODE_BUILD_GIST_TARGET)
-  set(GECODE_PACKAGE_QT_COMPONENTS "Core;Gui;Widgets;PrintSupport")
-elseif(GECODE_ENABLE_FLATZINC AND GECODE_HAS_QT_RUNTIME)
-  set(GECODE_PACKAGE_QT_COMPONENTS "Core")
-endif()
-if(NOT GECODE_PACKAGE_QT_COMPONENTS STREQUAL "")
-  if(Qt6_FOUND)
-    set(GECODE_PACKAGE_QT_MAJOR "6")
-  elseif(Qt5_FOUND)
-    set(GECODE_PACKAGE_QT_MAJOR "5")
+  set(GECODE_PACKAGE_NEEDS_THREADS OFF)
+  if(GECODE_ENABLE_THREAD)
+    set(GECODE_PACKAGE_NEEDS_THREADS ON)
   endif()
+  set(GECODE_PACKAGE_NEEDS_MPFR OFF)
+  if(GECODE_ENABLE_FLOAT_VARS AND GECODE_ENABLE_MPFR AND MPFR_FOUND AND TARGET MPFR::MPFR)
+    set(GECODE_PACKAGE_NEEDS_MPFR ON)
+  endif()
+  set(GECODE_PACKAGE_QT_MAJOR "")
+  set(GECODE_PACKAGE_QT_COMPONENTS "")
+  if(GECODE_BUILD_GIST_TARGET)
+    set(GECODE_PACKAGE_QT_COMPONENTS "Core;Gui;Widgets;PrintSupport")
+  elseif(GECODE_ENABLE_FLATZINC AND GECODE_HAS_QT_RUNTIME)
+    set(GECODE_PACKAGE_QT_COMPONENTS "Core")
+  endif()
+  if(NOT GECODE_PACKAGE_QT_COMPONENTS STREQUAL "")
+    if(Qt6_FOUND)
+      set(GECODE_PACKAGE_QT_MAJOR "6")
+    elseif(Qt5_FOUND)
+      set(GECODE_PACKAGE_QT_MAJOR "5")
+    endif()
+  endif()
+
+  configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GecodeConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/GecodeConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Gecode)
+
+  write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/GecodeConfigVersion.cmake
+    VERSION ${GECODE_PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion)
+
+  install(EXPORT GecodeTargets
+    FILE GecodeTargets.cmake
+    NAMESPACE Gecode::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Gecode)
+
+  install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/GecodeConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/GecodeConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Gecode)
+
+  install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/misc/cmake_modules/FindMPFR.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Gecode)
 endif()
-
-configure_package_config_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GecodeConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/GecodeConfig.cmake
-  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Gecode)
-
-write_basic_package_version_file(
-  ${CMAKE_CURRENT_BINARY_DIR}/GecodeConfigVersion.cmake
-  VERSION ${GECODE_PROJECT_VERSION}
-  COMPATIBILITY SameMajorVersion)
-
-install(EXPORT GecodeTargets
-  FILE GecodeTargets.cmake
-  NAMESPACE Gecode::
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Gecode)
-
-install(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/GecodeConfig.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/GecodeConfigVersion.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Gecode)
-
-install(FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/misc/cmake_modules/FindMPFR.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Gecode)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)

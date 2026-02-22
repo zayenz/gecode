@@ -79,11 +79,18 @@ jobs:
     - name: Configure CMake
       shell: bash
       working-directory: ${{github.workspace}}/build
-      run: >
-        cmake $GITHUB_WORKSPACE
-        -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-        -DGECODE_REGENERATE_VARIMP=${{ matrix.regenerate_varimp }}
-        ${{ matrix.os == 'ubuntu-latest' && '-DCMAKE_INSTALL_INCLUDEDIR=/usr/include' || '' }}
+      run: |
+        set -euxo pipefail
+        cmake_args=(
+          "$GITHUB_WORKSPACE"
+          "-DCMAKE_BUILD_TYPE=$BUILD_TYPE"
+          "-DGECODE_REGENERATE_VARIMP=${{ matrix.regenerate_varimp }}"
+        )
+        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          # Keep this path absolute to validate package config handling for absolute install dirs.
+          cmake_args+=("-DCMAKE_INSTALL_INCLUDEDIR=$GITHUB_WORKSPACE/install-abs-include")
+        fi
+        cmake "${cmake_args[@]}"
 
     - name: Build
       working-directory: ${{github.workspace}}/build
@@ -107,6 +114,7 @@ jobs:
         set -euxo pipefail
 
         prefix="$GITHUB_WORKSPACE/install"
+        expected_include="$GITHUB_WORKSPACE/install-abs-include"
         work="$RUNNER_TEMP/gecode-consumers"
         rm -rf "$work"
         mkdir -p "$work/a" "$work/b" "$work/c"
@@ -157,7 +165,7 @@ jobs:
         cmake --build "$work/c/build" -j4
 
         grep -q "Gecode_VERSION=" "$work/a/configure.log"
-        grep -q "Gecode_INCLUDE_DIRS=/usr/include" "$work/a/configure.log"
+        grep -q "Gecode_INCLUDE_DIRS=$expected_include" "$work/a/configure.log"
 
   build-cmake-windows:
     runs-on: windows-latest

@@ -83,6 +83,7 @@ jobs:
         cmake $GITHUB_WORKSPACE
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE
         -DGECODE_REGENERATE_VARIMP=${{ matrix.regenerate_varimp }}
+        ${{ matrix.os == 'ubuntu-latest' && '-DCMAKE_INSTALL_INCLUDEDIR=/usr/include' || '' }}
 
     - name: Build
       working-directory: ${{github.workspace}}/build
@@ -115,6 +116,7 @@ jobs:
         project(consumer_a LANGUAGES CXX)
         find_package(Gecode CONFIG REQUIRED)
         message(STATUS "Gecode_VERSION=${Gecode_VERSION}")
+        message(STATUS "Gecode_INCLUDE_DIRS=${Gecode_INCLUDE_DIRS}")
         add_executable(consumer_a main.cpp)
         target_link_libraries(consumer_a PRIVATE Gecode::gecode)
         EOF
@@ -155,6 +157,7 @@ jobs:
         cmake --build "$work/c/build" -j4
 
         grep -q "Gecode_VERSION=" "$work/a/configure.log"
+        grep -q "Gecode_INCLUDE_DIRS=/usr/include" "$work/a/configure.log"
 
   build-cmake-windows:
     runs-on: windows-latest

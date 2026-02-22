@@ -88,7 +88,7 @@ jobs:
         )
         if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
           # Keep this path absolute to validate package config handling for absolute install dirs.
-          cmake_args+=("-DCMAKE_INSTALL_INCLUDEDIR=$GITHUB_WORKSPACE/install-abs-include")
+          cmake_args+=("-DCMAKE_INSTALL_INCLUDEDIR=/tmp/gecode-install-abs-include")
         fi
         cmake "${cmake_args[@]}"
 
@@ -114,7 +114,7 @@ jobs:
         set -euxo pipefail
 
         prefix="$GITHUB_WORKSPACE/install"
-        expected_include="$GITHUB_WORKSPACE/install-abs-include"
+        expected_include="/tmp/gecode-install-abs-include"
         work="$RUNNER_TEMP/gecode-consumers"
         rm -rf "$work"
         mkdir -p "$work/a" "$work/b" "$work/c"

@@ -527,58 +527,80 @@ namespace Test { namespace Int {
        InglenookCrashReproducer(void)
          : ::Test::Base("Extensional::TupleSet::Crash::Inglenook") {}
 
-       virtual bool run(void) {
-         using namespace Gecode;
+      virtual bool run(void) {
+        using namespace Gecode;
 
-         const char* csv = std::getenv("GECODE_INGLENOOK_CSV");
-         if ((csv == nullptr) || (csv[0] == '\0'))
-           return true;
+        const char* csv = std::getenv("GECODE_INGLENOOK_CSV");
+        if ((csv == nullptr) || (csv[0] == '\0'))
+          return true;
 
-         std::ifstream file(csv);
-         if (!file.good()) {
-           std::cerr << "ERROR: Could not open CSV file: "
-                     << csv << std::endl;
-           return false;
-         }
+        const char* epk_env = std::getenv("GECODE_INGLENOOK_EPK");
+        ExtensionalPropKind epk = EPK_AUTO;
+        if ((epk_env != nullptr) && (epk_env[0] != '\0')) {
+          const std::string mode(epk_env);
+          if (mode == "auto") {
+            epk = EPK_AUTO;
+          } else if (mode == "sparse") {
+            epk = EPK_SPARSE;
+          } else if ((mode == "densecompressed") ||
+                     (mode == "dense_compressed") ||
+                     (mode == "dense-compressed")) {
+            epk = EPK_DENSE_COMPRESSED;
+          } else if (mode == "dense") {
+            epk = EPK_DENSE;
+          } else {
+            std::cerr << "ERROR: Unsupported GECODE_INGLENOOK_EPK value: "
+                      << mode << std::endl;
+            return false;
+          }
+        }
 
-         std::cerr << "DEBUG: Opened CSV file: " << csv << std::endl;
+        std::ifstream file(csv);
+        if (!file.good()) {
+          std::cerr << "ERROR: Could not open CSV file: "
+                    << csv << std::endl;
+          return false;
+        }
 
-         TupleSet ts(2);
-         std::string line;
+        std::cerr << "DEBUG: Opened CSV file: " << csv << std::endl;
 
-         // Skip header line.
-         if (!std::getline(file, line)) {
-           std::cerr << "ERROR: CSV file is empty: "
-                     << csv << std::endl;
-           return false;
-         }
+        TupleSet ts(2);
+        std::string line;
 
-         int line_count = 0;
-         while (std::getline(file, line)) {
-           if (line.empty())
-             continue;
+        // Skip header line.
+        if (!std::getline(file, line)) {
+          std::cerr << "ERROR: CSV file is empty: "
+                    << csv << std::endl;
+          return false;
+        }
 
-           std::istringstream stream(line);
-           int from, to;
-           char comma;
-           if (!(stream >> from >> comma >> to) || comma != ',') {
-             std::cerr << "ERROR: Malformed CSV line " << (line_count + 2)
-                       << ": " << line << std::endl;
-             return false;
-           }
+        int line_count = 0;
+        while (std::getline(file, line)) {
+          if (line.empty())
+            continue;
 
-           ts.add(IntArgs({from, to}));
-           line_count++;
-         }
+          std::istringstream stream(line);
+          int from, to;
+          char comma;
+          if (!(stream >> from >> comma >> to) || comma != ',') {
+            std::cerr << "ERROR: Malformed CSV line " << (line_count + 2)
+                      << ": " << line << std::endl;
+            return false;
+          }
 
-         std::cerr << "DEBUG: About to call ts.finalize() with "
-                   << line_count << " tuples" << std::endl;
-         ts.finalize();
-         std::cerr << "DEBUG: ts.finalize() completed successfully" << std::endl;
+          ts.add(IntArgs({from, to}));
+          line_count++;
+        }
 
-         return true;
-       }
-     };
+        std::cerr << "DEBUG: About to call ts.finalize() with "
+                  << line_count << " tuples, epk="
+                  << extensional_kind_name(epk) << std::endl;
+        ts.finalize(epk);
+        std::cerr << "DEBUG: ts.finalize() completed successfully" << std::endl;
+
+        return true;
+      }
+    };
 
      /// Sparse fallback smoke test for very low-density unary tuplesets
      class SparseTupleSetFallback : public ::Test::Base {

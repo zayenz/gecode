@@ -1,6 +1,13 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+      - 'release/**'
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -16,6 +23,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Install Ubuntu build deps
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y flex bison libgmp-dev libmpfr-dev
+
+    - name: Stabilize generated configure script timestamp
+      shell: bash
+      run: touch configure
+
     - name: Configure
       shell: bash
       run: ./configure
@@ -28,14 +49,29 @@ jobs:
       shell: bash
       run: make check
 
-  build-cmake:
+  build-cmake-unix:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            regenerate_varimp: OFF
+          - os: ubuntu-latest
+            regenerate_varimp: ON
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Install Ubuntu build deps
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y flex bison libgmp-dev libmpfr-dev
 
     - name: Create Build Environment
       run: cmake -E make_directory ${{github.workspace}}/build
@@ -43,9 +79,257 @@ jobs:
     - name: Configure CMake
       shell: bash
       working-directory: ${{github.workspace}}/build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+      run: |
+        set -euxo pipefail
+        cmake_args=(
+          "$GITHUB_WORKSPACE"
+          "-DCMAKE_BUILD_TYPE=$BUILD_TYPE"
+          "-DGECODE_REGENERATE_VARIMP=${{ matrix.regenerate_varimp }}"
+        )
+        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          # Keep this path absolute to validate package config handling for absolute install dirs.
+          cmake_args+=("-DCMAKE_INSTALL_INCLUDEDIR=/tmp/gecode-install-abs-include")
+        fi
+        cmake "${cmake_args[@]}"
 
     - name: Build
       working-directory: ${{github.workspace}}/build
       shell: bash
       run: cmake --build . --config $BUILD_TYPE
+
+    - name: Check
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --build . --config $BUILD_TYPE --target check
+
+    - name: Install CMake package
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --install . --config $BUILD_TYPE --prefix "$GITHUB_WORKSPACE/install"
+
+    - name: Consumer smoke tests
+      if: matrix.os == 'ubuntu-latest'
+      shell: bash
+      run: |
+        set -euxo pipefail
+
+        prefix="$GITHUB_WORKSPACE/install"
+        expected_include="/tmp/gecode-install-abs-include"
+        work="$RUNNER_TEMP/gecode-consumers"
+        rm -rf "$work"
+        mkdir -p "$work/a" "$work/b" "$work/c"
+
+        cat > "$work/a/CMakeLists.txt" <<'EOF'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_a LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED)
+        message(STATUS "Gecode_VERSION=${Gecode_VERSION}")
+        message(STATUS "Gecode_INCLUDE_DIRS=${Gecode_INCLUDE_DIRS}")
+        add_executable(consumer_a main.cpp)
+        target_link_libraries(consumer_a PRIVATE Gecode::gecode)
+        EOF
+        cat > "$work/a/main.cpp" <<'EOF'
+        #include <gecode/support/config.hpp>
+        int main(void) { return 0; }
+        EOF
+
+        cat > "$work/b/CMakeLists.txt" <<'EOF'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_b LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED COMPONENTS driver)
+        add_executable(consumer_b main.cpp)
+        target_link_libraries(consumer_b PRIVATE Gecode::gecodedriver)
+        EOF
+        cat > "$work/b/main.cpp" <<'EOF'
+        int main(void) { return 0; }
+        EOF
+
+        cat > "$work/c/CMakeLists.txt" <<'EOF'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_c LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED COMPONENTS gecodedriver)
+        add_executable(consumer_c main.cpp)
+        target_link_libraries(consumer_c PRIVATE Gecode::gecodedriver)
+        EOF
+        cat > "$work/c/main.cpp" <<'EOF'
+        int main(void) { return 0; }
+        EOF
+
+        cmake -S "$work/a" -B "$work/a/build" -DCMAKE_PREFIX_PATH="$prefix" 2>&1 | tee "$work/a/configure.log"
+        cmake --build "$work/a/build" -j4
+
+        cmake -S "$work/b" -B "$work/b/build" -DCMAKE_PREFIX_PATH="$prefix"
+        cmake --build "$work/b/build" -j4
+
+        cmake -S "$work/c" -B "$work/c/build" -DCMAKE_PREFIX_PATH="$prefix"
+        cmake --build "$work/c/build" -j4
+
+        grep -q "Gecode_VERSION=" "$work/a/configure.log"
+        grep -q "Gecode_INCLUDE_DIRS=$expected_include" "$work/a/configure.log"
+
+  build-cmake-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: shared
+            build_shared: ON
+            build_static: OFF
+          - name: static
+            build_shared: OFF
+            build_static: ON
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Create Build Environment
+      shell: pwsh
+      run: cmake -E make_directory "${{ github.workspace }}\\build"
+
+    - name: Configure CMake
+      shell: pwsh
+      run: >
+        cmake -S "${{ github.workspace }}" -B "${{ github.workspace }}\\build"
+        -G "Visual Studio 17 2022" -A x64
+        -DGECODE_ENABLE_QT=OFF
+        -DGECODE_ENABLE_GIST=OFF
+        -DGECODE_ENABLE_MPFR=OFF
+        -DGECODE_BUILD_SHARED=${{ matrix.build_shared }}
+        -DGECODE_BUILD_STATIC=${{ matrix.build_static }}
+
+    - name: Build
+      shell: pwsh
+      run: cmake --build "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }}
+
+    - name: Check
+      shell: pwsh
+      run: cmake --build "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }} --target check
+
+    - name: Install CMake package
+      shell: pwsh
+      run: cmake --install "${{ github.workspace }}\\build" --config ${{ env.BUILD_TYPE }} --prefix "${{ github.workspace }}\\install"
+
+    - name: Consumer smoke tests
+      if: matrix.name == 'shared'
+      shell: pwsh
+      run: |
+        $prefix = "${{ github.workspace }}\install"
+        $work = Join-Path $env:RUNNER_TEMP "gecode-consumers-win"
+        if (Test-Path $work) { Remove-Item -Recurse -Force $work }
+        New-Item -ItemType Directory -Force -Path (Join-Path $work "a"), (Join-Path $work "b"), (Join-Path $work "c") | Out-Null
+
+        @'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_a LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED)
+        message(STATUS "Gecode_VERSION=${Gecode_VERSION}")
+        add_executable(consumer_a main.cpp)
+        target_link_libraries(consumer_a PRIVATE Gecode::gecode)
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "a\CMakeLists.txt")
+        @'
+        #include <gecode/support/config.hpp>
+        int main(void) { return 0; }
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "a\main.cpp")
+
+        @'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_b LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED COMPONENTS driver)
+        add_executable(consumer_b main.cpp)
+        target_link_libraries(consumer_b PRIVATE Gecode::gecodedriver)
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "b\CMakeLists.txt")
+        @'
+        int main(void) { return 0; }
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "b\main.cpp")
+
+        @'
+        cmake_minimum_required(VERSION 3.21)
+        project(consumer_c LANGUAGES CXX)
+        find_package(Gecode CONFIG REQUIRED COMPONENTS gecodedriver)
+        add_executable(consumer_c main.cpp)
+        target_link_libraries(consumer_c PRIVATE Gecode::gecodedriver)
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "c\CMakeLists.txt")
+        @'
+        int main(void) { return 0; }
+        '@ | Set-Content -Encoding utf8 (Join-Path $work "c\main.cpp")
+
+        cmake -S (Join-Path $work "a") -B (Join-Path $work "a\build") -G "Visual Studio 17 2022" -A x64 "-DCMAKE_PREFIX_PATH=$prefix" 2>&1 | Tee-Object -FilePath (Join-Path $work "a\configure.log")
+        cmake --build (Join-Path $work "a\build") --config ${{ env.BUILD_TYPE }}
+
+        cmake -S (Join-Path $work "b") -B (Join-Path $work "b\build") -G "Visual Studio 17 2022" -A x64 "-DCMAKE_PREFIX_PATH=$prefix"
+        cmake --build (Join-Path $work "b\build") --config ${{ env.BUILD_TYPE }}
+
+        cmake -S (Join-Path $work "c") -B (Join-Path $work "c\build") -G "Visual Studio 17 2022" -A x64 "-DCMAKE_PREFIX_PATH=$prefix"
+        cmake --build (Join-Path $work "c\build") --config ${{ env.BUILD_TYPE }}
+
+        if (-not (Select-String -Path (Join-Path $work "a\configure.log") -Pattern "Gecode_VERSION=" -Quiet)) {
+          throw "Gecode_VERSION was not reported during consumer configure."
+        }
+
+  build-autoconf-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Resolve uv path on Windows host
+      shell: pwsh
+      run: |
+        $uvExe = (Get-Command uv -ErrorAction Stop).Source
+        $uvDir = Split-Path -Parent $uvExe
+        "UV_WIN_DIR=$uvDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: >-
+          autoconf
+          automake
+          bison
+          flex
+          gcc
+          make
+          m4
+          libtool
+          mingw-w64-ucrt-x86_64-gcc
+          mingw-w64-ucrt-x86_64-gmp
+          mingw-w64-ucrt-x86_64-mpfr
+
+    - name: Verify uv in MSYS2 shell
+      shell: msys2 {0}
+      run: |
+        UV_DIR="$(cygpath "$UV_WIN_DIR")"
+        echo "UV_DIR=$UV_DIR" >> "$GITHUB_ENV"
+        export PATH="$UV_DIR:$PATH"
+        uv --version
+
+    - name: Stabilize generated configure script timestamp
+      shell: msys2 {0}
+      run: touch configure
+
+    - name: Configure
+      shell: msys2 {0}
+      run: |
+        export PATH="$UV_DIR:$PATH"
+        CC=gcc CXX=g++ ./configure --with-host-os=Windows --disable-qt --disable-gist --disable-mpfr
+
+    - name: Build
+      shell: msys2 {0}
+      run: |
+        export PATH="$UV_DIR:$PATH"
+        make test -j4
+
+    - name: Check
+      shell: msys2 {0}
+      run: |
+        export PATH="$UV_DIR:$PATH"
+        make check

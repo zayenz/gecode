@@ -1,10 +1,19 @@
-/* -*- mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*- */
-/*
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.9"
+# ///
+
+"""Post-process autoheader output for Gecode's generated support/config.hpp."""
+
+import re
+import sys
+
+HEADER = """/*
  *  Main authors:
- *     Christian Schulte <schulte@gecode.org>
+ *     Guido Tack <tack@gecode.org>
  *
  *  Copyright:
- *     Christian Schulte, 2008
+ *     Guido Tack, 2008
  *
  *  This file is part of Gecode, the generic constraint
  *  development environment:
@@ -12,7 +21,7 @@
  *
  *  Permission is hereby granted, free of charge, to any person obtaining
  *  a copy of this software and associated documentation files (the
- *  "Software"), to deal in the Software without restriction, including
+ *  \"Software\"), to deal in the Software without restriction, including
  *  without limitation the rights to use, copy, modify, merge, publish,
  *  distribute, sublicense, and/or sell copies of the Software, and to
  *  permit persons to whom the Software is furnished to do so, subject to
@@ -21,7 +30,7 @@
  *  The above copyright notice and this permission notice shall be
  *  included in all copies or substantial portions of the Software.
  *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *  THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,
  *  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  *  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
  *  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
@@ -31,39 +40,22 @@
  *
  */
 
-/*
- * Define auto-linking for MSVC
- *
- */
+"""
 
-#if defined(_MSC_VER) && !defined(GECODE_NO_AUTOLINK)
 
-#if defined(_M_IX86)
-#define GECODE_DLL_PLATFORM "x86"
-#elif defined(_M_IA64)
-#define GECODE_DLL_PLATFORM "ia64"
-#elif defined(_M_X64)
-#define GECODE_DLL_PLATFORM "x64"
-#else
-#error Unsupported platform.
-#endif
+def main() -> int:
+    sys.stdout.write(HEADER)
+    prev = ""
+    for line in sys.stdin:
+        if re.search(r"\#undef.*GECODE.*", line) or re.search(r".*forceinline*", line):
+            sys.stdout.write(prev)
+            sys.stdout.write(line)
+            sys.stdout.write("\n")
+        else:
+            prev = line
+    sys.stdout.write("// STATISTICS: support-any\n")
+    return 0
 
-#if defined(_DEBUG)
-#define GECODE_DLL_RELEASE "d"
-#else
-#define GECODE_DLL_RELEASE "r"
-#endif
 
-#pragma comment(lib, \
-  GECODE_DLL_USERPREFIX "Gecode" GECODE_LIBRARY_NAME\
-  "-" GECODE_LIBRARY_VERSION \
-  "-" GECODE_DLL_RELEASE "-" GECODE_DLL_PLATFORM GECODE_DLL_USERSUFFIX)
-
-#undef GECODE_DLL_PLATFORM
-#undef GECODE_DLL_RELEASE
-
-#endif
-
-#undef GECODE_LIBRARY_NAME
-
-// STATISTICS: support-any
+if __name__ == "__main__":
+    raise SystemExit(main())

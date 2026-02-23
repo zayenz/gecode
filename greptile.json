@@ -1,0 +1,4 @@
+{
+  "fileChangeLimit": 300,
+  "ignorePatterns": "greptile.json\ncontribs/\ncontribs/**\n*.md\n*.txt\n*.json"
+}

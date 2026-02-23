@@ -38,7 +38,7 @@ dnl
 
 AC_DEFUN([AC_GECODE_GET_OS],
     [AC_ARG_WITH([host-os],
-           AC_HELP_STRING([--with-host-os],
+           AS_HELP_STRING([--with-host-os],
        [Override operating system test. Valid values are Linux, Darwin, FreeBSD, NetBSD, and Windows.]))
      AC_MSG_CHECKING([for the host operating system])
          if test "${with_host_os:-no}" = "no"; then
@@ -243,7 +243,7 @@ AC_DEFUN([AC_ADD_DLL_ARCH],
 
 AC_DEFUN([AC_CXX_COMPILER_VENDOR],
   [AC_ARG_WITH([compiler-vendor],
-     AC_HELP_STRING([--with-compiler-vendor],
+     AS_HELP_STRING([--with-compiler-vendor],
        [Override compiler test. Valid values are gnu, intel, and microsoft.]))
    AC_REQUIRE([AC_PROG_CXX])
    AC_REQUIRE([AC_PROG_CXXCPP])
@@ -334,7 +334,7 @@ AC_DEFUN([AC_GECODE_ADD_VTI],
    [AC_DEFINE(GECODE_HAS_$1_VARS, [], [Whether to build $1 variables])])
 AC_DEFUN([AC_GECODE_VIS],[
   AC_ARG_WITH([vis],
-    AC_HELP_STRING([--with-vis],
+    AS_HELP_STRING([--with-vis],
     [additional variable implementation specifications]))
     if test "${with_vis:-no}" != "no"; then
       with_vis=${with_vis//,/ }
@@ -343,7 +343,7 @@ AC_DEFUN([AC_GECODE_VIS],[
 AC_DEFUN([AC_GECODE_VTI],
    [
    AC_ARG_ENABLE([$1-vars],
-     AC_HELP_STRING([--enable-$1-vars],[build $2 @<:@default=$3@:>@]))
+     AS_HELP_STRING([--enable-$1-vars],[build $2 @<:@default=$3@:>@]))
    ac_gecode_vis="$4${ac_gecode_vis:+ }${ac_gecode_vis}"
    AC_MSG_CHECKING(whether to build the $1 variables library)
    if test "${enable_$1_vars:-$3}" = "yes"; then
@@ -371,7 +371,7 @@ dnl   Guido Tack <tack@gecode.org>
 AC_DEFUN([AC_GECODE_ENABLE_MODULE],
      [
      AC_ARG_ENABLE([$1],
-       AC_HELP_STRING([--enable-$1],
+       AS_HELP_STRING([--enable-$1],
          [$3 @<:@default=$2@:>@]))
      AC_MSG_CHECKING(whether to build $1)
      if test "${enable_$1:-$2}" = "yes"; then
@@ -393,7 +393,7 @@ dnl   Grégoire Dooms <dooms@info.ucl.ac.be>
 AC_DEFUN([AC_GECODE_ENABLE_CONTRIB],
 [
    AC_ARG_ENABLE([$1],
-     AC_HELP_STRING([--enable-$1],[build $2 @<:@default=yes@:>@]))
+     AS_HELP_STRING([--enable-$1],[build $2 @<:@default=yes@:>@]))
    AC_MSG_CHECKING(whether to build the $1 contrib library)
    if test "${enable_$1:-yes}" = "yes"; then
      AC_MSG_RESULT(yes)
@@ -413,7 +413,7 @@ AC_DEFUN([AC_GECODE_STATICLIBS],
         enable_shared="no"
       fi
       AC_ARG_ENABLE([static],
-        AC_HELP_STRING([--enable-static],
+        AS_HELP_STRING([--enable-static],
           [build static libraries @<:@default=no@:>@]))
       AC_MSG_CHECKING(whether to build static libraries)
         if test "${enable_static:-no}" = "yes"; then
@@ -428,7 +428,7 @@ AC_DEFUN([AC_GECODE_STATICLIBS],
           AC_MSG_RESULT(no)
         fi
       AC_ARG_ENABLE([shared],
-        AC_HELP_STRING([--enable-shared],
+        AS_HELP_STRING([--enable-shared],
           [build shared libraries @<:@default=yes@:>@]))
       AC_MSG_CHECKING(whether to build shared libraries)
         if test "${enable_shared:-yes}" = "yes"; then
@@ -445,7 +445,7 @@ AC_DEFUN([AC_GECODE_STATICLIBS],
 
 AC_DEFUN([AC_GECODE_CODESIZE],
     [AC_ARG_ENABLE([small-codesize],
-       AC_HELP_STRING([--enable-small-codesize],
+       AS_HELP_STRING([--enable-small-codesize],
          [optimize for code size @<:@default=no@:>@]))
      AC_MSG_CHECKING(whether to optimize for code size)
      if test "${enable_debug:-no}" = "yes"; then
@@ -470,7 +470,7 @@ AC_DEFUN([AC_GECODE_CODESIZE],
 
 AC_DEFUN([AC_GECODE_DEBUG],
     [AC_ARG_ENABLE([debug],
-       AC_HELP_STRING([--enable-debug],
+       AS_HELP_STRING([--enable-debug],
          [build with assertions @<:@default=no@:>@]))
      AC_MSG_CHECKING(whether to build with debug symbols and assertions)
      if test "${enable_debug:-no}" = "yes"; then
@@ -486,7 +486,7 @@ AC_DEFUN([AC_GECODE_DEBUG],
 
 AC_DEFUN([AC_GECODE_LEAK_DEBUG],
     [AC_ARG_ENABLE([leak-debug],
-       AC_HELP_STRING([--enable-leak-debug],
+       AS_HELP_STRING([--enable-leak-debug],
          [build with support for finding memory leaks @<:@default=no@:>@]))
      AC_MSG_CHECKING(whether to build with support for finding memory leaks)
      if test "${enable_leak_debug:-no}" = "yes"; then
@@ -502,7 +502,7 @@ AC_DEFUN([AC_GECODE_LEAK_DEBUG],
 
 AC_DEFUN([AC_GECODE_PEAKHEAP],
     [AC_ARG_ENABLE([peakheap],
-       AC_HELP_STRING([--enable-peakheap],
+       AS_HELP_STRING([--enable-peakheap],
          [build with peak heap size tracking @<:@default=no@:>@]))
      if test "${enable_peakheap:-no}" = "yes"; then
         AC_CHECK_FUNC(_msize,
@@ -559,7 +559,7 @@ AC_DEFUN([AC_GECODE_PEAKHEAP],
 
 AC_DEFUN([AC_GECODE_ALLOCATOR],
     [AC_ARG_ENABLE([allocator],
-       AC_HELP_STRING([--enable-allocator],
+       AS_HELP_STRING([--enable-allocator],
          [build with default memory allocator @<:@default=yes@:>@]))
      AC_MSG_CHECKING(whether to build with default memory allocator)
      if test "${enable_allocator:-yes}" = "yes"; then
@@ -573,7 +573,7 @@ AC_DEFUN([AC_GECODE_ALLOCATOR],
 
 AC_DEFUN([AC_GECODE_AUDIT],
     [AC_ARG_ENABLE([audit],
-       AC_HELP_STRING([--enable-audit],
+       AS_HELP_STRING([--enable-audit],
          [build with auditing code @<:@default=no@:>@]))
      AC_MSG_CHECKING(whether to build with auditing code)
      if test "${enable_audit:-no}" = "yes"; then
@@ -587,7 +587,7 @@ AC_DEFUN([AC_GECODE_AUDIT],
 
 AC_DEFUN([AC_GECODE_PROFILE],
      [AC_ARG_ENABLE([profile],
-       AC_HELP_STRING([--enable-profile],
+       AS_HELP_STRING([--enable-profile],
          [build with profiling information @<:@default=no@:>@]))
      AC_MSG_CHECKING(whether to build with profiling information)
      if test "${enable_profile:-no}" = "yes"; then
@@ -601,7 +601,7 @@ AC_DEFUN([AC_GECODE_PROFILE],
 
 AC_DEFUN([AC_GECODE_GCOV],
      [AC_ARG_ENABLE([gcov],
-       AC_HELP_STRING([--enable-gcov],
+       AS_HELP_STRING([--enable-gcov],
          [build with gcov support @<:@default=no@:>@]))
      AC_MSG_CHECKING(whether to build with gcov support)
      if test "${enable_gcov:-no}" = "yes"; then
@@ -617,7 +617,7 @@ AC_DEFUN([AC_GECODE_GCOV],
 AC_DEFUN([AC_GECODE_FREELIST_32_SIZE],
   [dnl max size of freelist on 32 bit platforms
   AC_ARG_WITH([freelist32-size-max],
-    AC_HELP_STRING([--with-freelist32-size-max],
+    AS_HELP_STRING([--with-freelist32-size-max],
     [max size of freelist on 32 bit platforms]))
   if test "${with_freelist32_size_max:-no}" != "no"; then
     AC_DEFINE_UNQUOTED([GECODE_FREELIST_SIZE_MAX32],[${with_freelist32_size_max}],[max freelist size on 32 bit platforms])
@@ -628,7 +628,7 @@ AC_DEFUN([AC_GECODE_FREELIST_32_SIZE],
 AC_DEFUN([AC_GECODE_FREELIST_64_SIZE],
   [dnl max size of freelist on 64 bit platforms
   AC_ARG_WITH([freelist64-size-max],
-    AC_HELP_STRING([--with-freelist64-size-max],
+    AS_HELP_STRING([--with-freelist64-size-max],
     [max size of freelist on 64 bit platforms]))
   if test "${with_freelist64_size_max:-no}" != "no"; then
     AC_DEFINE_UNQUOTED([GECODE_FREELIST_SIZE_MAX64],[${with_freelist64_size_max}],[max freelist size on 64 bit platforms])
@@ -642,24 +642,22 @@ AC_DEFUN([AC_GECODE_CHECK_ARITH],
     [AC_LANG_PUSH([C])
      AC_CHECK_SIZEOF(int)
      AC_MSG_CHECKING([if int has at least 32 bit])
-     AC_TRY_COMPILE([],
-       [
-       #if SIZEOF_INT>=4
-       #else
-       blablub
-       #endif
-       ],
+     AC_COMPILE_IFELSE(
+       [AC_LANG_PROGRAM([], [[
+#if SIZEOF_INT<4
+choke me
+#endif
+]])],
        [AC_MSG_RESULT(yes)],
        [AC_MSG_ERROR([Gecode needs at least 32 bit integers.])])
 
      AC_MSG_CHECKING([if doubles have a big enough mantissa])
-     AC_TRY_COMPILE([#include <float.h>],
-       [
-       #if DBL_MANT_DIG>=53
-       #else
-       blablub
-       #endif
-       ],
+     AC_COMPILE_IFELSE(
+       [AC_LANG_PROGRAM([[#include <float.h>]], [[
+#if DBL_MANT_DIG<53
+choke me
+#endif
+]])],
        [AC_MSG_RESULT(yes)],
        [AC_MSG_ERROR([Gecode needs a double mantissa of at least 53 bits.])])
 
@@ -756,7 +754,7 @@ AC_DEFUN([AC_GECODE_GCC_OPTIMIZED_SWITCHES],
 
 AC_DEFUN([AC_GECODE_GCC_VISIBILITY],
       [AC_ARG_ENABLE([gcc-visibility],
-       AC_HELP_STRING([--enable-gcc-visibility],
+       AS_HELP_STRING([--enable-gcc-visibility],
          [use gcc visibility attributes @<:@default=yes@:>@]))
      AC_MSG_CHECKING(whether to use gcc visibility attributes)
      if test "${enable_gcc_visibility:-yes}" = "yes"; then
@@ -934,14 +932,14 @@ dnl   AC_GECODE_DOC_SWITCHES
 dnl
 dnl Description:
 dnl   Produces the configure switches --enable-doc-search,
-dnl   --enable-doc-chm, and --enable-doc-tagfile.
+dnl   and --enable-doc-tagfile.
 dnl
 dnl Authors:
 dnl   Guido Tack <tack@gecode.org>
 AC_DEFUN([AC_GECODE_DOC_SWITCHES],
   [dnl check if we can use dot for generating graphs in the documentation
    AC_ARG_ENABLE([doc-dot],
-     AC_HELP_STRING([--enable-doc-dot],
+     AS_HELP_STRING([--enable-doc-dot],
     [enable graphs in documentation @<:@default=yes@:>@]))
    AC_CHECK_PROG(DOT, dot, dot)
    AC_MSG_CHECKING(whether to enable graphs in the documentation)
@@ -963,7 +961,7 @@ AC_DEFUN([AC_GECODE_DOC_SWITCHES],
    fi
 
    AC_ARG_ENABLE([doc-search],
-     AC_HELP_STRING([--enable-doc-search],
+     AS_HELP_STRING([--enable-doc-search],
     [enable documentation search engine @<:@default=no@:>@]))
    AC_MSG_CHECKING(whether to enable the documentation search engine)
    if test "${enable_doc_search:-no}" = "yes"; then
@@ -974,7 +972,7 @@ AC_DEFUN([AC_GECODE_DOC_SWITCHES],
      AC_SUBST(ENABLEDOCSEARCH, "no")
    fi
    AC_ARG_ENABLE([doc-tagfile],
-     AC_HELP_STRING([--enable-doc-tagfile],
+     AS_HELP_STRING([--enable-doc-tagfile],
     [generate doxygen tagfile @<:@default=yes@:>@]))
    AC_MSG_CHECKING(whether to generate a doxygen tagfile)
    if test "${enable_doc_tagfile:-yes}" = "yes"; then
@@ -984,54 +982,6 @@ AC_DEFUN([AC_GECODE_DOC_SWITCHES],
      AC_MSG_RESULT(no)
      AC_SUBST(GECODE_DOXYGEN_TAGFILE, [])
    fi
-   AC_ARG_ENABLE([doc-chm],
-     AC_HELP_STRING([--enable-doc-chm],
-    [build compressed html documentation @<:@default=yes on Windows@:>@]))
-   AC_MSG_CHECKING(whether to build compressed html documentation)
-   case $host_os in
-    windows*)
-           if test "${enable_doc_chm:-yes}" = "yes"; then
-          AC_MSG_RESULT(yes)
-               AC_SUBST(ENABLEDOCCHM, "yes")
-                  AC_SUBST(ENABLEDOCSEARCH, "no")
-           else
-               AC_MSG_RESULT(no)
-               AC_SUBST(ENABLEDOCCHM, "no")
-           fi
-    ;;
-    *)
-           if test "${enable_doc_chm:-no}" = "yes"; then
-          AC_MSG_ERROR([building chms is only supported on Windows.])
-           else
-               AC_MSG_RESULT(no)
-               AC_SUBST(ENABLEDOCCHM, "no")
-           fi
-    ;;
-   esac
-   AC_ARG_ENABLE([doc-docset],
-     AC_HELP_STRING([--enable-doc-docset],
-    [build docset documentation for XCode @<:@default=no@:>@]))
-   AC_MSG_CHECKING(whether to build docset documentation for XCode)
-   case $host_os in
-    darwin*)
-           if test "${enable_doc_docset:-no}" = "yes"; then
-          AC_MSG_RESULT(yes)
-               AC_SUBST(ENABLEDOCDOCSET, "yes")
-                  AC_SUBST(ENABLEDOCSEARCH, "no")
-           else
-               AC_MSG_RESULT(no)
-               AC_SUBST(ENABLEDOCDOCSET, "no")
-           fi
-    ;;
-    *)
-           if test "${enable_doc_docset:-no}" = "yes"; then
-          AC_MSG_ERROR([building docsets is only supported on Mac OS X.])
-           else
-               AC_MSG_RESULT(no)
-               AC_SUBST(ENABLEDOCDOCSET, "no")
-           fi
-    ;;
-   esac
    ])
 
 dnl Macro:
@@ -1046,7 +996,7 @@ dnl   Guido Tack <tack@gecode.org>
 AC_DEFUN([AC_GECODE_UNIVERSAL],
   [dnl build universal binaries on Mac OS X
   AC_ARG_WITH([sdk],
-    AC_HELP_STRING([--with-sdk],
+    AS_HELP_STRING([--with-sdk],
     [SDK to use on Mac OS X]))
   if test "${host_os}" = "darwin"; then
     if test "${with_sdk:-no}" != "no"; then
@@ -1055,7 +1005,7 @@ AC_DEFUN([AC_GECODE_UNIVERSAL],
     fi
   fi
   AC_ARG_WITH([macosx-version-min],
-    AC_HELP_STRING([--with-macosx-version-min],
+    AS_HELP_STRING([--with-macosx-version-min],
     [minimum version of Mac OS X to support]))
   if test "${host_os}" = "darwin"; then
     if test "${with_macosx_version_min:-no}" != "no"; then
@@ -1066,7 +1016,7 @@ AC_DEFUN([AC_GECODE_UNIVERSAL],
     fi
   fi
   AC_ARG_WITH([architectures],
-    AC_HELP_STRING([--with-architectures],
+    AS_HELP_STRING([--with-architectures],
     [architectures to compile for on Mac OS X]))
   AC_MSG_CHECKING(Whether to build for different architectures)
   if test "${host_os}" = "darwin"; then
@@ -1098,7 +1048,7 @@ dnl   Guido Tack <tack@gecode.org>
 AC_DEFUN([AC_GECODE_FRAMEWORK],
   [dnl build framework bundle on Mac OS X
   AC_ARG_ENABLE([framework],
-    AC_HELP_STRING([--enable-framework],
+    AS_HELP_STRING([--enable-framework],
     [build framework bundle on Mac OS X @<:@default=no@:>@]))
   if test "${host_os}" = "darwin"; then
     AC_MSG_CHECKING(whether to build framework bundle on Mac OS X)
@@ -1124,7 +1074,7 @@ dnl
 AC_DEFUN([AC_GECODE_MPFR_INCLUDE],
   [dnl build with support for the mpfr header
   AC_ARG_WITH([mpfr-include],
-    AC_HELP_STRING([--with-mpfr-include],
+    AS_HELP_STRING([--with-mpfr-include],
     [path to the mpfr header file]))
   if test "${with_mpfr_include:-no}" != "no"; then
       AC_SUBST(MPFR_CPPFLAGS,[-I${with_mpfr_include}])
@@ -1141,7 +1091,7 @@ dnl
 AC_DEFUN([AC_GECODE_MPFR_LIB],
   [dnl build with support for the mpfr library
   AC_ARG_WITH([mpfr-lib],
-    AC_HELP_STRING([--with-mpfr-lib],
+    AS_HELP_STRING([--with-mpfr-lib],
     [path to the mpfr library]))
   if test "${with_mpfr_lib:-no}" != "no"; then
       case $ac_gecode_compiler_vendor in
@@ -1175,7 +1125,7 @@ dnl
 AC_DEFUN([AC_GECODE_GMP_INCLUDE],
   [dnl build with support for the gmp headers
   AC_ARG_WITH([gmp-include],
-    AC_HELP_STRING([--with-gmp-include],
+    AS_HELP_STRING([--with-gmp-include],
     [path to the gmp or mpir header files]))
   if test "${with_gmp_include:-no}" != "no"; then
       AC_SUBST(GMP_CPPFLAGS,[-I${with_gmp_include}])
@@ -1192,7 +1142,7 @@ dnl
 AC_DEFUN([AC_GECODE_GMP_LIB],
   [dnl build with support for the GMP library
   AC_ARG_WITH([gmp-lib],
-    AC_HELP_STRING([--with-gmp-lib],
+    AS_HELP_STRING([--with-gmp-lib],
     [path to the gmp or mpir library]))
 
   ac_gecode_tmp_gmp_lib=""
@@ -1257,7 +1207,7 @@ dnl Authors:
 AC_DEFUN([AC_GECODE_MPFR],
   [
   AC_ARG_ENABLE([mpfr],
-    AC_HELP_STRING([--enable-mpfr],
+    AS_HELP_STRING([--enable-mpfr],
       [build with MPFR support @<:@default=yes@:>@]))
   if test "${enable_float_vars:-yes}" = "yes"; then
     AC_MSG_CHECKING(whether to build with MPFR support)
@@ -1320,26 +1270,28 @@ dnl   Guido Tack <tack@gecode.org>
 AC_DEFUN([AC_GECODE_QT],
   [
   AC_ARG_ENABLE([qt],
-    AC_HELP_STRING([--enable-qt],
-      [build with Qt support, requires at least Qt 4.3 @<:@default=yes@:>@]))
-  AC_CHECK_PROGS(QMAKE, [qmake-qt4 qmake])
-  AC_CHECK_PROGS(MOC, [moc-qt4 moc])
+    AS_HELP_STRING([--enable-qt],
+      [build with Qt support, requires Qt 5 or newer @<:@default=yes@:>@]))
+  AC_CHECK_PROGS(QMAKE, [qmake6 qmake-qt6 qmake-qt5 qmake5 qmake])
+  AC_CHECK_PROGS(MOC, [moc-qt6 moc6 moc-qt5 moc])
   AC_MSG_CHECKING(whether to build with Qt support)
   if test "${enable_qt:-yes}" = "yes"; then
     if test "${QMAKE}x" = "x" -o "${MOC}x" = "x"; then
       AC_MSG_RESULT(no)
+      AC_MSG_WARN([Qt support requested but qmake/moc were not found. Disabling Qt support.])
+      enable_qt=no
     else
-      ac_gecode_qt_version=`${QMAKE} -query QT_VERSION`
-      ac_gecode_qt_major=`echo ${ac_gecode_qt_version} | grep -o '^[[0-9]]*'`
-      ac_gecode_qt_minor=`echo ${ac_gecode_qt_version} | sed -e 's/^[[0-9]]*\\.//g' -e 's/\\.[[0-9]]*$//g'`
+      ac_gecode_qt_version=`${QMAKE} -query QT_VERSION 2>/dev/null`
+      ac_gecode_qt_major=`echo ${ac_gecode_qt_version} | sed -e 's/\\..*$//'`
       ac_gecode_qt_ok="yes"
-      if test ${ac_gecode_qt_major} -lt 4; then ac_gecode_qt_ok="no";
-      else if test ${ac_gecode_qt_major} -eq 4 \
-                -a ${ac_gecode_qt_minor} -lt 3; then ac_gecode_qt_ok="no";
-           fi
-      fi
+      case ${ac_gecode_qt_major} in
+        ''|*[[!0-9]]*) ac_gecode_qt_ok="no" ;;
+        *) if test ${ac_gecode_qt_major} -lt 5; then ac_gecode_qt_ok="no"; fi ;;
+      esac
       if test "${ac_gecode_qt_ok}" != "yes"; then
         AC_MSG_RESULT(no)
+        AC_MSG_WARN([Qt support requested but qmake did not report Qt 5/6. Disabling Qt support.])
+        enable_qt=no
       else
         AC_MSG_RESULT(yes)
         AC_DEFINE([GECODE_HAS_QT],[],[Whether Qt is available])
@@ -1347,9 +1299,7 @@ AC_DEFUN([AC_GECODE_QT],
         ac_gecode_qt_tmpdir=`mktemp -d gistqt.XXXXXX` || exit 1
         cd ${ac_gecode_qt_tmpdir}
         echo "CONFIG += release" > a.pro
-        if test ${ac_gecode_qt_major} -ge 5; then
-          echo "QT += widgets printsupport" >> a.pro
-        fi
+        echo "QT += core gui widgets printsupport" >> a.pro
         ${QMAKE}
         if test -d a.xcodeproj; then
           ac_gecode_qt_makefile=a.xcodeproj/qt_preprocess.mak
@@ -1368,22 +1318,21 @@ AC_DEFUN([AC_GECODE_QT],
         ac_gecode_qt_inc=`grep ${ac_gecode_qt_makefile} -e 'INCPATH.*=' | sed -e 's/.*=//' -e 's|\\\\|/|g' -e 's|-I\\("*\\)\\.\\./\\.\\.|-I\\1..|g'`
         ac_gecode_qt_libs=`grep ${ac_gecode_qt_makefile} -e 'LIBS.*=' | sed -e 's/.*=//' -e 's|\\\\|/|g' -e 's|-I\\("*\\)\\.\\./\\.\\.|-I\\1..|g'`
         if test -d a.xcodeproj -o -d a.pbproj; then
-          ac_gecode_qt_libs="-framework QtGui -framework QtCore"
+          ac_gecode_qt_libs="-framework QtWidgets -framework QtPrintSupport -framework QtGui -framework QtCore"
         fi
         cd ..
         rm -r ${ac_gecode_qt_tmpdir}
         AC_SUBST(QTINCLUDES, ${ac_gecode_qt_inc})
         AC_SUBST(QTDEFINES, ${ac_gecode_qt_defines})
         AC_SUBST(QTLIBS, ${ac_gecode_qt_libs})
-        AC_SUBST(enable_qt,yes)
-        enable_qt=yes;
+        enable_qt=yes
       fi
     fi
   else
     AC_MSG_RESULT(no)
-    enable_qt=no;
+    enable_qt=no
   fi
-  AC_SUBST(enable_qt, ${enable_qt})
+  AC_SUBST(enable_qt, [${enable_qt}])
 ])
 
 dnl Macro:
@@ -1398,7 +1347,7 @@ dnl   Guido Tack <tack@gecode.org>
 AC_DEFUN([AC_GECODE_GIST],
   [
   AC_ARG_ENABLE([gist],
-    AC_HELP_STRING([--enable-gist],
+    AS_HELP_STRING([--enable-gist],
       [build Gecode Interactive Search Tool @<:@default=yes@:>@]))
   AC_MSG_CHECKING(whether to build Gist)
   if test "${enable_gist:-yes}" = "yes" -a "${enable_qt}" = "yes"; then
@@ -1423,7 +1372,7 @@ dnl   Samuel Gagnon <samuel.gagnon92@gmail.com>
 AC_DEFUN([AC_GECODE_CBS],
   [
   AC_ARG_ENABLE([cbs],
-    AC_HELP_STRING([--enable-cbs],
+    AS_HELP_STRING([--enable-cbs],
       [build with support for counting-based search @<:@default=no@:>@]))
   AC_MSG_CHECKING(whether to build with support for cbs)
   if test "${enable_cbs:-no}" = "yes"; then
@@ -1448,11 +1397,19 @@ dnl   Christian Schulte <schulte@gecode.org>
 AC_DEFUN([AC_GECODE_CPPROFILER],
   [
   AC_ARG_ENABLE([cpprofiler],
-    AC_HELP_STRING([--enable-cpprofiler],
+    AS_HELP_STRING([--enable-cpprofiler],
       [build with support for CPProfiler @<:@default=yes@:>@]))
+  AC_SUBST(LINKCPPROFILER, [])
   AC_MSG_CHECKING(whether to build with support for CPProfiler)
-  if test "${enable_cpprofiler:-no}" = "yes"; then
+  if test "${enable_cpprofiler:-yes}" = "yes"; then
     AC_MSG_RESULT(yes)
+    if test "${host_os}" = "windows"; then
+      if test "${ac_cv_cxx_compiler_vendor}" = "microsoft"; then
+        AC_SUBST(LINKCPPROFILER, [ws2_32.lib])
+      else
+        AC_SUBST(LINKCPPROFILER, [-lws2_32])
+      fi
+    fi
     AC_SUBST(enable_cpprofiler, yes)
     AC_DEFINE([GECODE_HAS_CPPROFILER],[],[Whether CPProfiler support available])
   else
@@ -1463,7 +1420,7 @@ AC_DEFUN([AC_GECODE_CPPROFILER],
 AC_DEFUN([AC_GECODE_USER_SUFFIX],
   [
   AC_ARG_WITH([lib-prefix],
-    AC_HELP_STRING([--with-lib-prefix],
+    AS_HELP_STRING([--with-lib-prefix],
       [add user-defined prefix to library names]))
   AC_MSG_CHECKING(for user-defined library name prefix)
   if test "x${with_lib_prefix}" != "x"; then
@@ -1476,7 +1433,7 @@ AC_DEFUN([AC_GECODE_USER_SUFFIX],
   AC_DEFINE_UNQUOTED(GECODE_DLL_USERPREFIX,"${ac_gecode_userprefix}",
     [User-defined prefix of dll names])
   AC_ARG_WITH([lib-suffix],
-    AC_HELP_STRING([--with-lib-suffix],
+    AS_HELP_STRING([--with-lib-suffix],
       [add user-defined suffix to library names]))
   AC_MSG_CHECKING(for user-defined library name suffix)
   if test "x${with_lib_suffix}" != "x"; then
@@ -1494,7 +1451,7 @@ AC_DEFUN([AC_GECODE_USER_SUFFIX],
 
 AC_DEFUN([AC_GECODE_THREADS],[
   AC_ARG_ENABLE([thread],
-    AC_HELP_STRING([--enable-thread],
+    AS_HELP_STRING([--enable-thread],
       [build with multi-threading support @<:@default=yes@:>@]))
   AC_MSG_CHECKING(whether to build with multi-threading support)
   if test "${enable_thread:-yes}" = "yes"; then
@@ -1504,7 +1461,7 @@ AC_DEFUN([AC_GECODE_THREADS],[
     AC_MSG_RESULT(no)
   fi
   AC_ARG_ENABLE([osx-unfair-mutex],
-    AC_HELP_STRING([--enable-osx-unfair-mutex],
+    AS_HELP_STRING([--enable-osx-unfair-mutex],
       [use unfair mutexes on macOS @<:@default=yes@:>@]))
   AC_MSG_CHECKING(whether to use unfair mutexes on macOS)
   if test "${enable_osx_unfair_mutex:-yes}" = "yes"; then
@@ -1556,7 +1513,7 @@ AC_DEFUN([AC_GECODE_FLEXBISON],
 
 AC_DEFUN([AC_GECODE_RESOURCE],[
   AC_ARG_ENABLE([resource],
-    AC_HELP_STRING([--enable-resource],
+    AS_HELP_STRING([--enable-resource],
       [build Gecode with resource files for Microsoft Visual Studio @<:@default=no@:>@]))
   AC_CHECK_PROG(HAVE_RC, rc.exe, [found])
   AC_MSG_CHECKING(whether to build with Visual Studio resource files)

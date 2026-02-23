@@ -158,6 +158,11 @@ endif()
 
 if(GECODE_ENABLE_MPFR)
   find_package(MPFR)
+  if(NOT MPFR_FOUND)
+    message(WARNING
+      "GECODE_ENABLE_MPFR=ON but MPFR was not found; float-MPFR support will be disabled. "
+      "Set CMAKE_PREFIX_PATH, MPFR_ROOT, or a toolchain file (for example vcpkg) to locate MPFR.")
+  endif()
 endif()
 
 set(GECODE_HAS_QT_RUNTIME FALSE)

@@ -77,6 +77,9 @@ When `-DGECODE_REGENERATE_VARIMP=ON` is set, CMake also requires `uv`.
 Compatibility aliases are still accepted temporarily:
 `ENABLE_THREADS`, `ENABLE_GIST`, `BUILD_EXAMPLES`, `ENABLE_CPPROFILER`.
 
+For a Visual Studio + vcpkg workflow (including preset-based commands for
+MPFR), see [`docs/cmake-build.md`](docs/cmake-build.md).
+
 ## CMake Package Consumption
 
 For CMake build/install workflows and downstream `find_package(Gecode)` usage,

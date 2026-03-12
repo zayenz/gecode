@@ -33,6 +33,40 @@ cmake --build build --config Release --target check
 cmake --install build --config Release --prefix /path/to/install
 ```
 
+## Visual Studio + vcpkg (MPFR)
+
+This repository includes a vcpkg manifest (`vcpkg.json`) and CMake presets
+for a ready-to-run Visual Studio path with MPFR enabled.
+
+Prerequisites:
+
+- Visual Studio 2022 with C++ toolchain
+- CMake 3.21 or newer
+- `VCPKG_ROOT` set to your vcpkg checkout
+
+Preset flow:
+
+```powershell
+cmake --preset vs2022-vcpkg
+cmake --build --preset vs2022-vcpkg-release
+cmake --build --preset vs2022-vcpkg-check
+```
+
+Equivalent command-line flow (without presets):
+
+```powershell
+cmake -S . -B build/vs2022-vcpkg -G "Visual Studio 17 2022" -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows `
+  -DGECODE_ENABLE_MPFR=ON -DGECODE_ENABLE_QT=OFF -DGECODE_ENABLE_GIST=OFF
+cmake --build build/vs2022-vcpkg --config Release
+cmake --build build/vs2022-vcpkg --config Release --target check
+cmake --install build/vs2022-vcpkg --config Release --prefix C:/path/to/install
+```
+
+Visual Studio is a multi-config generator, so use `--config Release` (or
+`Debug`) for build/install/check commands rather than `CMAKE_BUILD_TYPE`.
+
 ## Build Conventions and Key Options
 
 ### Common CMake options

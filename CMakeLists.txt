@@ -747,12 +747,12 @@ if(BUILD_TESTING)
     get_property(GECODE_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
     if(GECODE_IS_MULTI_CONFIG)
       add_custom_target(check
-        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$" -C $<CONFIG>
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test" -C $<CONFIG>
         DEPENDS gecode-test
         USES_TERMINAL)
     else()
       add_custom_target(check
-        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$"
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test"
         DEPENDS gecode-test
         USES_TERMINAL)
     endif()

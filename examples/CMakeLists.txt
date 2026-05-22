@@ -29,6 +29,7 @@ set(GECODE_EXAMPLE_SOURCES
   grocery.cpp
   hamming.cpp
   ind-set.cpp
+  inglenook.cpp
   job-shop.cpp
   kakuro.cpp
   knights.cpp

@@ -174,7 +174,7 @@ public:
               ts.add(w);
             }
           }
-          ts.finalize();
+          ts.finalize(EPK_AUTO);
 
           // Array of all words of length w_l
           IntVarArgs words(*this,n,0,n_w-1);
@@ -198,7 +198,7 @@ public:
               for (int d=0; d<w_l; d++)
                 w[d] = ml(x,y+d);
             // Constrain word
-            extensional(*this, w, ts);
+            extensional(*this, w, ts, IPL_DEF, EPK_AUTO);
           }
         }
       }

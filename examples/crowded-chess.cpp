@@ -115,7 +115,7 @@ namespace {
       delete s;
     }
 
-    bishops.finalize();
+    bishops.finalize(EPK_AUTO);
   }
 }
 /**
@@ -307,7 +307,7 @@ public:
       IntVarArgs b(s.size());
       for (int i = s.size(); i--; )
         b[i] = channel(*this, expr(*this, (s[i] == B)));
-      extensional(*this, b, bishops, opt.ipl());
+      extensional(*this, b, bishops, opt.ipl(), EPK_AUTO);
     }
 
     // Handle knights
@@ -420,4 +420,3 @@ main(int argc, char* argv[]) {
 }
 
 // STATISTICS: example-any
-

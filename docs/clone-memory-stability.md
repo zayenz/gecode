@@ -20,6 +20,31 @@ Each behavioral fix should follow this order:
 The fault-injection harness and sanitizer matrix are extended testing support.
 They are not expected to run in the default developer test loop.
 
+## External PR Triage
+
+This branch ports fixes from the reviewed exception-safety PR only when they can
+be stated as a local invariant and covered by a focused regression test. Do not
+carry over broad cleanups or performance-sensitive changes just because they
+appear in the source PR.
+
+Currently ported areas:
+
+- failed clone construction and recovery of source-space forwarding state
+- failed clone disposal-array allocation
+- failed dispose-notice array allocation
+- integer-set range allocation failure
+- minimodel expression allocation failure
+- marked advisor subscriptions under UBSan
+
+Currently deferred areas:
+
+- Moving propagation-stat accounting behind a virtual hook. The reviewed change
+  adds a virtual call on the propagation hot path without a local override or a
+  failing test in the source PR.
+- Reducing tracer lock scope. That is a separate thread-safety and performance
+  change, and needs its own TSan-backed review rather than being bundled with
+  clone and allocation recovery.
+
 ## Clone and Recovery Invariants
 
 ### Space cloning

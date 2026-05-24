@@ -309,6 +309,7 @@ jobs:
         $prefix = "${{ github.workspace }}\install-vcpkg"
         $work = Join-Path $env:RUNNER_TEMP "gecode-consumers-win-vcpkg"
         $toolchain = "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
+        $vcpkgInstalled = "${{ github.workspace }}\build\vs2022-vcpkg\vcpkg_installed"
         if (Test-Path $work) { Remove-Item -Recurse -Force $work }
         New-Item -ItemType Directory -Force -Path (Join-Path $work "a"), (Join-Path $work "b"), (Join-Path $work "c") | Out-Null
 
@@ -350,6 +351,7 @@ jobs:
         cmake -S (Join-Path $work "a") -B (Join-Path $work "a\build") -G "Visual Studio 17 2022" -A x64 `
           "-DCMAKE_TOOLCHAIN_FILE=$toolchain" `
           "-DVCPKG_TARGET_TRIPLET=x64-windows" `
+          "-DVCPKG_INSTALLED_DIR=$vcpkgInstalled" `
           "-DCMAKE_PREFIX_PATH=$prefix" 2>&1 | Tee-Object -FilePath (Join-Path $work "a\configure.log")
         if ($LASTEXITCODE -ne 0) {
           throw "consumer_a configure failed."
@@ -359,12 +361,14 @@ jobs:
         cmake -S (Join-Path $work "b") -B (Join-Path $work "b\build") -G "Visual Studio 17 2022" -A x64 `
           "-DCMAKE_TOOLCHAIN_FILE=$toolchain" `
           "-DVCPKG_TARGET_TRIPLET=x64-windows" `
+          "-DVCPKG_INSTALLED_DIR=$vcpkgInstalled" `
           "-DCMAKE_PREFIX_PATH=$prefix"
         cmake --build (Join-Path $work "b\build") --config ${{ env.BUILD_TYPE }}
 
         cmake -S (Join-Path $work "c") -B (Join-Path $work "c\build") -G "Visual Studio 17 2022" -A x64 `
           "-DCMAKE_TOOLCHAIN_FILE=$toolchain" `
           "-DVCPKG_TARGET_TRIPLET=x64-windows" `
+          "-DVCPKG_INSTALLED_DIR=$vcpkgInstalled" `
           "-DCMAKE_PREFIX_PATH=$prefix"
         cmake --build (Join-Path $work "c\build") --config ${{ env.BUILD_TYPE }}
 

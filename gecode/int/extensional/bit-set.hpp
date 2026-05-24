@@ -112,10 +112,10 @@ namespace Gecode { namespace Int { namespace Extensional {
   BitSet<IndexType>::BitSet(Space& home,
                             const BitSet<OldIndexType>& bs)
     : _limit(static_cast<IndexType>(bs._limit)),
-      _capacity(static_cast<IndexType>(bs._capacity)),
+      _capacity(static_cast<IndexType>(bs.width())),
       _index(home.alloc<IndexType>(_limit)),
       _bits(home.alloc<BitSetData>(_limit)),
-      _pos((bs._pos != nullptr) ? home.alloc<IndexType>(bs._capacity) : nullptr) {
+      _pos((bs._pos != nullptr) ? home.alloc<IndexType>(_capacity) : nullptr) {
     assert(_limit > 0U);
     for (IndexType i=0; i<_limit; i++) {
       _bits[i] = bs._bits[i];
@@ -123,7 +123,9 @@ namespace Gecode { namespace Int { namespace Extensional {
     }
     if (_pos != nullptr) {
       for (IndexType i=0; i<_capacity; i++)
-        _pos[i] = static_cast<IndexType>(bs._pos[i]);
+        _pos[i] = 0;
+      for (IndexType i=0; i<_limit; i++)
+        _pos[_index[i]] = i+1;
     }
   }
 

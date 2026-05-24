@@ -102,16 +102,20 @@ namespace Gecode {
    *
    */
   void
+  TupleSet::Data::finalize(void) {
+    finalize(EPK_DENSE);
+  }
+
+  void
   TupleSet::Data::finalize(ExtensionalPropKind epk) {
     using namespace Int::Extensional;
     assert(!finalized());
-    // Mark as finalized
-    n_free = -1;
 
     // Initialization
     if (n_tuples == 0) {
       heap.rfree(td);
       td=nullptr;
+      n_free = -1;
       return;
     }
 
@@ -154,6 +158,7 @@ namespace Gecode {
       }
       heap.rfree(td);
       td = new_td;
+      n_free = 0;
     }
     
     // Only now compute how many words are needed!
@@ -198,9 +203,14 @@ namespace Gecode {
       const unsigned long long n_tcells64 =
         static_cast<unsigned long long>(n_tuples) *
         static_cast<unsigned long long>(arity);
-      const unsigned long long n_support_ones =
-        static_cast<unsigned long long>(arity) *
-        static_cast<unsigned long long>(n_tuples);
+      const unsigned long long sparse_support_cells_per_entry =
+        static_cast<unsigned long long>(BitSetData::bpb / 4U);
+      const bool support_bits_sparse =
+        (n_support_entries64 >
+         std::numeric_limits<unsigned long long>::max() /
+           sparse_support_cells_per_entry) ||
+        (n_tcells64 <=
+         n_support_entries64 * sparse_support_cells_per_entry);
       const bool dense_possible =
         (n_support_entries64 >
          static_cast<unsigned long long>(std::numeric_limits<unsigned int>::max()))
@@ -212,36 +222,24 @@ namespace Gecode {
       const unsigned long long dense_bytes =
         n_support_entries64 *
         static_cast<unsigned long long>(sizeof(BitSetData));
-      const unsigned long long sparse_bytes_est =
-        (n_tcells64 * 2ULL + static_cast<unsigned long long>(n_vals + 1U)) *
-        static_cast<unsigned long long>(sizeof(unsigned int));
-      const unsigned long long compressed_entries_est = n_support_ones;
-      const unsigned long long compressed_bytes_est =
-        static_cast<unsigned long long>(n_vals + 1U) *
-          static_cast<unsigned long long>(sizeof(unsigned int)) +
-        compressed_entries_est *
-          static_cast<unsigned long long>(sizeof(CSupportWord));
 
-      // Keep dense for small dense payloads, otherwise choose between sparse and
-      // compressed with a mild bias towards compressed when similarly sized.
+      // Keep dense for small dense payloads and for large, non-sparse support
+      // matrices. For other larger tables, prefer the shared compressed
+      // representation over sparse, as sparse has substantial propagator-local
+      // clone state when a table is posted many times.
       const unsigned long long dense_small_threshold =
-        64ULL * 1024ULL * 1024ULL;
-      const unsigned int compressed_bias_percent = 20U;
+        2ULL * 1024ULL * 1024ULL;
 
       SupportRepresentation selected = SR_NONE;
       switch (epk) {
       case EPK_AUTO:
-        if (dense_possible && (dense_bytes <= dense_small_threshold)) {
+        if (dense_possible &&
+            ((dense_bytes <= dense_small_threshold) ||
+             !support_bits_sparse)) {
           selected = SR_DENSE;
           break;
         }
-        if (sparse_possible && compressed_possible) {
-          const unsigned long long sparse_biased =
-            sparse_bytes_est +
-            (sparse_bytes_est * compressed_bias_percent) / 100ULL;
-          selected = (compressed_bytes_est <= sparse_biased) ?
-            SR_DENSE_COMPRESSED : SR_SPARSE;
-        } else if (compressed_possible) {
+        if (compressed_possible) {
           selected = SR_DENSE_COMPRESSED;
         } else if (sparse_possible) {
           selected = SR_SPARSE;
@@ -480,6 +478,7 @@ namespace Gecode {
     }
     if ((min < Int::Limits::min) || (max > Int::Limits::max))
       throw Int::OutOfLimits("TupleSet::finalize()");
+    n_free = -1;
     assert(finalized());
   }
 

@@ -36,7 +36,13 @@ namespace Gecode {
   forceinline void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t,
               IntPropLevel ipl) {
-    extensional(home, x, t, true, ipl, EPK_AUTO);
+    extensional(home, x, t, true, ipl);
+  }
+
+  forceinline void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, IntPropLevel ipl) {
+    extensional(home, x, t, true, ipl, epk);
   }
 
   forceinline void
@@ -46,9 +52,21 @@ namespace Gecode {
   }
 
   forceinline void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              ExtensionalPropKind epk, IntPropLevel ipl) {
+    extensional(home, x, t, pos, ipl, epk);
+  }
+
+  forceinline void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, Reify r,
               IntPropLevel ipl) {
-    extensional(home, x, t, true, r, ipl, EPK_AUTO);
+    extensional(home, x, t, true, r, ipl);
+  }
+
+  forceinline void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, Reify r,
+              ExtensionalPropKind epk, IntPropLevel ipl) {
+    extensional(home, x, t, true, r, ipl, epk);
   }
 
   forceinline void
@@ -58,9 +76,21 @@ namespace Gecode {
   }
 
   forceinline void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              Reify r, ExtensionalPropKind epk, IntPropLevel ipl) {
+    extensional(home, x, t, pos, r, ipl, epk);
+  }
+
+  forceinline void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
               IntPropLevel ipl) {
-    extensional(home, x, t, true, ipl, EPK_AUTO);
+    extensional(home, x, t, true, ipl);
+  }
+
+  forceinline void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, IntPropLevel ipl) {
+    extensional(home, x, t, true, ipl, epk);
   }
 
   forceinline void
@@ -70,15 +100,33 @@ namespace Gecode {
   }
 
   forceinline void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              ExtensionalPropKind epk, IntPropLevel ipl) {
+    extensional(home, x, t, pos, ipl, epk);
+  }
+
+  forceinline void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, Reify r,
               IntPropLevel ipl) {
-    extensional(home, x, t, true, r, ipl, EPK_AUTO);
+    extensional(home, x, t, true, r, ipl);
+  }
+
+  forceinline void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, Reify r,
+              ExtensionalPropKind epk, IntPropLevel ipl) {
+    extensional(home, x, t, true, r, ipl, epk);
   }
 
   forceinline void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, Reify r,
               IntPropLevel ipl, ExtensionalPropKind epk) {
     extensional(home, x, t, true, r, ipl, epk);
+  }
+
+  forceinline void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              Reify r, ExtensionalPropKind epk, IntPropLevel ipl) {
+    extensional(home, x, t, pos, r, ipl, epk);
   }
 
 }

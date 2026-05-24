@@ -40,9 +40,7 @@
 #include <gecode/minimodel.hh>
 #include <climits>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
 
 namespace Test { namespace Int {
@@ -520,87 +518,6 @@ namespace Test { namespace Int {
          return new RandomAssignment(arity, dom, 1000, _rand);
        }
      };
-
-     /// Crash reproducer for Inglenook tuple-set finalization
-     class InglenookCrashReproducer : public ::Test::Base {
-     public:
-       InglenookCrashReproducer(void)
-         : ::Test::Base("Extensional::TupleSet::Crash::Inglenook") {}
-
-      virtual bool run(void) {
-        using namespace Gecode;
-
-        const char* csv = std::getenv("GECODE_INGLENOOK_CSV");
-        if ((csv == nullptr) || (csv[0] == '\0'))
-          return true;
-
-        const char* epk_env = std::getenv("GECODE_INGLENOOK_EPK");
-        ExtensionalPropKind epk = EPK_AUTO;
-        if ((epk_env != nullptr) && (epk_env[0] != '\0')) {
-          const std::string mode(epk_env);
-          if (mode == "auto") {
-            epk = EPK_AUTO;
-          } else if (mode == "sparse") {
-            epk = EPK_SPARSE;
-          } else if ((mode == "densecompressed") ||
-                     (mode == "dense_compressed") ||
-                     (mode == "dense-compressed")) {
-            epk = EPK_DENSE_COMPRESSED;
-          } else if (mode == "dense") {
-            epk = EPK_DENSE;
-          } else {
-            std::cerr << "ERROR: Unsupported GECODE_INGLENOOK_EPK value: "
-                      << mode << std::endl;
-            return false;
-          }
-        }
-
-        std::ifstream file(csv);
-        if (!file.good()) {
-          std::cerr << "ERROR: Could not open CSV file: "
-                    << csv << std::endl;
-          return false;
-        }
-
-        std::cerr << "DEBUG: Opened CSV file: " << csv << std::endl;
-
-        TupleSet ts(2);
-        std::string line;
-
-        // Skip header line.
-        if (!std::getline(file, line)) {
-          std::cerr << "ERROR: CSV file is empty: "
-                    << csv << std::endl;
-          return false;
-        }
-
-        int line_count = 0;
-        while (std::getline(file, line)) {
-          if (line.empty())
-            continue;
-
-          std::istringstream stream(line);
-          int from, to;
-          char comma;
-          if (!(stream >> from >> comma >> to) || comma != ',') {
-            std::cerr << "ERROR: Malformed CSV line " << (line_count + 2)
-                      << ": " << line << std::endl;
-            return false;
-          }
-
-          ts.add(IntArgs({from, to}));
-          line_count++;
-        }
-
-        std::cerr << "DEBUG: About to call ts.finalize() with "
-                  << line_count << " tuples, epk="
-                  << extensional_kind_name(epk) << std::endl;
-        ts.finalize(epk);
-        std::cerr << "DEBUG: ts.finalize() completed successfully" << std::endl;
-
-        return true;
-      }
-    };
 
      /// Sparse fallback smoke test for very low-density unary tuplesets
      class SparseTupleSetFallback : public ::Test::Base {
@@ -1132,6 +1049,16 @@ namespace Test { namespace Int {
                      << std::endl;
            return false;
          }
+
+         TupleSet td(2);
+         for (int i=0; i<100; i++)
+           td.add(IntArgs({i, (i*11) % 100}));
+         td.finalize();
+         if (!td.dense_support()) {
+           std::cerr << "ERROR: Default finalize did not keep dense support"
+                     << std::endl;
+           return false;
+         }
          return true;
        }
      };
@@ -1640,7 +1567,6 @@ namespace Test { namespace Int {
      RegOpt ro6(static_cast<int>(USHRT_MAX-1));
      RegOpt ro7(static_cast<int>(USHRT_MAX));
 
-     InglenookCrashReproducer inglenook_crash_reproducer;
      SparseTupleSetFallback sparse_tuple_set_fallback;
      SparseTupleSetFallbackTernary sparse_tuple_set_fallback_ternary;
      SparseTupleSetFallbackHighArity sparse_tuple_set_fallback_high_arity;

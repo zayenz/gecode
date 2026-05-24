@@ -337,6 +337,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         queued(static_cast<Space&>(home).alloc<unsigned char>(n_vals)),
         tv(ts0.sparse_tuple_value_ids()),
         in_propagate(false) {
+      home.notice(*this, AP_DISPOSE);
       assert(tv != nullptr);
       for (unsigned int i=0U; i<n_tuples; i++) {
         active_ids[i] = i;
@@ -457,6 +458,7 @@ namespace Gecode { namespace Int { namespace Extensional {
 
     virtual size_t
     dispose(Space& home) {
+      home.ignore(*this, AP_DISPOSE);
       c.dispose(home);
       ts.~TupleSet();
       (void) Propagator::dispose(home);
@@ -760,6 +762,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         gid_val(static_cast<Space&>(home).alloc<int>(n_vals)),
         tv(ts0.sparse_tuple_value_ids()),
         in_propagate(false) {
+      home.notice(*this, AP_DISPOSE);
       assert(tv != nullptr);
       for (unsigned int i=0U; i<n_tuples; i++) {
         active_ids[i] = i;
@@ -831,6 +834,7 @@ namespace Gecode { namespace Int { namespace Extensional {
 
     virtual size_t
     dispose(Space& home) {
+      home.ignore(*this, AP_DISPOSE);
       c.dispose(home);
       b.cancel(home,*this,PC_BOOL_VAL);
       ts.~TupleSet();
@@ -944,6 +948,12 @@ namespace Gecode {
 
   void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              IntPropLevel ipl) {
+    extensional(home,x,t,pos,ipl,EPK_DENSE);
+  }
+
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel,
               ExtensionalPropKind epk) {
     using namespace Int;
@@ -972,7 +982,6 @@ namespace Gecode {
         GECODE_ES_FAIL((Extensional::SparseInc<IntView,false>::post(home,xv,t)));
       return;
     }
-
     ViewArray<IntView> xv(home,x);
     if (dk == Int::Extensional::DD_DENSE_COMPRESSED) {
       if (pos)
@@ -984,6 +993,12 @@ namespace Gecode {
     } else {
       GECODE_ES_FAIL((Extensional::postnegcompact<IntView>(home,xv,t)));
     }
+  }
+
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              Reify r, IntPropLevel ipl) {
+    extensional(home,x,t,pos,r,ipl,EPK_DENSE);
   }
 
   void
@@ -1064,7 +1079,6 @@ namespace Gecode {
       }
       return;
     }
-
     ViewArray<IntView> xv(home,x);
     if (dk == Int::Extensional::DD_DENSE_COMPRESSED) {
       if (pos) {
@@ -1142,6 +1156,12 @@ namespace Gecode {
 
   void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              IntPropLevel ipl) {
+    extensional(home,x,t,pos,ipl,EPK_DENSE);
+  }
+
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel,
               ExtensionalPropKind epk) {
     using namespace Int;
@@ -1172,7 +1192,6 @@ namespace Gecode {
         GECODE_ES_FAIL((Extensional::SparseInc<BoolView,false>::post(home,xv,t)));
       return;
     }
-
     ViewArray<BoolView> xv(home,x);
     if (dk == Int::Extensional::DD_DENSE_COMPRESSED) {
       if (pos)
@@ -1184,6 +1203,12 @@ namespace Gecode {
     } else {
       GECODE_ES_FAIL((Extensional::postnegcompact<BoolView>(home,xv,t)));
     }
+  }
+
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              Reify r, IntPropLevel ipl) {
+    extensional(home,x,t,pos,r,ipl,EPK_DENSE);
   }
 
   void
@@ -1266,7 +1291,6 @@ namespace Gecode {
       }
       return;
     }
-
     ViewArray<BoolView> xv(home,x);
     if (dk == Int::Extensional::DD_DENSE_COMPRESSED) {
       if (pos) {

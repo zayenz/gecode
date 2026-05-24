@@ -2316,16 +2316,34 @@ namespace Gecode {
 namespace Gecode {
 
   /**
-   * \brief Representation and posting preference for extensional tuple sets
+   * \brief Representation and posting selection for extensional tuple sets
+   *
+   * The selector controls which support representation is materialized by
+   * TupleSet::finalize(ExtensionalPropKind) and which propagator family is
+   * used by tuple-set extensional posting. Posting with EPK_DENSE or
+   * EPK_DENSE_COMPRESSED requires a tuple set finalized with a matching
+   * representation. EPK_SPARSE can also post from dense support data.
    *
    * \ingroup TaskModelIntExt
    */
-  enum ExtensionalPropKind {
-    EPK_AUTO,   ///< Select representation/posting automatically
-    EPK_DENSE,  ///< Prefer dense tuple-set posting
-    EPK_SPARSE, ///< Prefer sparse tuple-set posting
-    EPK_DENSE_COMPRESSED ///< Prefer compressed dense tuple-set posting
+  enum class ExtensionalPropKind {
+    EPK_AUTO,   ///< Select representation and posting automatically
+    EPK_DENSE,  ///< Use dense support representation/posting
+    EPK_SPARSE, ///< Use sparse support representation/posting
+    EPK_DENSE_COMPRESSED ///< Use compressed dense support representation/posting
   };
+  /// Select representation and posting automatically
+  static constexpr ExtensionalPropKind EPK_AUTO =
+    ExtensionalPropKind::EPK_AUTO;
+  /// Use dense support representation/posting
+  static constexpr ExtensionalPropKind EPK_DENSE =
+    ExtensionalPropKind::EPK_DENSE;
+  /// Use sparse support representation/posting
+  static constexpr ExtensionalPropKind EPK_SPARSE =
+    ExtensionalPropKind::EPK_SPARSE;
+  /// Use compressed dense support representation/posting
+  static constexpr ExtensionalPropKind EPK_DENSE_COMPRESSED =
+    ExtensionalPropKind::EPK_DENSE_COMPRESSED;
 
   /** \brief Class representing a set of tuples.
    *
@@ -2450,6 +2468,9 @@ namespace Gecode {
       const Range* lst(int i) const;
       /// Finalize datastructure (disallows additions of more Tuples)
       GECODE_INT_EXPORT
+      void finalize(void);
+      /// Finalize datastructure (disallows additions of more Tuples)
+      GECODE_INT_EXPORT
       void finalize(ExtensionalPropKind epk);
       /// Resize tuple data
       GECODE_INT_EXPORT
@@ -2508,8 +2529,15 @@ namespace Gecode {
     TupleSet& add(const IntArgs& t);
     /// Is tuple set finalized
     bool finalized(void) const;
-    /// Finalize tuple set
-    void finalize(ExtensionalPropKind epk=EPK_AUTO);
+    /// Finalize tuple set with dense support data
+    void finalize(void);
+    /// Finalize tuple set with representation \a epk
+    /**
+     * Explicit representation selection materializes only the selected
+     * support representation. Later posting with a different representation
+     * can throw OutOfLimits if that representation is unavailable.
+     */
+    void finalize(ExtensionalPropKind epk);
     //@}
 
     /// \name Tuple access
@@ -2648,6 +2676,18 @@ namespace Gecode {
   extensional(Home home, const IntVarArgs& x, const TupleSet& t,
               IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$x\in t\f$ using representation \a epk.
+   *
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::OutOfLimits if the requested
+   *     representation is not available in finalized tuple set \a t.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
   /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
    *
    * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
@@ -2662,8 +2702,31 @@ namespace Gecode {
    */
   GECODE_INT_EXPORT void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
-              IntPropLevel ipl=IPL_DEF,
-              ExtensionalPropKind epk=EPK_AUTO);
+              IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
+   *
+   * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
+   *     and otherwise for \f$x\not\in t\f$.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x and \a t are of different size.
+   * \li Throws an exception of type Int::NotYetFinalized, if the tuple
+   *     set \a t has not been finalized.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              IntPropLevel ipl, ExtensionalPropKind epk);
 
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$.
    *
@@ -2679,6 +2742,14 @@ namespace Gecode {
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, Reify r,
               IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, Reify r,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$.
    *
    * \li If \a pos is true, it posts a propagator for \f$(x\in t)\equiv r\f$
@@ -2694,8 +2765,33 @@ namespace Gecode {
   GECODE_INT_EXPORT void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
               Reify r,
-              IntPropLevel ipl=IPL_DEF,
-              ExtensionalPropKind epk=EPK_AUTO);
+              IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              Reify r, ExtensionalPropKind epk,
+              IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$.
+   *
+   * \li If \a pos is true, it posts a propagator for \f$(x\in t)\equiv r\f$
+   *     and otherwise for \f$(x\not\in t)\equiv r\f$.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x and \a t are of different size.
+   * \li Throws an exception of type Int::NotYetFinalized, if the tuple
+   *     set \a t has not been finalized.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              Reify r,
+              IntPropLevel ipl, ExtensionalPropKind epk);
 
   /** \brief Post propagator for \f$x\in t\f$.
    *
@@ -2711,6 +2807,18 @@ namespace Gecode {
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
               IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$x\in t\f$ using representation \a epk.
+   *
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::OutOfLimits if the requested
+   *     representation is not available in finalized tuple set \a t.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
   /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
    *
    * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
@@ -2725,8 +2833,31 @@ namespace Gecode {
    */
   GECODE_INT_EXPORT void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
-              IntPropLevel ipl=IPL_DEF,
-              ExtensionalPropKind epk=EPK_AUTO);
+              IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
+   *
+   * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
+   *     and otherwise for \f$x\not\in t\f$.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x and \a t are of different size.
+   * \li Throws an exception of type Int::NotYetFinalized, if the tuple
+   *     set \a t has not been finalized.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              IntPropLevel ipl, ExtensionalPropKind epk);
 
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$.
    *
@@ -2740,6 +2871,40 @@ namespace Gecode {
    */
   void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, Reify r,
+              IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, Reify r,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$.
+   *
+   * \li If \a pos is true, it posts a propagator for \f$(x\in t)\equiv r\f$
+   *     and otherwise for \f$(x\not\in t)\equiv r\f$.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x and \a t are of different size.
+   * \li Throws an exception of type Int::NotYetFinalized, if the tuple
+   *     set \a t has not been finalized.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              Reify r,
+              IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              Reify r, ExtensionalPropKind epk,
               IntPropLevel ipl=IPL_DEF);
 
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$.
@@ -2757,8 +2922,7 @@ namespace Gecode {
   GECODE_INT_EXPORT void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               Reify r,
-              IntPropLevel ipl=IPL_DEF,
-              ExtensionalPropKind epk=EPK_AUTO);
+              IntPropLevel ipl, ExtensionalPropKind epk);
 
 }
 

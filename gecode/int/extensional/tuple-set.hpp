@@ -49,6 +49,7 @@ namespace Gecode {
   forceinline const TupleSet::BitSetData*
   TupleSet::Range::supports(unsigned int n_words, int n) const {
     assert((min <= n) && (n <= max));
+    assert(s != nullptr);
     const unsigned long offset =
       static_cast<unsigned long>(n_words) *
       static_cast<unsigned long>(n - min);
@@ -156,6 +157,13 @@ namespace Gecode {
   forceinline
   TupleSet::operator bool(void) const {
     return object() != nullptr;
+  }
+
+  forceinline void
+  TupleSet::finalize(void) {
+    Data* d = static_cast<Data*>(object());
+    if (!d->finalized())
+      d->finalize();
   }
 
   forceinline void

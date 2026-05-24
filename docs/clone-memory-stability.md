@@ -22,10 +22,11 @@ They are not expected to run in the default developer test loop.
 
 ## External PR Triage
 
-This branch ports fixes from the reviewed exception-safety PR only when they can
-be stated as a local invariant and covered by a focused regression test. Do not
-carry over broad cleanups or performance-sensitive changes just because they
-appear in the source PR.
+This branch ports fixes from Gecode PR #211 only when they can be stated as a
+local invariant and covered by a focused regression test. The PR was reviewed
+locally after rebasing it onto `origin/build-modernization`; do not carry over
+broad cleanups or performance-sensitive changes just because they appear in the
+source PR.
 
 Currently ported areas:
 
@@ -35,6 +36,14 @@ Currently ported areas:
 - integer-set range allocation failure
 - minimodel expression allocation failure
 - marked advisor subscriptions under UBSan
+
+Local regression evidence:
+
+- clone and allocation recovery: `build/fault-red/bin/gecode-test -iter 1
+  -threads 1 -stop true -test '^Fault::'`
+- marked advisor subscriptions: `build/fault-ubsan/bin/gecode-test -iter 1
+  -threads 1 -stop true -test '^Fault::'`
+- local logs, when present, live under `findings/clone-memory-stability/`
 
 Currently deferred areas:
 
@@ -115,6 +124,7 @@ Fault phases should map to one ownership boundary:
 - derived `Space` copy
 - local-object copy
 - clone disposal-array allocation
+- dispose-notice array allocation
 - integer-set range allocation
 - minimodel expression allocation
 

@@ -1468,6 +1468,250 @@ namespace Test { namespace Int {
        }
      };
 
+     /// Positive tuple-set bounds propagation should keep interior holes
+     class TupleSetBoundsKeepsInterior : public ::Test::Base {
+     public:
+       TupleSetBoundsKeepsInterior(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::KeepsInterior") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t)
+             : x(*this,2,0,4) {
+             rel(*this,x[1],IRT_EQ,0);
+             extensional(*this,x,t,true,IPL_BND);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({0,0}).add({2,0}).add({4,0});
+         ts.finalize();
+
+         BoundsSpace* s = new BoundsSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         (s->x[0].min() == 0) &&
+                         (s->x[0].max() == 4) &&
+                         (s->x[0].size() == 5);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Positive tuple-set bounds propagation should tighten unsupported bounds
+     class TupleSetBoundsTighten : public ::Test::Base {
+     public:
+       TupleSetBoundsTighten(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::Tighten") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t)
+             : x(*this,2,0,4) {
+             rel(*this,x[1],IRT_EQ,0);
+             extensional(*this,x,t,true,IPL_BND);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({1,0}).add({3,0});
+         ts.finalize();
+
+         BoundsSpace* s = new BoundsSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         (s->x[0].min() == 1) &&
+                         (s->x[0].max() == 3) &&
+                         (s->x[0].size() == 3);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Bounds pruning must re-check tuple supports against domain holes
+     class TupleSetBoundsDomainSupport : public ::Test::Base {
+     public:
+       TupleSetBoundsDomainSupport(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::DomainSupport") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t)
+             : x(*this,2,0,4) {
+             rel(*this,x[1],IRT_LQ,1);
+             extensional(*this,x,t,true,IPL_BND);
+             rel(*this,x[1],IRT_NQ,0);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({0,0}).add({4,1});
+         ts.finalize();
+
+         BoundsSpace* s = new BoundsSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         s->x[0].assigned() && (s->x[0].val() == 4) &&
+                         s->x[1].assigned() && (s->x[1].val() == 1);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Per-position levels should allow mixed bounds and domain pruning
+     class TupleSetMixedLevels : public ::Test::Base {
+     public:
+       TupleSetMixedLevels(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::MixedLevels") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class MixedSpace : public Space {
+         public:
+           IntVarArray x;
+           MixedSpace(const TupleSet& t)
+             : x(*this,2,0,4) {
+             IntPropLevelArgs ipls({IPL_BND, IPL_DOM});
+             extensional(*this,x,t,true,ipls);
+           }
+           MixedSpace(MixedSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new MixedSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({0,0}).add({4,2});
+         ts.finalize();
+
+         MixedSpace* s = new MixedSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         (s->x[0].min() == 0) &&
+                         (s->x[0].max() == 4) &&
+                         (s->x[0].size() == 5) &&
+                         (s->x[1].min() == 0) &&
+                         (s->x[1].max() == 2) &&
+                         (s->x[1].size() == 2) &&
+                         !s->x[1].in(1);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Per-position levels should also work for Boolean tuple sets
+     class TupleSetBoolMixedLevels : public ::Test::Base {
+     public:
+       TupleSetBoolMixedLevels(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::BoolMixedLevels") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class MixedSpace : public Space {
+         public:
+           BoolVarArray x;
+           MixedSpace(const TupleSet& t)
+             : x(*this,2,0,1) {
+             rel(*this,x[0],IRT_EQ,1);
+             IntPropLevelArgs ipls({IPL_BND, IPL_DOM});
+             extensional(*this,x,t,true,ipls);
+           }
+           MixedSpace(MixedSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new MixedSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({0,0}).add({1,1});
+         ts.finalize();
+
+         MixedSpace* s = new MixedSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         s->x[0].assigned() && (s->x[0].val() == 1) &&
+                         s->x[1].assigned() && (s->x[1].val() == 1);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Bounds pruning should work with compact-table tuple-set representations
+     class TupleSetBoundsRepresentations : public ::Test::Base {
+     public:
+       TupleSetBoundsRepresentations(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::Representations") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t, ExtensionalPropKind epk)
+             : x(*this,2,0,4) {
+             rel(*this,x[1],IRT_EQ,0);
+             extensional(*this,x,t,true,IPL_BND,epk);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+
+         ExtensionalPropKind epks[2] = {
+           EPK_DENSE, EPK_DENSE_COMPRESSED
+         };
+         for (int i=0; i<2; i++) {
+           TupleSet ts(2);
+           ts.add({1,0}).add({3,0});
+           ts.finalize(epks[i]);
+           BoundsSpace* s = new BoundsSpace(ts,epks[i]);
+           const bool ok = (s->status() != SS_FAILED) &&
+                           (s->x[0].min() == 1) &&
+                           (s->x[0].max() == 3) &&
+                           (s->x[0].size() == 3);
+           delete s;
+           if (!ok)
+             return false;
+         }
+         return true;
+       }
+     };
+
      /// %Test with large tuple set
      class TupleSetLarge : public Test {
      protected:
@@ -1832,6 +2076,12 @@ namespace Test { namespace Int {
      SparseTupleSetNegativeFail sparse_tuple_set_negative_fail;
      SparseTupleSetNegativePrune sparse_tuple_set_negative_prune;
      SparseTupleSetReifiedModes sparse_tuple_set_reified_modes;
+     TupleSetBoundsKeepsInterior tuple_set_bounds_keeps_interior;
+     TupleSetBoundsTighten tuple_set_bounds_tighten;
+     TupleSetBoundsDomainSupport tuple_set_bounds_domain_support;
+     TupleSetMixedLevels tuple_set_mixed_levels;
+     TupleSetBoolMixedLevels tuple_set_bool_mixed_levels;
+     TupleSetBoundsRepresentations tuple_set_bounds_representations;
      //@}
 
    }

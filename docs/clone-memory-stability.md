@@ -125,11 +125,14 @@ Fault phases should map to one ownership boundary:
 - local-object copy
 - clone disposal-array allocation
 - dispose-notice array allocation
+- branch heuristic storage allocation
 - integer-set range allocation
-- minimodel expression allocation
+- minimodel expression allocation, including int, float, and set expressions
 
 Each phase should have one test that proves the source object remains usable
 after the injected failure and that the next non-failing operation still works.
+For broad heap-backed paths, use budgeted tests that fail each observed heap
+allocation position before accepting the operation as covered.
 
 ## Sanitizer Strategy
 

@@ -197,8 +197,7 @@ protected:
     case SAME_OR_0_TUPLE_SET: {
       static TupleSet table = same_or_0_tuple_set(colors);
       IntVar result(*this, 0, colors);
-      extensional(*this, IntVarArgs() << a << b << result, table,
-                  IPL_DEF, EPK_AUTO);
+      extensional(*this, IntVarArgs() << a << b << result, table);
       return result;
     }
     case SAME_OR_0_DFA: {

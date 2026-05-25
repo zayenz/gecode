@@ -95,13 +95,12 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<unsigned int sz>
   forceinline void
-  TinyBitSet<sz>::add_to_mask_aligned(const TupleSet::CSupportWord* b,
-                                      const TupleSet::CSupportWord* e,
-                                      BitSetData* mask) const {
+  TinyBitSet<sz>::add_to_mask(const CompressedSupport& support,
+                              BitSetData* mask) const {
     for (unsigned int i=0U; i<sz; i++) {
-      const BitSetData* s = find_aligned_word(b,e,i);
-      if (s != nullptr)
-        mask[i] = BitSetData::o(mask[i],*s);
+      const BitSetData* w = find_support_word(support,i);
+      if (w != nullptr)
+        mask[i] = BitSetData::o(mask[i],*w);
     }
   }
 
@@ -115,14 +114,13 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<unsigned int sz>
   forceinline void
-  TinyBitSet<sz>::intersect_with_mask_aligned
-  (const TupleSet::CSupportWord* b, const TupleSet::CSupportWord* e) {
+  TinyBitSet<sz>::intersect_with_mask(const CompressedSupport& support) {
     for (unsigned int i=0U; i<sz; i++) {
-      const BitSetData* s = find_aligned_word(b,e,i);
-      if (s == nullptr)
+      const BitSetData* w = find_support_word(support,i);
+      if (w == nullptr)
         _bits[i].init(false);
       else
-        _bits[i] = BitSetData::a(_bits[i],*s);
+        _bits[i] = BitSetData::a(_bits[i],*w);
     }
   }
 
@@ -136,12 +134,10 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<unsigned int sz>
   forceinline void
-  TinyBitSet<sz>::intersect_with_masks_aligned
-  (const TupleSet::CSupportWord* ab, const TupleSet::CSupportWord* ae,
-   const TupleSet::CSupportWord* bb, const TupleSet::CSupportWord* be) {
+  TinyBitSet<sz>::intersect_with_masks(const CompressedSupport& a, const CompressedSupport& b) {
     for (unsigned int i=0U; i<sz; i++) {
-      const BitSetData* sa = find_aligned_word(ab,ae,i);
-      const BitSetData* sb = find_aligned_word(bb,be,i);
+      const BitSetData* sa = find_support_word(a,i);
+      const BitSetData* sb = find_support_word(b,i);
       BitSetData m;
       if (sa != nullptr) {
         m = *sa;
@@ -163,12 +159,11 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<unsigned int sz>
   forceinline void
-  TinyBitSet<sz>::nand_with_mask_aligned(const TupleSet::CSupportWord* b,
-                                         const TupleSet::CSupportWord* e) {
+  TinyBitSet<sz>::nand_with_mask(const CompressedSupport& support) {
     for (unsigned int i=0U; i<sz; i++) {
-      const BitSetData* s = find_aligned_word(b,e,i);
-      if (s != nullptr)
-        _bits[i] = BitSetData::a(_bits[i],~(*s));
+      const BitSetData* w = find_support_word(support,i);
+      if (w != nullptr)
+        _bits[i] = BitSetData::a(_bits[i],~(*w));
     }
   }
 
@@ -191,11 +186,10 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<unsigned int sz>
   forceinline bool
-  TinyBitSet<sz>::intersects_aligned(const TupleSet::CSupportWord* b,
-                                     const TupleSet::CSupportWord* e) {
+  TinyBitSet<sz>::intersects(const CompressedSupport& support) {
     for (unsigned int i=0U; i<sz; i++) {
-      const BitSetData* s = find_aligned_word(b,e,i);
-      if ((s != nullptr) && !BitSetData::a(_bits[i],*s).none())
+      const BitSetData* w = find_support_word(support,i);
+      if ((w != nullptr) && !BitSetData::a(_bits[i],*w).none())
         return true;
     }
     return false;
@@ -213,14 +207,13 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<unsigned int sz>
   forceinline unsigned long long int
-  TinyBitSet<sz>::ones_aligned(const TupleSet::CSupportWord* b,
-                               const TupleSet::CSupportWord* e) const {
+  TinyBitSet<sz>::ones(const CompressedSupport& support) const {
     unsigned long long int o = 0U;
     for (unsigned int i=0U; i<sz; i++) {
-      const BitSetData* s = find_aligned_word(b,e,i);
-      if (s != nullptr)
+      const BitSetData* w = find_support_word(support,i);
+      if (w != nullptr)
         o += static_cast<unsigned long long int>
-          (BitSetData::a(_bits[i],*s).ones());
+          (BitSetData::a(_bits[i],*w).ones());
     }
     return o;
   }

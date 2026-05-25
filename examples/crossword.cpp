@@ -198,7 +198,7 @@ public:
               for (int d=0; d<w_l; d++)
                 w[d] = ml(x,y+d);
             // Constrain word
-            extensional(*this, w, ts, IPL_DEF, EPK_AUTO);
+            extensional(*this, w, ts);
           }
         }
       }

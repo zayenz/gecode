@@ -37,10 +37,34 @@
 
 namespace Gecode { namespace Int { namespace Extensional {
 
+  forceinline
+  CompressedSupport::CompressedSupport(void)
+    : b(nullptr), e(nullptr) {}
+
+  forceinline
+  CompressedSupport::CompressedSupport(const TupleSet::CSupportWord* b0,
+                                       const TupleSet::CSupportWord* e0)
+    : b(b0), e(e0) {}
+
+  forceinline const TupleSet::CSupportWord*
+  CompressedSupport::begin(void) const {
+    return b;
+  }
+
+  forceinline const TupleSet::CSupportWord*
+  CompressedSupport::end(void) const {
+    return e;
+  }
+
+  forceinline bool
+  CompressedSupport::empty(void) const {
+    return (b == nullptr) || (b >= e);
+  }
+
   forceinline const TupleSet::BitSetData*
-  find_aligned_word(const TupleSet::CSupportWord* b,
-                    const TupleSet::CSupportWord* e,
-                    unsigned int widx) {
+  find_support_word(const CompressedSupport& s, unsigned int widx) {
+    const TupleSet::CSupportWord* b = s.begin();
+    const TupleSet::CSupportWord* e = s.end();
     while (b < e) {
       const TupleSet::CSupportWord* m = b + ((e-b) >> 1);
       if (widx < m->widx) {
@@ -91,12 +115,12 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<class IndexType>
   forceinline
-  BitSet<IndexType>::BitSet(Space& home, unsigned int n, bool aligned)
+  BitSet<IndexType>::BitSet(Space& home, unsigned int n, bool indexed)
     : _limit(static_cast<IndexType>(n)),
       _capacity(static_cast<IndexType>(n)),
       _index(home.alloc<IndexType>(n)),
       _bits(home.alloc<BitSetData>(n)),
-      _pos(aligned ? home.alloc<IndexType>(n) : nullptr) {
+      _pos(indexed ? home.alloc<IndexType>(n) : nullptr) {
     // Set all bits in all words (including the last)
     for (IndexType i=0; i<_limit; i++) {
       _bits[i].init(true);
@@ -204,20 +228,20 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<class IndexType>
   forceinline void
-  BitSet<IndexType>::add_to_mask_aligned(const TupleSet::CSupportWord* b,
-                                         const TupleSet::CSupportWord* e,
-                                         BitSetData* mask) const {
-    if ((_limit == 0U) || (b >= e))
+  BitSet<IndexType>::add_to_mask(const CompressedSupport& support,
+                                 BitSetData* mask) const {
+    if ((_limit == 0U) || support.empty())
       return;
     if (_pos == nullptr) {
       for (IndexType i=0; i<_limit; i++) {
-        const BitSetData* s = find_aligned_word(b,e,_index[i]);
-        if (s != nullptr)
-          mask[i] = BitSetData::o(mask[i],*s);
+        const BitSetData* w = find_support_word(support,_index[i]);
+        if (w != nullptr)
+          mask[i] = BitSetData::o(mask[i],*w);
       }
       return;
     }
-    for (const TupleSet::CSupportWord* s=b; s<e; ++s) {
+    for (const TupleSet::CSupportWord* s=support.begin();
+         s<support.end(); ++s) {
       if (s->widx >= static_cast<unsigned int>(_capacity))
         continue;
       const IndexType p = _pos[s->widx];
@@ -253,13 +277,12 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<class IndexType>
   forceinline void
-  BitSet<IndexType>::intersect_with_mask_aligned
-  (const TupleSet::CSupportWord* b, const TupleSet::CSupportWord* e) {
+  BitSet<IndexType>::intersect_with_mask(const CompressedSupport& support) {
     if (_limit == 0U)
       return;
     for (IndexType i = _limit; i--; ) {
       assert(!_bits[i].none());
-      const BitSetData* s = find_aligned_word(b,e,_index[i]);
+      const BitSetData* s = find_support_word(support,_index[i]);
       BitSetData w;
       if (s == nullptr) {
         w.init(false);
@@ -289,15 +312,13 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<class IndexType>
   forceinline void
-  BitSet<IndexType>::intersect_with_masks_aligned
-  (const TupleSet::CSupportWord* ab, const TupleSet::CSupportWord* ae,
-   const TupleSet::CSupportWord* bb, const TupleSet::CSupportWord* be) {
+  BitSet<IndexType>::intersect_with_masks(const CompressedSupport& a, const CompressedSupport& b) {
     if (_limit == 0U)
       return;
     for (IndexType i = _limit; i--; ) {
       assert(!_bits[i].none());
-      const BitSetData* sa = find_aligned_word(ab,ae,_index[i]);
-      const BitSetData* sb = find_aligned_word(bb,be,_index[i]);
+      const BitSetData* sa = find_support_word(a,_index[i]);
+      const BitSetData* sb = find_support_word(b,_index[i]);
       BitSetData m;
       if (sa != nullptr) {
         m = *sa;
@@ -326,23 +347,23 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<class IndexType>
   forceinline void
-  BitSet<IndexType>::nand_with_mask_aligned(const TupleSet::CSupportWord* b,
-                                            const TupleSet::CSupportWord* e) {
-    if ((_limit == 0U) || (b >= e))
+  BitSet<IndexType>::nand_with_mask(const CompressedSupport& support) {
+    if ((_limit == 0U) || support.empty())
       return;
     if (_pos == nullptr) {
       for (IndexType i = _limit; i--; ) {
         assert(!_bits[i].none());
-        const BitSetData* s = find_aligned_word(b,e,_index[i]);
-        if (s != nullptr) {
-          BitSetData w = BitSetData::a(_bits[i],~(*s));
+        const BitSetData* w0 = find_support_word(support,_index[i]);
+        if (w0 != nullptr) {
+          BitSetData w = BitSetData::a(_bits[i],~(*w0));
           replace_and_decrease(i,w);
           assert(i == _limit || !_bits[i].none());
         }
       }
       return;
     }
-    for (const TupleSet::CSupportWord* s=b; s<e; ++s) {
+    for (const TupleSet::CSupportWord* s=support.begin();
+         s<support.end(); ++s) {
       if (s->widx >= static_cast<unsigned int>(_capacity))
         continue;
       const IndexType p = _pos[s->widx];
@@ -365,19 +386,19 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<class IndexType>
   forceinline bool
-  BitSet<IndexType>::intersects_aligned(const TupleSet::CSupportWord* b,
-                                        const TupleSet::CSupportWord* e) const {
-    if ((_limit == 0U) || (b >= e))
+  BitSet<IndexType>::intersects(const CompressedSupport& support) const {
+    if ((_limit == 0U) || support.empty())
       return false;
     if (_pos == nullptr) {
       for (IndexType i=0; i<_limit; i++) {
-        const BitSetData* s = find_aligned_word(b,e,_index[i]);
-        if ((s != nullptr) && !BitSetData::a(_bits[i],*s).none())
+        const BitSetData* w = find_support_word(support,_index[i]);
+        if ((w != nullptr) && !BitSetData::a(_bits[i],*w).none())
           return true;
       }
       return false;
     }
-    for (const TupleSet::CSupportWord* s=b; s<e; ++s) {
+    for (const TupleSet::CSupportWord* s=support.begin();
+         s<support.end(); ++s) {
       if (s->widx >= static_cast<unsigned int>(_capacity))
         continue;
       const IndexType p = _pos[s->widx];
@@ -399,21 +420,21 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<class IndexType>
   forceinline unsigned long long int
-  BitSet<IndexType>::ones_aligned(const TupleSet::CSupportWord* b,
-                                  const TupleSet::CSupportWord* e) const {
+  BitSet<IndexType>::ones(const CompressedSupport& support) const {
     unsigned long long int o = 0U;
-    if ((_limit == 0U) || (b >= e))
+    if ((_limit == 0U) || support.empty())
       return 0U;
     if (_pos == nullptr) {
       for (IndexType i=0; i<_limit; i++) {
-        const BitSetData* s = find_aligned_word(b,e,_index[i]);
-        if (s != nullptr)
+        const BitSetData* w = find_support_word(support,_index[i]);
+        if (w != nullptr)
           o += static_cast<unsigned long long int>
-            (BitSetData::a(_bits[i],*s).ones());
+            (BitSetData::a(_bits[i],*w).ones());
       }
       return o;
     }
-    for (const TupleSet::CSupportWord* s=b; s<e; ++s) {
+    for (const TupleSet::CSupportWord* s=support.begin();
+         s<support.end(); ++s) {
       if (s->widx >= static_cast<unsigned int>(_capacity))
         continue;
       const IndexType p = _pos[s->widx];

@@ -1327,7 +1327,7 @@ namespace Gecode { namespace Int { namespace Extensional {
             continue;
           }
           unsigned int gid = 0U;
-          if (ts.dense_compressed_support(i,n,b,e,gid)) {
+          if (TupleSetAccess::dense_compressed_support(ts,i,n,b,e,gid)) {
             ok = true;
             return;
           }
@@ -1368,6 +1368,9 @@ namespace Gecode { namespace Int { namespace Extensional {
       const CSupportWord* end(void) const {
         return e;
       }
+      CompressedSupport support(void) const {
+        return CompressedSupport(b,e);
+      }
     };
 
     class LostSupports {
@@ -1388,7 +1391,7 @@ namespace Gecode { namespace Int { namespace Extensional {
             return;
           }
           unsigned int gid = 0U;
-          if (p.ts.dense_compressed_support(a.index(),l,b,e,gid)) {
+          if (TupleSetAccess::dense_compressed_support(p.ts,a.index(),l,b,e,gid)) {
             ok = true;
             return;
           }
@@ -1415,6 +1418,9 @@ namespace Gecode { namespace Int { namespace Extensional {
       }
       const CSupportWord* end(void) const {
         return e;
+      }
+      CompressedSupport support(void) const {
+        return CompressedSupport(b,e);
       }
     };
 
@@ -1448,7 +1454,7 @@ namespace Gecode { namespace Int { namespace Extensional {
                   const CSupportWord*& b,
                   const CSupportWord*& e) const {
       unsigned int gid = 0U;
-      return ts.dense_compressed_support(a.index(),n,b,e,gid);
+      return TupleSetAccess::dense_compressed_support(ts,a.index(),n,b,e,gid);
     }
 
     template<class Table>
@@ -1459,7 +1465,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       for (int i=0; i<x.size(); i++) {
         table.clear_mask(mask);
         for (ValidSupports vs(ts,i,x[i]); vs(); ++vs)
-          table.add_to_mask_aligned(vs.begin(),vs.end(),mask);
+          table.add_to_mask(vs.support(),mask);
         table.template intersect_with_mask<false>(mask);
         if (table.empty())
           goto schedule;
@@ -1636,12 +1642,12 @@ namespace Gecode { namespace Int { namespace Extensional {
           const CSupportWord* bb = nullptr;
           const CSupportWord* be = nullptr;
           bool min_supported =
-            supports(a,x.min(),bb,be) && table.intersects_aligned(bb,be);
+            supports(a,x.min(),bb,be) && table.intersects(CompressedSupport(bb,be));
           if (!min_supported) {
             GECODE_ME_CHECK(x.eq(home,x.max()));
           } else {
             bool max_supported =
-              supports(a,x.max(),bb,be) && table.intersects_aligned(bb,be);
+              supports(a,x.max(),bb,be) && table.intersects(CompressedSupport(bb,be));
             if (!max_supported)
               GECODE_ME_CHECK(x.eq(home,x.min()));
           }
@@ -1652,7 +1658,7 @@ namespace Gecode { namespace Int { namespace Extensional {
           unsigned int n_nq = 0U;
           int last_support = 0;
           for (ValidSupports vs(*this,a); vs(); ++vs) {
-            if (!table.intersects_aligned(vs.begin(),vs.end()))
+            if (!table.intersects(vs.support()))
               nq[n_nq++] = vs.val();
             else
               last_support = vs.val();
@@ -1696,7 +1702,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         const CSupportWord* bb = nullptr;
         const CSupportWord* be = nullptr;
         if (supports(a,x.val(),bb,be))
-          table.intersect_with_mask_aligned(bb,be);
+          table.intersect_with_mask(CompressedSupport(bb,be));
         else
           table.flush();
         return home.ES_NOFIX_DISPOSE(c,a);
@@ -1706,11 +1712,11 @@ namespace Gecode { namespace Int { namespace Extensional {
         const CSupportWord* bb = nullptr;
         const CSupportWord* be = nullptr;
         if (supports(a,x.min(d),bb,be))
-          table.nand_with_mask_aligned(bb,be);
+          table.nand_with_mask(CompressedSupport(bb,be));
         a.adjust();
       } else if (!x.any(d) && (x.width(d) <= x.size())) {
         for (LostSupports ls(*this,a,x.min(d),x.max(d)); ls(); ++ls) {
-          table.nand_with_mask_aligned(ls.begin(),ls.end());
+          table.nand_with_mask(ls.support());
           if (table.empty())
             return Base::disabled() ? home.ES_NOFIX_DISPOSE(c,a) : ES_FAILED;
         }
@@ -1725,11 +1731,11 @@ namespace Gecode { namespace Int { namespace Extensional {
           const bool has_min = supports(a,x.min(),mb,me);
           const bool has_max = supports(a,x.max(),xb,xe);
           if (has_min && has_max)
-            table.intersect_with_masks_aligned(mb,me,xb,xe);
+            table.intersect_with_masks(CompressedSupport(mb,me),CompressedSupport(xb,xe));
           else if (has_min)
-            table.intersect_with_mask_aligned(mb,me);
+            table.intersect_with_mask(CompressedSupport(mb,me));
           else if (has_max)
-            table.intersect_with_mask_aligned(xb,xe);
+            table.intersect_with_mask(CompressedSupport(xb,xe));
           else
             table.flush();
         } else {
@@ -1737,7 +1743,7 @@ namespace Gecode { namespace Int { namespace Extensional {
           BitSetData* mask = r.alloc<BitSetData>(table.size());
           table.clear_mask(mask);
           for (ValidSupports vs(*this,a); vs(); ++vs)
-            table.add_to_mask_aligned(vs.begin(),vs.end(),mask);
+            table.add_to_mask(vs.support(),mask);
           table.template intersect_with_mask<false>(mask);
         }
       }
@@ -1900,7 +1906,7 @@ namespace Gecode { namespace Int { namespace Extensional {
           int* nq = r.alloc<int>(x.size());
           unsigned int n_nq = 0U;
           for (ValidSupports vs(*this,a); vs(); ++vs) {
-            if (x_size == table.ones_aligned(vs.begin(),vs.end()))
+            if (x_size == table.ones(vs.support()))
               nq[n_nq++] = vs.val();
           }
           if (n_nq > 0U) {
@@ -1938,7 +1944,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         const CSupportWord* bb = nullptr;
         const CSupportWord* be = nullptr;
         if (supports(a,x.val(),bb,be))
-          table.intersect_with_mask_aligned(bb,be);
+          table.intersect_with_mask(CompressedSupport(bb,be));
         else
           table.flush();
         return home.ES_NOFIX_DISPOSE(c,a);
@@ -1953,7 +1959,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       BitSetData* mask = r.alloc<BitSetData>(table.size());
       table.clear_mask(mask);
       do {
-        table.add_to_mask_aligned(vs.begin(),vs.end(),mask);
+        table.add_to_mask(vs.support(),mask);
         ++vs;
       } while (vs());
       table.template intersect_with_mask<false>(mask);
@@ -2136,7 +2142,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         const CSupportWord* bb = nullptr;
         const CSupportWord* be = nullptr;
         if (supports(a,x.val(),bb,be))
-          table.intersect_with_mask_aligned(bb,be);
+          table.intersect_with_mask(CompressedSupport(bb,be));
         else
           table.flush();
         return home.ES_NOFIX_DISPOSE(c,a);
@@ -2151,7 +2157,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       BitSetData* mask = r.alloc<BitSetData>(table.size());
       table.clear_mask(mask);
       do {
-        table.add_to_mask_aligned(vs.begin(),vs.end(),mask);
+        table.add_to_mask(vs.support(),mask);
         ++vs;
       } while (vs());
       table.template intersect_with_mask<false>(mask);

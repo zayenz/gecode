@@ -243,6 +243,23 @@ namespace Gecode {
     return data().key;
   }
 
+  forceinline ExtensionalPropKind
+  TupleSet::representation(void) const {
+    switch (data().support_repr) {
+    case Data::SR_DENSE:
+      return EPK_DENSE;
+    case Data::SR_SPARSE:
+      return EPK_SPARSE;
+    case Data::SR_DENSE_COMPRESSED:
+      return EPK_DENSE_COMPRESSED;
+    case Data::SR_NONE:
+      return EPK_DENSE;
+    default:
+      GECODE_NEVER;
+      return EPK_DENSE;
+    }
+  }
+
   forceinline bool
   TupleSet::dense_support(void) const {
     return (data().support != nullptr) || (data().n_tuples == 0);
@@ -333,6 +350,56 @@ namespace Gecode {
     }
     return false;
   }
+
+  namespace Int { namespace Extensional {
+
+    forceinline bool
+    TupleSetAccess::dense_support(const TupleSet& ts) {
+      return ts.dense_support();
+    }
+
+    forceinline bool
+    TupleSetAccess::sparse_support(const TupleSet& ts) {
+      return ts.sparse_support();
+    }
+
+    forceinline bool
+    TupleSetAccess::dense_compressed_support(const TupleSet& ts) {
+      return ts.dense_compressed_support();
+    }
+
+    forceinline unsigned int
+    TupleSetAccess::sparse_values(const TupleSet& ts) {
+      return ts.sparse_values();
+    }
+
+    forceinline const unsigned int*
+    TupleSetAccess::sparse_tuple_value_ids(const TupleSet& ts) {
+      return ts.sparse_tuple_value_ids();
+    }
+
+    forceinline const unsigned int*
+    TupleSetAccess::sparse_support_offsets(const TupleSet& ts) {
+      return ts.sparse_support_offsets();
+    }
+
+    forceinline bool
+    TupleSetAccess::sparse_support(const TupleSet& ts, int p, int n,
+                                   const unsigned int*& b,
+                                   const unsigned int*& e,
+                                   unsigned int& gid) {
+      return ts.sparse_support(p,n,b,e,gid);
+    }
+
+    forceinline bool
+    TupleSetAccess::dense_compressed_support(const TupleSet& ts, int p, int n,
+                                             const TupleSet::CSupportWord*& b,
+                                             const TupleSet::CSupportWord*& e,
+                                             unsigned int& gid) {
+      return ts.dense_compressed_support(p,n,b,e,gid);
+    }
+
+  }}
 
 
   template<class Char, class Traits>

@@ -307,7 +307,7 @@ public:
       IntVarArgs b(s.size());
       for (int i = s.size(); i--; )
         b[i] = channel(*this, expr(*this, (s[i] == B)));
-      extensional(*this, b, bishops, opt.ipl(), EPK_AUTO);
+      extensional(*this, b, bishops, opt.ipl());
     }
 
     // Handle knights

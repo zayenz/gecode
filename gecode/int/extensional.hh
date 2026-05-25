@@ -49,6 +49,27 @@
 
 namespace Gecode { namespace Int { namespace Extensional {
 
+  /// Compressed tuple-word support list
+  class CompressedSupport {
+  protected:
+    /// First support word
+    const TupleSet::CSupportWord* b;
+    /// One past last support word
+    const TupleSet::CSupportWord* e;
+  public:
+    /// Initialize as empty support list
+    CompressedSupport(void);
+    /// Initialize from support word range
+    CompressedSupport(const TupleSet::CSupportWord* b0,
+                      const TupleSet::CSupportWord* e0);
+    /// Return first support word
+    const TupleSet::CSupportWord* begin(void) const;
+    /// Return one past last support word
+    const TupleSet::CSupportWord* end(void) const;
+    /// Whether support list is empty
+    bool empty(void) const;
+  };
+
   /**
    * \brief Domain consistent layered graph (regular) propagator
    *
@@ -250,7 +271,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     void replace_and_decrease(IndexType i, BitSetData w);
   public:
     /// Initialize bit set for a number of words \a n
-    BitSet(Space& home, unsigned int n, bool aligned=false);
+    BitSet(Space& home, unsigned int n, bool indexed=false);
     /// Initialize during cloning
     template<class OldIndexType>
     BitSet(Space& home, const BitSet<OldIndexType>& bs);
@@ -274,40 +295,32 @@ namespace Gecode { namespace Int { namespace Extensional {
     void clear_mask(BitSetData* mask) const;
     /// Add \b to \a mask
     void add_to_mask(const BitSetData* b, BitSetData* mask) const;
-    /// Add aligned compressed support list to \a mask
-    void add_to_mask_aligned(const TupleSet::CSupportWord* b,
-                             const TupleSet::CSupportWord* e,
-                             BitSetData* mask) const;
+    /// Add compressed support list to \a mask
+    void add_to_mask(const CompressedSupport& s, BitSetData* mask) const;
     /// Intersect with \a mask, sparse mask if \a sparse is true
     template<bool sparse>
     void intersect_with_mask(const BitSetData* mask);
-    /// Intersect with aligned compressed support list
-    void intersect_with_mask_aligned(const TupleSet::CSupportWord* b,
-                                     const TupleSet::CSupportWord* e);
+    /// Intersect with compressed support list
+    void intersect_with_mask(const CompressedSupport& s);
     /// Intersect with the "or" of \a and \a b
     void intersect_with_masks(const BitSetData* a, const BitSetData* b);
-    /// Intersect with the "or" of two aligned compressed support lists
-    void intersect_with_masks_aligned(const TupleSet::CSupportWord* ab,
-                                      const TupleSet::CSupportWord* ae,
-                                      const TupleSet::CSupportWord* bb,
-                                      const TupleSet::CSupportWord* be);
+    /// Intersect with the "or" of two compressed support lists
+    void intersect_with_masks(const CompressedSupport& a,
+                              const CompressedSupport& b);
     /// Check if \a has a non-empty intersection with the set
     bool intersects(const BitSetData* b) const;
-    /// Check if aligned compressed support list intersects with the set
-    bool intersects_aligned(const TupleSet::CSupportWord* b,
-                            const TupleSet::CSupportWord* e) const;
+    /// Check if compressed support list intersects with the set
+    bool intersects(const CompressedSupport& s) const;
     /// Perform "nand" with \a b
     void nand_with_mask(const BitSetData* b);
-    /// Perform "nand" with aligned compressed support list
-    void nand_with_mask_aligned(const TupleSet::CSupportWord* b,
-                                const TupleSet::CSupportWord* e);
+    /// Perform "nand" with compressed support list
+    void nand_with_mask(const CompressedSupport& s);
     /// Return the number of ones
     unsigned long long int ones(void) const;
     /// Return the number of ones after intersection with \a b
     unsigned long long int ones(const BitSetData* b) const;
-    /// Return the number of ones after intersection with aligned support list
-    unsigned long long int ones_aligned(const TupleSet::CSupportWord* b,
-                                        const TupleSet::CSupportWord* e) const;
+    /// Return the number of ones after intersection with compressed support list
+    unsigned long long int ones(const CompressedSupport& s) const;
     /// Return an upper bound on the number of bits
     unsigned long long int bits(void) const;
     /// Return the number of required bit set words
@@ -331,7 +344,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     BitSetData _bits[_size];
   public:
     /// Initialize sparse bit set for a number of words \a n
-    TinyBitSet(Space& home, unsigned int n, bool aligned=false);
+    TinyBitSet(Space& home, unsigned int n, bool indexed=false);
     /// Initialize during cloning
     template<unsigned int largersize>
     TinyBitSet(Space& home, const TinyBitSet<largersize>& tbs);
@@ -350,42 +363,34 @@ namespace Gecode { namespace Int { namespace Extensional {
     void clear_mask(BitSetData* mask);
     /// Add \b to \a mask
     void add_to_mask(const BitSetData* b, BitSetData* mask) const;
-    /// Add aligned compressed support list to \a mask
-    void add_to_mask_aligned(const TupleSet::CSupportWord* b,
-                             const TupleSet::CSupportWord* e,
-                             BitSetData* mask) const;
+    /// Add compressed support list to \a mask
+    void add_to_mask(const CompressedSupport& s, BitSetData* mask) const;
     /// Intersect with \a mask, sparse mask if \a sparse is true
     template<bool sparse>
     void intersect_with_mask(const BitSetData* mask);
-    /// Intersect with aligned compressed support list
-    void intersect_with_mask_aligned(const TupleSet::CSupportWord* b,
-                                     const TupleSet::CSupportWord* e);
+    /// Intersect with compressed support list
+    void intersect_with_mask(const CompressedSupport& s);
     /// Intersect with the "or" of \a and \a b
     void intersect_with_masks(const BitSetData* a, const BitSetData* b);
-    /// Intersect with the "or" of two aligned compressed support lists
-    void intersect_with_masks_aligned(const TupleSet::CSupportWord* ab,
-                                      const TupleSet::CSupportWord* ae,
-                                      const TupleSet::CSupportWord* bb,
-                                      const TupleSet::CSupportWord* be);
+    /// Intersect with the "or" of two compressed support lists
+    void intersect_with_masks(const CompressedSupport& a,
+                              const CompressedSupport& b);
     /// Check if \a has a non-empty intersection with the set
     bool intersects(const BitSetData* b);
-    /// Check if aligned compressed support list intersects with the set
-    bool intersects_aligned(const TupleSet::CSupportWord* b,
-                            const TupleSet::CSupportWord* e);
+    /// Check if compressed support list intersects with the set
+    bool intersects(const CompressedSupport& s);
     /// Perform "nand" with \a b
     void nand_with_mask(const BitSetData* b);
-    /// Perform "nand" with aligned compressed support list
-    void nand_with_mask_aligned(const TupleSet::CSupportWord* b,
-                                const TupleSet::CSupportWord* e);
+    /// Perform "nand" with compressed support list
+    void nand_with_mask(const CompressedSupport& s);
     /// Perform "nand" with and the "or" of \a a and \a b
     void nand_with_masks(const BitSetData* a, const BitSetData* b);
     /// Return the number of ones
     unsigned long long int ones(void) const;
     /// Return the number of ones after intersection with \a b
     unsigned long long int ones(const BitSetData* b) const;
-    /// Return the number of ones after intersection with aligned support list
-    unsigned long long int ones_aligned(const TupleSet::CSupportWord* b,
-                                        const TupleSet::CSupportWord* e) const;
+    /// Return the number of ones after intersection with compressed support list
+    unsigned long long int ones(const CompressedSupport& s) const;
     /// Return an upper bound on the number of bits
     unsigned long long int bits(void) const;
     /// Return the number of required bit set words

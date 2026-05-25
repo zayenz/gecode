@@ -526,7 +526,7 @@ public:
           rel(*this, x, IRT_GQ, 9-n);
           rel(*this, x, IRT_NQ, 9-n+1);
         } else {
-          extensional(*this, x, dc.get(n,c), IPL_DEF, EPK_AUTO);
+          extensional(*this, x, dc.get(n,c));
           return;
         }
       }

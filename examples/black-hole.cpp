@@ -180,8 +180,7 @@ public:
       ts.finalize(EPK_AUTO);
 
       for (int i = 51; i--; )
-        extensional(*this, IntVarArgs({x[i],x[i+1]}), ts,
-                    IPL_DEF, EPK_AUTO);
+        extensional(*this, IntVarArgs({x[i],x[i+1]}), ts);
     }
 
     // A card must be played before the one under it.

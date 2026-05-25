@@ -142,7 +142,7 @@ public:
 
             IntVarArgs args;
             args << group[p1] << group[p2] << pair;
-            extensional(*this, args, ts, IPL_DEF, EPK_AUTO);
+            extensional(*this, args, ts);
 
             pairs << pair;
           }

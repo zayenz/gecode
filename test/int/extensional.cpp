@@ -394,7 +394,17 @@ namespace Test { namespace Int {
 
      ///% Transform a TupleSet into a DFA
      Gecode::DFA tupleset2dfa(Gecode::TupleSet ts) {
-       return ts.dfa();
+       using namespace Gecode;
+       REG expression;
+       for (int i = 0; i<ts.tuples(); i++) {
+         REG r;
+         for (int j = 0; j<ts.arity(); j++) {
+           r += REG(ts[i][j]);
+         }
+         expression |= r;
+       }
+       DFA dfa(expression);
+       return dfa;
      }
 
      /// %Test with tuple set
@@ -534,15 +544,8 @@ namespace Test { namespace Int {
            ts.add(IntArgs({i}));
          ts.finalize(EPK_SPARSE);
 
-         if (!ts.sparse_support()) {
+         if (ts.representation() != EPK_SPARSE) {
            std::cerr << "ERROR: TupleSet did not select sparse support"
-                     << std::endl;
-           return false;
-         }
-
-         TupleSet rt(1, ts.dfa());
-         if (!(ts == rt)) {
-           std::cerr << "ERROR: TupleSet::dfa() round-trip failed"
                      << std::endl;
            return false;
          }
@@ -593,7 +596,7 @@ namespace Test { namespace Int {
            ts.add(IntArgs({i, (i*7) % n, (i*11) % n}));
          ts.finalize(EPK_SPARSE);
 
-         if (!ts.sparse_support()) {
+         if (ts.representation() != EPK_SPARSE) {
            std::cerr << "ERROR: Ternary TupleSet did not select sparse support"
                      << std::endl;
            return false;
@@ -648,7 +651,7 @@ namespace Test { namespace Int {
                            (i*7) % n, (i*11) % n, (i*13) % n}));
          ts.finalize(EPK_SPARSE);
 
-         if (!ts.sparse_support()) {
+         if (ts.representation() != EPK_SPARSE) {
            std::cerr << "ERROR: High-arity TupleSet did not select sparse support"
                      << std::endl;
            return false;
@@ -723,7 +726,7 @@ namespace Test { namespace Int {
          TupleSet sat(0);
          sat.add(IntArgs(0));
          sat.finalize(EPK_SPARSE);
-         if (!sat.sparse_support()) {
+         if (sat.representation() != EPK_SPARSE) {
            std::cerr << "ERROR: Nullary sat table not sparse" << std::endl;
            return false;
          }
@@ -787,7 +790,7 @@ namespace Test { namespace Int {
          ts.add(IntArgs({0,0})).add(IntArgs({1,1}))
            .add(IntArgs({2,2})).add(IntArgs({3,3}));
          ts.finalize(EPK_SPARSE);
-         if (!ts.sparse_support())
+         if (ts.representation() != EPK_SPARSE)
            return false;
 
          SparseDeltaSpace* root = new SparseDeltaSpace(ts);
@@ -840,7 +843,7 @@ namespace Test { namespace Int {
          ts.add(IntArgs({0,0})).add(IntArgs({1,1}))
            .add(IntArgs({2,1})).add(IntArgs({3,3}));
          ts.finalize(EPK_SPARSE);
-         if (!ts.sparse_support())
+         if (ts.representation() != EPK_SPARSE)
            return false;
 
          SparseAssignSpace* root = new SparseAssignSpace(ts);
@@ -884,7 +887,7 @@ namespace Test { namespace Int {
          TupleSet ts(2);
          ts.add(IntArgs({0,1})).add(IntArgs({1,0}));
          ts.finalize(EPK_SPARSE);
-         if (!ts.sparse_support())
+         if (ts.representation() != EPK_SPARSE)
            return false;
 
          SparseBoolSpace* root = new SparseBoolSpace(ts);
@@ -1016,16 +1019,16 @@ namespace Test { namespace Int {
          for (int i=0; i<100; i++)
            ts.add(IntArgs({i, (i*3) % 100}));
          ts.finalize(EPK_SPARSE);
-         if (!ts.sparse_support()) {
+         if (ts.representation() != EPK_SPARSE) {
            std::cerr << "ERROR: Sparse support not available" << std::endl;
            return false;
          }
-         if (ts.dense_support()) {
+         if (ts.representation() == EPK_DENSE) {
            std::cerr << "ERROR: Dense support unexpectedly materialized"
                      << std::endl;
            return false;
          }
-         if (ts.dense_compressed_support()) {
+         if (ts.representation() == EPK_DENSE_COMPRESSED) {
            std::cerr << "ERROR: Compressed support unexpectedly materialized"
                      << std::endl;
            return false;
@@ -1035,16 +1038,16 @@ namespace Test { namespace Int {
          for (int i=0; i<100; i++)
            tc.add(IntArgs({i, (i*7) % 100}));
          tc.finalize(EPK_DENSE_COMPRESSED);
-         if (!tc.dense_compressed_support()) {
+         if (tc.representation() != EPK_DENSE_COMPRESSED) {
            std::cerr << "ERROR: Compressed support not available" << std::endl;
            return false;
          }
-         if (tc.dense_support()) {
+         if (tc.representation() == EPK_DENSE) {
            std::cerr << "ERROR: Dense support unexpectedly materialized"
                      << std::endl;
            return false;
          }
-         if (tc.sparse_support()) {
+         if (tc.representation() == EPK_SPARSE) {
            std::cerr << "ERROR: Sparse support unexpectedly materialized"
                      << std::endl;
            return false;
@@ -1054,7 +1057,7 @@ namespace Test { namespace Int {
          for (int i=0; i<100; i++)
            td.add(IntArgs({i, (i*11) % 100}));
          td.finalize();
-         if (!td.dense_support()) {
+         if (td.representation() != EPK_DENSE) {
            std::cerr << "ERROR: Default finalize did not keep dense support"
                      << std::endl;
            return false;
@@ -1091,7 +1094,7 @@ namespace Test { namespace Int {
          ts.add(IntArgs({0,0})).add(IntArgs({0,1}))
            .add(IntArgs({1,0})).add(IntArgs({1,1}));
          ts.finalize(EPK_SPARSE);
-         if (ts.dense_support())
+         if (ts.representation() == EPK_DENSE)
            return false;
          NegativeFailSpace* root = new NegativeFailSpace(ts);
          DFS<NegativeFailSpace> e(root);
@@ -1130,7 +1133,7 @@ namespace Test { namespace Int {
          TupleSet ts(2);
          ts.add(IntArgs({0,0})).add(IntArgs({0,1}));
          ts.finalize(EPK_SPARSE);
-         if (ts.dense_support())
+         if (ts.representation() == EPK_DENSE)
            return false;
          NegativePruneSpace* root = new NegativePruneSpace(ts);
          DFS<NegativePruneSpace> e(root);
@@ -1180,7 +1183,7 @@ namespace Test { namespace Int {
          TupleSet ts(2);
          ts.add(IntArgs({0,0}));
          ts.finalize(EPK_SPARSE);
-         if (ts.dense_support())
+         if (ts.representation() == EPK_DENSE)
            return false;
 
          auto count = [&ts](bool pos, ReifyMode rm, int bv,

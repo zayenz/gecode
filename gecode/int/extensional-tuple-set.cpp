@@ -121,7 +121,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     void
     init_support_counts(void) {
       assert(tv != nullptr);
-      const unsigned int* offsets = ts.sparse_support_offsets();
+      const unsigned int* offsets = TupleSetAccess::sparse_support_offsets(ts);
       if (offsets != nullptr) {
         for (unsigned int i=0U; i<n_vals; i++)
           support_count[i] = offsets[i+1U] - offsets[i];
@@ -176,7 +176,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       const unsigned int* b = nullptr;
       const unsigned int* e = nullptr;
       unsigned int gid = 0U;
-      if (ts.sparse_support(i,n,b,e,gid)) {
+      if (TupleSetAccess::sparse_support(ts,i,n,b,e,gid)) {
         if (support_count[gid] == 0U)
           return;
         for (const unsigned int* t=b; t<e; t++)
@@ -325,7 +325,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     SparseInc(Home home, ViewArray<View>& x0, const TupleSet& ts0)
       : Propagator(home), x(home,x0), ts(ts0), c(home), arity(x0.size()),
         n_tuples(static_cast<unsigned int>(ts0.tuples())),
-        n_vals(ts0.sparse_values()),
+        n_vals(TupleSetAccess::sparse_values(ts0)),
         active_ids(static_cast<Space&>(home).alloc<unsigned int>(n_tuples)),
         pos_in_active(static_cast<Space&>(home).alloc<unsigned int>(n_tuples)),
         active_limit(n_tuples),
@@ -335,7 +335,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         zero_queue(static_cast<Space&>(home).alloc<unsigned int>(n_vals)),
         zero_queue_size(0U),
         queued(static_cast<Space&>(home).alloc<unsigned char>(n_vals)),
-        tv(ts0.sparse_tuple_value_ids()),
+        tv(TupleSetAccess::sparse_tuple_value_ids(ts0)),
         in_propagate(false) {
       home.notice(*this, AP_DISPOSE);
       assert(tv != nullptr);
@@ -368,7 +368,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         zero_queue(home.alloc<unsigned int>(p.n_vals)),
         zero_queue_size(p.zero_queue_size),
         queued(home.alloc<unsigned char>(p.n_vals)),
-        tv(ts.sparse_tuple_value_ids()),
+        tv(TupleSetAccess::sparse_tuple_value_ids(ts)),
         in_propagate(false) {
       x.update(home,p.x);
       c.update(home,p.c);
@@ -675,7 +675,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       const unsigned int* begin = nullptr;
       const unsigned int* end = nullptr;
       unsigned int gid = 0U;
-      if (ts.sparse_support(i,n,begin,end,gid))
+      if (TupleSetAccess::sparse_support(ts,i,n,begin,end,gid))
         for (const unsigned int* t=begin; t<end; t++)
           deactivate_tuple(*t);
     }
@@ -755,12 +755,12 @@ namespace Gecode { namespace Int { namespace Extensional {
       : Propagator(home), x(home,x0), b(b0), ts(ts0), c(home),
         arity(x0.size()),
         n_tuples(static_cast<unsigned int>(ts0.tuples())),
-        n_vals(ts0.sparse_values()),
+        n_vals(TupleSetAccess::sparse_values(ts0)),
         active_ids(static_cast<Space&>(home).alloc<unsigned int>(n_tuples)),
         pos_in_active(static_cast<Space&>(home).alloc<unsigned int>(n_tuples)),
         active_limit(n_tuples),
         gid_val(static_cast<Space&>(home).alloc<int>(n_vals)),
-        tv(ts0.sparse_tuple_value_ids()),
+        tv(TupleSetAccess::sparse_tuple_value_ids(ts0)),
         in_propagate(false) {
       home.notice(*this, AP_DISPOSE);
       assert(tv != nullptr);
@@ -786,7 +786,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         pos_in_active(home.alloc<unsigned int>(p.n_tuples)),
         active_limit(p.active_limit),
         gid_val(home.alloc<int>(p.n_vals)),
-        tv(ts.sparse_tuple_value_ids()),
+        tv(TupleSetAccess::sparse_tuple_value_ids(ts)),
         in_propagate(false) {
       x.update(home,p.x);
       b.update(home,p.b);
@@ -915,25 +915,25 @@ namespace Gecode { namespace Int { namespace Extensional {
   dispatch_kind(const TupleSet& t, ExtensionalPropKind epk) {
     switch (epk) {
     case EPK_AUTO:
-      if (t.dense_compressed_support())
+      if (TupleSetAccess::dense_compressed_support(t))
         return DD_DENSE_COMPRESSED;
-      if (t.sparse_support())
+      if (TupleSetAccess::sparse_support(t))
         return DD_SPARSE;
-      if (t.dense_support())
+      if (TupleSetAccess::dense_support(t))
         return DD_DENSE;
       throw OutOfLimits("Int::extensional");
     case EPK_DENSE:
-      if (t.dense_support())
+      if (TupleSetAccess::dense_support(t))
         return DD_DENSE;
       throw OutOfLimits("Int::extensional");
     case EPK_SPARSE:
-      if (t.sparse_support())
+      if (TupleSetAccess::sparse_support(t))
         return DD_SPARSE;
-      if (t.dense_support())
+      if (TupleSetAccess::dense_support(t))
         return DD_DENSE;
       throw OutOfLimits("Int::extensional");
     case EPK_DENSE_COMPRESSED:
-      if (t.dense_compressed_support())
+      if (TupleSetAccess::dense_compressed_support(t))
         return DD_DENSE_COMPRESSED;
       throw OutOfLimits("Int::extensional");
     default:
@@ -949,7 +949,7 @@ namespace Gecode {
   void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel ipl) {
-    extensional(home,x,t,pos,ipl,EPK_DENSE);
+    extensional(home,x,t,pos,ipl,EPK_AUTO);
   }
 
   void
@@ -998,7 +998,7 @@ namespace Gecode {
   void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
               Reify r, IntPropLevel ipl) {
-    extensional(home,x,t,pos,r,ipl,EPK_DENSE);
+    extensional(home,x,t,pos,r,ipl,EPK_AUTO);
   }
 
   void
@@ -1157,7 +1157,7 @@ namespace Gecode {
   void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel ipl) {
-    extensional(home,x,t,pos,ipl,EPK_DENSE);
+    extensional(home,x,t,pos,ipl,EPK_AUTO);
   }
 
   void
@@ -1208,7 +1208,7 @@ namespace Gecode {
   void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               Reify r, IntPropLevel ipl) {
-    extensional(home,x,t,pos,r,ipl,EPK_DENSE);
+    extensional(home,x,t,pos,r,ipl,EPK_AUTO);
   }
 
   void

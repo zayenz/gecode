@@ -2313,6 +2313,12 @@ namespace Gecode {
 
 #include <gecode/int/extensional/dfa.hpp>
 
+namespace Gecode { namespace Int { namespace Extensional {
+
+  class TupleSetAccess;
+
+}}}
+
 namespace Gecode {
 
   /**
@@ -2354,6 +2360,7 @@ namespace Gecode {
    * \ingroup TaskModelIntExt
    */
   class TupleSet : public SharedHandle {
+    friend class Int::Extensional::TupleSetAccess;
   public:
     /** \brief Type of a tuple
      *
@@ -2403,6 +2410,7 @@ namespace Gecode {
     protected:
       /// Initial number of free tuples
       static const int n_initial_free = 1024;
+    public:
       /// Support representation kind
       enum SupportRepresentation {
         SR_NONE,
@@ -2556,15 +2564,15 @@ namespace Gecode {
     int max(void) const;
     /// Return hash key
     std::size_t hash(void) const;
+    /// Return materialized tuple-set representation
+    ExtensionalPropKind representation(void) const;
+  private:
     /// Whether dense support representation is available
     bool dense_support(void) const;
     /// Whether tuple set uses sparse support representation
     bool sparse_support(void) const;
     /// Whether compressed dense support representation is available
     bool dense_compressed_support(void) const;
-    /// Convert tuple set to DFA accepting exactly the tuples
-    GECODE_INT_EXPORT
-    DFA dfa(void) const;
     /// Return number of sparse support values
     unsigned int sparse_values(void) const;
     /// Return tuple-value sparse ids (size tuples()*arity())
@@ -2581,6 +2589,7 @@ namespace Gecode {
                                   const CSupportWord*& b,
                                   const CSupportWord*& e,
                                   unsigned int& gid) const;
+  public:
     //@}
 
     /// \name Range access and iteration
@@ -2623,6 +2632,37 @@ namespace Gecode {
     };
     //@}
   };
+
+  namespace Int { namespace Extensional {
+
+    /// Internal access to finalized tuple-set support representations
+    class TupleSetAccess {
+    public:
+      /// Whether dense support representation is available
+      static bool dense_support(const TupleSet& ts);
+      /// Whether sparse support representation is available
+      static bool sparse_support(const TupleSet& ts);
+      /// Whether compressed dense support representation is available
+      static bool dense_compressed_support(const TupleSet& ts);
+      /// Return number of sparse support values
+      static unsigned int sparse_values(const TupleSet& ts);
+      /// Return tuple-value sparse ids
+      static const unsigned int* sparse_tuple_value_ids(const TupleSet& ts);
+      /// Return sparse support offsets
+      static const unsigned int* sparse_support_offsets(const TupleSet& ts);
+      /// Return sparse support tuple id range for position/value
+      static bool sparse_support(const TupleSet& ts, int p, int n,
+                                 const unsigned int*& b,
+                                 const unsigned int*& e,
+                                 unsigned int& gid);
+      /// Return compressed support words for position/value
+      static bool dense_compressed_support(const TupleSet& ts, int p, int n,
+                                           const TupleSet::CSupportWord*& b,
+                                           const TupleSet::CSupportWord*& e,
+                                           unsigned int& gid);
+    };
+
+  }}
 
 }
 

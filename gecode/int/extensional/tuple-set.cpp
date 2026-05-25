@@ -38,7 +38,6 @@
 #include <gecode/int.hh>
 #include <algorithm>
 #include <limits>
-#include <vector>
 
 namespace Gecode { namespace Int { namespace Extensional {
 
@@ -686,78 +685,6 @@ namespace Gecode {
   
     finalize();
   } 
-
-  DFA
-  TupleSet::dfa(void) const {
-    if (!*this)
-      throw Int::UninitializedTupleSet("TupleSet::dfa()");
-    if (!finalized())
-      throw Int::NotYetFinalized("TupleSet::dfa()");
-
-    const int a = arity();
-    const int n = tuples();
-
-    if (n == 0) {
-      DFA::Transition t[1];
-      t[0] = DFA::Transition(-1,0,0);
-      int f[1] = {-1};
-      return DFA(0,t,f,false);
-    }
-
-    const unsigned long long max_transitions =
-      static_cast<unsigned long long>(n) *
-      static_cast<unsigned long long>(a);
-    if (max_transitions >
-        static_cast<unsigned long long>(std::numeric_limits<int>::max()-1))
-      throw Int::OutOfLimits("TupleSet::dfa()");
-
-    std::vector<DFA::Transition> transitions;
-    transitions.reserve(static_cast<std::size_t>(max_transitions + 1ULL));
-    std::vector<int> finals;
-    finals.reserve(2);
-
-    if (a == 0) {
-      finals.push_back(0);
-    } else {
-      const int final_state = 1;
-      int next_state = 2;
-      std::vector<int> state_at_depth(static_cast<std::size_t>(a),0);
-      std::vector<int> prev_prefix(static_cast<std::size_t>(a-1),0);
-      bool has_prev = false;
-
-      for (int i=0; i<n; i++) {
-        Tuple c = (*this)[i];
-
-        int lcp = 0;
-        if (has_prev) {
-          while ((lcp < a-1) && (prev_prefix[lcp] == c[lcp]))
-            lcp++;
-        }
-
-        for (int d=lcp; d<a-1; d++) {
-          if (next_state == std::numeric_limits<int>::max())
-            throw Int::OutOfLimits("TupleSet::dfa()");
-          const int from = state_at_depth[d];
-          const int to = next_state++;
-          transitions.push_back(DFA::Transition(from,c[d],to));
-          state_at_depth[d+1] = to;
-        }
-
-        transitions.push_back
-          (DFA::Transition(state_at_depth[a-1],c[a-1],final_state));
-
-        for (int d=0; d<a-1; d++)
-          prev_prefix[d] = c[d];
-        has_prev = true;
-      }
-
-      finals.push_back(final_state);
-    }
-
-    transitions.push_back(DFA::Transition(-1,0,0));
-    finals.push_back(-1);
-    return DFA(0,&transitions[0],&finals[0],false);
-  }
 
   bool
   TupleSet::equal(const TupleSet& t) const {

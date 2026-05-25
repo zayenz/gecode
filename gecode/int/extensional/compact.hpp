@@ -79,14 +79,15 @@ namespace Gecode { namespace Int { namespace Extensional {
   Compact<View,pos>::CTAdvisor::CTAdvisor
   (Space& home, Propagator& p, 
    Council<CTAdvisor>& c, const TupleSet& ts, View x0, int i)
-    : ViewAdvisor<View>(home,p,c,x0), _fst(ts.fst(i)), _lst(ts.lst(i)) {
+    : ViewAdvisor<View>(home,p,c,x0), _fst(ts.fst(i)), _lst(ts.lst(i)),
+      _idx(i) {
     adjust();
   }
 
   template<class View, bool pos>
   forceinline
   Compact<View,pos>::CTAdvisor::CTAdvisor(Space& home, CTAdvisor& a)
-    : ViewAdvisor<View>(home,a), _fst(a._fst), _lst(a._lst) {}
+    : ViewAdvisor<View>(home,a), _fst(a._fst), _lst(a._lst), _idx(a._idx) {}
 
   template<class View, bool pos>
   forceinline const typename Compact<View,pos>::Range*
@@ -98,6 +99,12 @@ namespace Gecode { namespace Int { namespace Extensional {
   forceinline const typename Compact<View,pos>::Range*
   Compact<View,pos>::CTAdvisor::lst(void) const {
     return _lst;
+  }
+
+  template<class View, bool pos>
+  forceinline int
+  Compact<View,pos>::CTAdvisor::index(void) const {
+    return _idx;
   }
 
   template<class View, bool pos>
@@ -177,7 +184,6 @@ namespace Gecode { namespace Int { namespace Extensional {
   template<class View, bool pos>
   forceinline void
   Compact<View,pos>::ValidSupports::find(void) {
-    assert(!pos);
     assert(n <= max);
     while (true) {
       while (xr() && (n > xr.max()))
@@ -210,14 +216,9 @@ namespace Gecode { namespace Int { namespace Extensional {
                                                   CTAdvisor& a)
     : n_words(p.n_words), max(a.view().max()),
       xr(a.view()), sr(a.fst()), lst(a.lst()), n(xr.min()) {
-    if (pos) {
-      while (n > sr->max)
-        sr++;
-      s = sr->supports(n_words,n);
-    } else {
-      s = nullptr; // To avoid warnings
+    s = nullptr; // To avoid warnings
+    if (xr())
       find();
-    }
   }
   template<class View, bool pos>
   forceinline
@@ -225,41 +226,18 @@ namespace Gecode { namespace Int { namespace Extensional {
                                                   int i, View x)
     : n_words(ts.words()), max(x.max()),
       xr(x), sr(ts.fst(i)), lst(ts.lst(i)), n(xr.min()) {
-    if (pos) {
-      while (n > sr->max)
-        sr++;
-      s = sr->supports(n_words,n);
-    } else {
-      s = nullptr; // To avoid warnings
+    s = nullptr; // To avoid warnings
+    if (xr())
       find();
-    }
   }
   template<class View, bool pos>
   forceinline void
   Compact<View,pos>::ValidSupports::operator ++(void) {
     n++;
-    if (pos) {
-      if (n <= xr.max()) {
-        assert(n <= sr->max);
-        s += n_words;
-      } else if (n <= max) {
-        while (n > xr.max())
-          ++xr;
-        n = xr.min();
-        while (n > sr->max)
-          sr++;
-        s = sr->supports(n_words,n);
-        assert((xr.min() <= n) && (n <= xr.max()));
-        assert((sr->min <= n) && (n <= sr->max));
-        assert(sr->min <= xr.min());
-      }
-    } else {
-      if ((n <= sr->max) && (n <= xr.max())) {
-        s += n_words;
-      } else if (n <= max) {
-        find();
-      }
-    }
+    if ((n <= sr->max) && (n <= xr.max()))
+      s += n_words;
+    else if (n <= max)
+      find();
   }
   template<class View, bool pos>
   forceinline bool
@@ -458,8 +436,12 @@ namespace Gecode { namespace Int { namespace Extensional {
   template<class TableProp>
   forceinline
   PosCompact<View,Table>::PosCompact(Space& home, TableProp& p)
-    : Compact<View,true>(home,p), status(NONE), table(home,p.table) {
+    : Compact<View,true>(home,p), status(NONE), table(home,p.table),
+      ipl((p.ipl == nullptr) ? nullptr : home.alloc<IntPropLevel>(p.n_ipl)),
+      n_ipl(p.n_ipl) {
     assert(!table.empty());
+    for (int i=0; i<n_ipl; i++)
+      ipl[i] = p.ipl[i];
   }
 
   template<class View, class Table>
@@ -513,8 +495,62 @@ namespace Gecode { namespace Int { namespace Extensional {
   forceinline
   PosCompact<View,Table>::PosCompact(Home home, ViewArray<View>& x,
                                      const TupleSet& ts)
-    : Compact<View,true>(home,ts), status(MULTIPLE), table(home,ts.words()) {
+    : Compact<View,true>(home,ts), status(MULTIPLE), table(home,ts.words()),
+      ipl(nullptr), n_ipl(0) {
     setup(home,table,x);
+  }
+
+  template<class View, class Table>
+  forceinline
+  PosCompact<View,Table>::PosCompact(Home home, ViewArray<View>& x,
+                                     const TupleSet& ts,
+                                     const IntPropLevelArgs& ipl0)
+    : Compact<View,true>(home,ts), status(MULTIPLE), table(home,ts.words()),
+      ipl(static_cast<Space&>(home).alloc<IntPropLevel>(ipl0.size())),
+      n_ipl(ipl0.size()) {
+    for (int i=0; i<n_ipl; i++)
+      ipl[i] = ipl0[i];
+    setup(home,table,x);
+  }
+
+  template<class View, class Table>
+  forceinline bool
+  PosCompact<View,Table>::bounds(CTAdvisor& a) const {
+    return (ipl != nullptr) && tuple_set_bounds_level(ipl[a.index()]);
+  }
+
+  template<class View, class Table>
+  bool
+  PosCompact<View,Table>::min_support(CTAdvisor& a, View x, int& n) {
+    for (const Range* r=a.fst(); r<=a.lst(); r++) {
+      const int low = std::max(x.min(), r->min);
+      const int high = std::min(x.max(), r->max);
+      for (int v=low; v<=high; v++)
+        if (x.in(v) && table.intersects(supports(a,v))) {
+          n = v;
+          return true;
+        }
+    }
+    return false;
+  }
+
+  template<class View, class Table>
+  bool
+  PosCompact<View,Table>::max_support(CTAdvisor& a, View x, int& n) {
+    const Range* r = a.lst();
+    while (true) {
+      const int low = std::max(x.min(), r->min);
+      const int high = std::min(x.max(), r->max);
+      for (int v=high; v>=low; v--)
+        if (x.in(v) && table.intersects(supports(a,v))) {
+          n = v;
+          return true;
+        }
+      if (r == a.fst())
+        break;
+      r--;
+    }
+    return false;
   }
       
   template<class View, class Table>
@@ -522,6 +558,16 @@ namespace Gecode { namespace Int { namespace Extensional {
   PosCompact<View,Table>::post(Home home, ViewArray<View>& x,
                                const TupleSet& ts) {
     auto ct = new (home) PosCompact(home,x,ts);
+    assert((x.size() > 1) && (ts.tuples() > 1));
+    return ct->table.empty() ? ES_FAILED : ES_OK;
+  }
+
+  template<class View, class Table>
+  forceinline ExecStatus
+  PosCompact<View,Table>::post(Home home, ViewArray<View>& x,
+                               const TupleSet& ts,
+                               const IntPropLevelArgs& ipl) {
+    auto ct = new (home) PosCompact(home,x,ts,ipl);
     assert((x.size() > 1) && (ts.tuples() > 1));
     return ct->table.empty() ? ES_FAILED : ES_OK;
   }
@@ -564,6 +610,20 @@ namespace Gecode { namespace Int { namespace Extensional {
       // No point filtering variable if it was the only modified variable
       if (touched.single(a) || x.assigned())
         continue;
+
+      if (bounds(a)) {
+        int min = 0;
+        int max = 0;
+        if (!min_support(a,x,min))
+          return ES_FAILED;
+        if (!max_support(a,x,max))
+          return ES_FAILED;
+        GECODE_ME_CHECK(x.gq(home,min));
+        GECODE_ME_CHECK(x.lq(home,max));
+        if (!x.assigned())
+          a.adjust();
+        continue;
+      }
       
       if (x.size() == 2) { // Consider min and max values only
         if (!table.intersects(supports(a,x.min())))
@@ -681,6 +741,23 @@ namespace Gecode { namespace Int { namespace Extensional {
    * Post function
    */
   template<class View>
+  forceinline ModEvent
+  prune_poscompact_initial(Home home, View x, const TupleSet& ts, int i,
+                           const IntPropLevelArgs* ipl) {
+    if ((ipl != nullptr) && tuple_set_bounds_level((*ipl)[i])) {
+      ModEvent me = x.gq(home,ts.fst(i)->min);
+      if (me_failed(me))
+        return me;
+      ModEvent me2 = x.lq(home,ts.lst(i)->max);
+      if (me_failed(me2))
+        return me2;
+      return me_modified(me2) ? me2 : me;
+    }
+    TupleSet::Ranges r(ts,i);
+    return x.inter_r(home, r, false);
+  }
+
+  template<class View>
   ExecStatus
   postposcompact(Home home, ViewArray<View>& x, const TupleSet& ts) {
     if (ts.tuples() == 0)
@@ -688,8 +765,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     
     // All variables pruned to correct domain
     for (int i=0; i<x.size(); i++) {
-      TupleSet::Ranges r(ts,i);
-      GECODE_ME_CHECK(x[i].inter_r(home, r, false));
+      GECODE_ME_CHECK(prune_poscompact_initial(home,x[i],ts,i,nullptr));
     }
 
     if ((x.size() <= 1) || (ts.tuples() <= 1))
@@ -718,6 +794,49 @@ namespace Gecode { namespace Int { namespace Extensional {
       case Gecode::Support::IT_INT:
         return PosCompact<View,BitSet<unsigned int>>
           ::post(home,x,ts);
+      default: GECODE_NEVER;
+      }
+    }
+    GECODE_NEVER;
+    return ES_OK;
+  }
+
+  template<class View>
+  ExecStatus
+  postposcompact(Home home, ViewArray<View>& x, const TupleSet& ts,
+                 const IntPropLevelArgs& ipl) {
+    if (ts.tuples() == 0)
+      return (x.size() == 0) ? ES_OK : ES_FAILED;
+
+    for (int i=0; i<x.size(); i++) {
+      GECODE_ME_CHECK(prune_poscompact_initial(home,x[i],ts,i,&ipl));
+    }
+
+    if ((x.size() <= 1) || (ts.tuples() <= 1))
+      return ES_OK;
+
+    switch (ts.words()) {
+    case 0U:
+      GECODE_NEVER; return ES_OK;
+    case 1U:
+      return PosCompact<View,TinyBitSet<1U>>::post(home,x,ts,ipl);
+    case 2U:
+      return PosCompact<View,TinyBitSet<2U>>::post(home,x,ts,ipl);
+    case 3U:
+      return PosCompact<View,TinyBitSet<3U>>::post(home,x,ts,ipl);
+    case 4U:
+      return PosCompact<View,TinyBitSet<4U>>::post(home,x,ts,ipl);
+    default:
+      switch (Gecode::Support::u_type(ts.words())) {
+      case Gecode::Support::IT_CHAR:
+        return PosCompact<View,BitSet<unsigned char>>
+          ::post(home,x,ts,ipl);
+      case Gecode::Support::IT_SHRT:
+        return PosCompact<View,BitSet<unsigned short int>>
+          ::post(home,x,ts,ipl);
+      case Gecode::Support::IT_INT:
+        return PosCompact<View,BitSet<unsigned int>>
+          ::post(home,x,ts,ipl);
       default: GECODE_NEVER;
       }
     }
@@ -1582,14 +1701,70 @@ namespace Gecode { namespace Int { namespace Extensional {
 
     Status status;
     Table table;
+    IntPropLevel* ipl;
+    int n_ipl;
+
+    bool bounds(CTAdvisor& a) const {
+      return (ipl != nullptr) && tuple_set_bounds_level(ipl[a.index()]);
+    }
+
+    bool supported(CTAdvisor& a, int n) {
+      const CSupportWord* b = nullptr;
+      const CSupportWord* e = nullptr;
+      return supports(a,n,b,e) && table.intersects(CompressedSupport(b,e));
+    }
+
+    bool min_support(CTAdvisor& a, View x, int& n) {
+      for (const typename Base::Range* r=a.fst(); r<=a.lst(); r++) {
+        const int low = std::max(x.min(), r->min);
+        const int high = std::min(x.max(), r->max);
+        for (int v=low; v<=high; v++)
+          if (x.in(v) && supported(a,v)) {
+            n = v;
+            return true;
+          }
+      }
+      return false;
+    }
+
+    bool max_support(CTAdvisor& a, View x, int& n) {
+      const typename Base::Range* r = a.lst();
+      while (true) {
+        const int low = std::max(x.min(), r->min);
+        const int high = std::min(x.max(), r->max);
+        for (int v=high; v>=low; v--)
+          if (x.in(v) && supported(a,v)) {
+            n = v;
+            return true;
+          }
+        if (r == a.fst())
+          break;
+        r--;
+      }
+      return false;
+    }
 
     template<class TableProp>
     PosCompactCompressed(Space& home, TableProp& p)
-      : Base(home,p), status(NONE), table(home,p.table) {
+      : Base(home,p), status(NONE), table(home,p.table),
+        ipl((p.ipl == nullptr) ? nullptr : home.alloc<IntPropLevel>(p.n_ipl)),
+        n_ipl(p.n_ipl) {
       assert(!table.empty());
+      for (int i=0; i<n_ipl; i++)
+        ipl[i] = p.ipl[i];
     }
     PosCompactCompressed(Home home, ViewArray<View>& x, const TupleSet& ts)
-      : Base(home,ts), status(MULTIPLE), table(home,ts.words(),true) {
+      : Base(home,ts), status(MULTIPLE), table(home,ts.words(),true),
+        ipl(nullptr), n_ipl(0) {
+      setup(home,table,x);
+    }
+    PosCompactCompressed(Home home, ViewArray<View>& x, const TupleSet& ts,
+                         const IntPropLevelArgs& ipl0)
+      : Base(home,ts), status(MULTIPLE), table(home,ts.words(),true),
+        ipl(static_cast<Space&>(home).alloc<IntPropLevel>(ipl0.size())),
+        n_ipl(ipl0.size()) {
+      for (int i=0; i<n_ipl; i++)
+        ipl[i] = ipl0[i];
       setup(home,table,x);
     }
 
@@ -1636,6 +1811,13 @@ namespace Gecode { namespace Int { namespace Extensional {
       return ct->table.empty() ? ES_FAILED : ES_OK;
     }
 
+    static ExecStatus post(Home home, ViewArray<View>& x, const TupleSet& ts,
+                           const IntPropLevelArgs& ipl) {
+      auto ct = new (home) PosCompactCompressed(home,x,ts,ipl);
+      assert((x.size() > 1) && (ts.tuples() > 1));
+      return ct->table.empty() ? ES_FAILED : ES_OK;
+    }
+
     virtual size_t dispose(Space& home) {
       (void) Base::dispose(home);
       return sizeof(*this);
@@ -1662,6 +1844,20 @@ namespace Gecode { namespace Int { namespace Extensional {
 
         if (touched.single(a) || x.assigned())
           continue;
+
+        if (bounds(a)) {
+          int min = 0;
+          int max = 0;
+          if (!min_support(a,x,min))
+            return ES_FAILED;
+          if (!max_support(a,x,max))
+            return ES_FAILED;
+          GECODE_ME_CHECK(x.gq(home,min));
+          GECODE_ME_CHECK(x.lq(home,max));
+          if (!x.assigned())
+            a.adjust();
+          continue;
+        }
 
         if (x.size() == 2) {
           const CSupportWord* bb = nullptr;
@@ -1806,6 +2002,41 @@ namespace Gecode { namespace Int { namespace Extensional {
         return PosCompactCompressed<View,BitSet<unsigned short int>>::post(home,x,ts);
       case Gecode::Support::IT_INT:
         return PosCompactCompressed<View,BitSet<unsigned int>>::post(home,x,ts);
+      default:
+        GECODE_NEVER;
+      }
+    }
+    GECODE_NEVER;
+    return ES_OK;
+  }
+
+  template<class View>
+  ExecStatus
+  postposcompact_compressed(Home home, ViewArray<View>& x, const TupleSet& ts,
+                            const IntPropLevelArgs& ipl) {
+    if (ts.tuples() == 0)
+      return (x.size() == 0) ? ES_OK : ES_FAILED;
+
+    for (int i=0; i<x.size(); i++) {
+      GECODE_ME_CHECK(prune_poscompact_initial(home,x[i],ts,i,&ipl));
+    }
+    if ((x.size() <= 1) || (ts.tuples() <= 1))
+      return ES_OK;
+
+    switch (ts.words()) {
+    case 0U: GECODE_NEVER; return ES_OK;
+    case 1U: return PosCompactCompressed<View,TinyBitSet<1U>>::post(home,x,ts,ipl);
+    case 2U: return PosCompactCompressed<View,TinyBitSet<2U>>::post(home,x,ts,ipl);
+    case 3U: return PosCompactCompressed<View,TinyBitSet<3U>>::post(home,x,ts,ipl);
+    case 4U: return PosCompactCompressed<View,TinyBitSet<4U>>::post(home,x,ts,ipl);
+    default:
+      switch (Gecode::Support::u_type(ts.words())) {
+      case Gecode::Support::IT_CHAR:
+        return PosCompactCompressed<View,BitSet<unsigned char>>::post(home,x,ts,ipl);
+      case Gecode::Support::IT_SHRT:
+        return PosCompactCompressed<View,BitSet<unsigned short int>>::post(home,x,ts,ipl);
+      case Gecode::Support::IT_INT:
+        return PosCompactCompressed<View,BitSet<unsigned int>>::post(home,x,ts,ipl);
       default:
         GECODE_NEVER;
       }

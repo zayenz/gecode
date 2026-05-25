@@ -942,6 +942,25 @@ namespace Gecode { namespace Int { namespace Extensional {
     }
   }
 
+  template<class View>
+  ExecStatus
+  postposcompact_levels(Home home, ViewArray<View>& x, const TupleSet& t,
+                        const IntPropLevelArgs& ipl,
+                        ExtensionalPropKind epk) {
+    const DispatchKind dk = dispatch_kind(t,epk);
+    switch (dk) {
+    case DD_DENSE:
+      return postposcompact(home,x,t,ipl);
+    case DD_DENSE_COMPRESSED:
+      return postposcompact_compressed(home,x,t,ipl);
+    case DD_SPARSE:
+      throw OutOfLimits("Int::extensional");
+    default:
+      GECODE_NEVER;
+      return ES_FAILED;
+    }
+  }
+
 }}}
 
 namespace Gecode {
@@ -954,7 +973,7 @@ namespace Gecode {
 
   void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
-              IntPropLevel,
+              IntPropLevel ipl,
               ExtensionalPropKind epk) {
     using namespace Int;
     if (!t.finalized())
@@ -975,6 +994,15 @@ namespace Gecode {
       if (!pos)
         return;
       GECODE_ES_FAIL(ES_FAILED);
+      return;
+    }
+
+    if (pos && (vbd(ipl) == IPL_BND)) {
+      ViewArray<IntView> xv(home,x);
+      IntPropLevelArgs ipls(x.size());
+      for (int i=0; i<x.size(); i++)
+        ipls[i] = IPL_BND;
+      GECODE_ES_FAIL((Extensional::postposcompact_levels(home,xv,t,ipls,epk)));
       return;
     }
 
@@ -999,6 +1027,40 @@ namespace Gecode {
     } else {
       GECODE_ES_FAIL((Extensional::postnegcompact<IntView>(home,xv,t)));
     }
+  }
+
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              const IntPropLevelArgs& ipl) {
+    extensional(home,x,t,pos,ipl,EPK_DENSE);
+  }
+
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              const IntPropLevelArgs& ipl, ExtensionalPropKind epk) {
+    using namespace Int;
+    if (!t.finalized())
+      throw NotYetFinalized("Int::extensional");
+    if ((t.arity() != x.size()) || (ipl.size() != x.size()))
+      throw ArgumentSizeMismatch("Int::extensional");
+    if (same(x))
+      throw ArgumentSame("Int::extensional");
+    GECODE_POST;
+
+    if (!pos || Int::Extensional::tuple_set_all_domain(ipl)) {
+      extensional(home,x,t,pos,IPL_DOM,epk);
+      return;
+    }
+
+    if (x.size() == 0) {
+      if (t.tuples() > 0)
+        return;
+      GECODE_ES_FAIL(ES_FAILED);
+      return;
+    }
+
+    ViewArray<IntView> xv(home,x);
+    GECODE_ES_FAIL((Extensional::postposcompact_levels(home,xv,t,ipl,epk)));
   }
 
   void
@@ -1191,7 +1253,7 @@ namespace Gecode {
 
   void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
-              IntPropLevel,
+              IntPropLevel ipl,
               ExtensionalPropKind epk) {
     using namespace Int;
     if (!t.finalized())
@@ -1217,6 +1279,15 @@ namespace Gecode {
       return;
     }
 
+    if (pos && (vbd(ipl) == IPL_BND)) {
+      ViewArray<BoolView> xv(home,x);
+      IntPropLevelArgs ipls(x.size());
+      for (int i=0; i<x.size(); i++)
+        ipls[i] = IPL_BND;
+      GECODE_ES_FAIL((Extensional::postposcompact_levels(home,xv,t,ipls,epk)));
+      return;
+    }
+
     const Int::Extensional::DispatchKind dk =
       Int::Extensional::dispatch_kind(t,epk);
     if (dk == Int::Extensional::DD_SPARSE) {
@@ -1238,6 +1309,44 @@ namespace Gecode {
     } else {
       GECODE_ES_FAIL((Extensional::postnegcompact<BoolView>(home,xv,t)));
     }
+  }
+
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              const IntPropLevelArgs& ipl) {
+    extensional(home,x,t,pos,ipl,EPK_DENSE);
+  }
+
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              const IntPropLevelArgs& ipl, ExtensionalPropKind epk) {
+    using namespace Int;
+    if (!t.finalized())
+      throw NotYetFinalized("Int::extensional");
+    if (t.arity() != x.size())
+      throw ArgumentSizeMismatch("Int::extensional");
+    if ((t.min() < 0) || (t.max() > 1))
+      throw NotZeroOne("Int::extensional");
+    if (ipl.size() != x.size())
+      throw ArgumentSizeMismatch("Int::extensional");
+    if (same(x))
+      throw ArgumentSame("Int::extensional");
+    GECODE_POST;
+
+    if (!pos || Int::Extensional::tuple_set_all_domain(ipl)) {
+      extensional(home,x,t,pos,IPL_DOM,epk);
+      return;
+    }
+
+    if (x.size() == 0) {
+      if (t.tuples() > 0)
+        return;
+      GECODE_ES_FAIL(ES_FAILED);
+      return;
+    }
+
+    ViewArray<BoolView> xv(home,x);
+    GECODE_ES_FAIL((Extensional::postposcompact_levels(home,xv,t,ipl,epk)));
   }
 
   void

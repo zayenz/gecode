@@ -246,6 +246,21 @@ namespace Gecode { namespace Int { namespace Extensional {
   /// Import type
   typedef Gecode::Support::BitSetData BitSetData;
 
+  /// Whether tuple-set extensional should use bounds pruning for \a ipl
+  forceinline bool
+  tuple_set_bounds_level(IntPropLevel ipl) {
+    return vbd(ipl) == IPL_BND;
+  }
+
+  /// Whether no position requests bounds pruning
+  forceinline bool
+  tuple_set_all_domain(const IntPropLevelArgs& ipl) {
+    for (int i=0; i<ipl.size(); i++)
+      if (tuple_set_bounds_level(ipl[i]))
+        return false;
+    return true;
+  }
+
   /*
    * Forward declarations
    */
@@ -423,6 +438,8 @@ namespace Gecode { namespace Int { namespace Extensional {
       const Range* _fst;
       /// Last range of support data structure
       const Range* _lst;
+      /// Position of this advisor
+      int _idx;
     public:
       /// \name Constructors
       //@{
@@ -438,6 +455,8 @@ namespace Gecode { namespace Int { namespace Extensional {
       const Range* fst(void) const;
       /// Return lasst range of support data structure
       const Range* lst(void) const;
+      /// Return position of this advisor
+      int index(void) const;
       /// Dispose advisor
       void dispose(Space& home, Council<CTAdvisor>& c);
     };
@@ -600,6 +619,16 @@ namespace Gecode { namespace Int { namespace Extensional {
     Status status;
     /// Current table
     Table table;
+    /// Per-position propagation levels, or null for domain propagation
+    IntPropLevel* ipl;
+    /// Number of stored propagation levels
+    int n_ipl;
+    /// Whether advisor \a a uses bounds pruning
+    bool bounds(CTAdvisor& a) const;
+    /// Find smallest value of \a x with an active tuple support
+    bool min_support(CTAdvisor& a, View x, int& n);
+    /// Find largest value of \a x with an active tuple support
+    bool max_support(CTAdvisor& a, View x, int& n);
     /// Check whether the table is empty
     bool empty(void) const;
     /// Constructor for cloning \a p
@@ -607,6 +636,9 @@ namespace Gecode { namespace Int { namespace Extensional {
     PosCompact(Space& home, TableProp& p);
     /// Constructor for posting
     PosCompact(Home home, ViewArray<View>& x, const TupleSet& ts);
+    /// Constructor for posting with per-position propagation levels
+    PosCompact(Home home, ViewArray<View>& x, const TupleSet& ts,
+               const IntPropLevelArgs& ipl);
   public:
     /// Schedule function
     virtual void reschedule(Space& home);
@@ -616,6 +648,9 @@ namespace Gecode { namespace Int { namespace Extensional {
     virtual Actor* copy(Space& home);
     /// Post propagator for views \a x and table \a t
     static ExecStatus post(Home home, ViewArray<View>& x, const TupleSet& ts);
+    /// Post propagator for views \a x and table \a t with per-position levels
+    static ExecStatus post(Home home, ViewArray<View>& x, const TupleSet& ts,
+                           const IntPropLevelArgs& ipl);
     /// Delete propagator and return its size
     size_t dispose(Space& home);
     /// Give advice to propagator
@@ -625,10 +660,19 @@ namespace Gecode { namespace Int { namespace Extensional {
   /// Post function for positive compact table propagator
   template<class View>
   ExecStatus postposcompact(Home home, ViewArray<View>& x, const TupleSet& ts);
+  /// Post function for positive compact table propagator with per-position levels
+  template<class View>
+  ExecStatus postposcompact(Home home, ViewArray<View>& x, const TupleSet& ts,
+                            const IntPropLevelArgs& ipl);
   /// Post function for positive compact table with compressed supports
   template<class View>
   ExecStatus postposcompact_compressed(Home home, ViewArray<View>& x,
                                        const TupleSet& ts);
+  /// Post function for positive compact table with compressed supports and per-position levels
+  template<class View>
+  ExecStatus postposcompact_compressed(Home home, ViewArray<View>& x,
+                                       const TupleSet& ts,
+                                       const IntPropLevelArgs& ipl);
 
   /**
    * \brief Domain consistent negative extensional propagator

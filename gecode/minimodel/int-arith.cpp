@@ -61,15 +61,23 @@ namespace Gecode { namespace MiniModel {
     int aInt;
     /// Boolean expression argument (used in ite for example)
     BoolExpr b;
+    /// Allocate internal expression slots without public default nodes
+    static LinIntExpr* allocate(int n) {
+      LinIntExpr* a = static_cast<LinIntExpr*>
+        (heap.ralloc(sizeof(LinIntExpr)*n));
+      for (int i=0; i<n; i++)
+        (void) new (a+i) LinIntExpr(LinIntExpr::NoNode());
+      return a;
+    }
     /// Constructor
     ArithNonLinIntExpr(ArithNonLinIntExprType t0, int n0)
-      : t(t0), a(heap.alloc<LinIntExpr>(n0)), n(n0) {}
+      : t(t0), a(allocate(n0)), n(n0) {}
     /// Constructor
     ArithNonLinIntExpr(ArithNonLinIntExprType t0, int n0, int a0)
-      : t(t0), a(heap.alloc<LinIntExpr>(n0)), n(n0), aInt(a0) {}
+      : t(t0), a(allocate(n0)), n(n0), aInt(a0) {}
     /// Constructor
     ArithNonLinIntExpr(ArithNonLinIntExprType t0, int n0, const BoolExpr& b0)
-      : t(t0), a(heap.alloc<LinIntExpr>(n0)), n(n0), b(b0) {}
+      : t(t0), a(allocate(n0)), n(n0), b(b0) {}
     /// Destructor
     ~ArithNonLinIntExpr(void) {
       heap.free<LinIntExpr>(a,n);
@@ -292,6 +300,19 @@ namespace Gecode { namespace MiniModel {
       dynamic_cast<ArithNonLinIntExpr*>(e.nle())->t == t;
   }
 
+  class ArithNonLinIntExprGuard {
+  private:
+    ArithNonLinIntExpr* e;
+  public:
+    ArithNonLinIntExprGuard(ArithNonLinIntExpr* e0) : e(e0) {}
+    ~ArithNonLinIntExprGuard(void) {
+      delete e;
+    }
+    void release(void) {
+      e = nullptr;
+    }
+  };
+
 }}
 
 namespace Gecode {
@@ -303,8 +324,11 @@ namespace Gecode {
       return e;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_ABS,1);
+    ArithNonLinIntExprGuard g(ae);
     ae->a[0] = e;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -321,6 +345,7 @@ namespace Gecode {
       n += 1;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_MIN,n);
+    ArithNonLinIntExprGuard g(ae);
     int i=0;
     if (hasType(e0, ArithNonLinIntExpr::ANLE_MIN)) {
       ArithNonLinIntExpr* e0e = static_cast<ArithNonLinIntExpr*>(e0.nle());
@@ -337,7 +362,9 @@ namespace Gecode {
     } else {
       ae->a[i++] = e1;
     }
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -354,6 +381,7 @@ namespace Gecode {
       n += 1;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_MAX,n);
+    ArithNonLinIntExprGuard g(ae);
     int i=0;
     if (hasType(e0, ArithNonLinIntExpr::ANLE_MAX)) {
       ArithNonLinIntExpr* e0e = static_cast<ArithNonLinIntExpr*>(e0.nle());
@@ -370,7 +398,9 @@ namespace Gecode {
     } else {
       ae->a[i++] = e1;
     }
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -378,9 +408,12 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_MIN,x.size());
+    ArithNonLinIntExprGuard g(ae);
     for (int i=x.size(); i--;)
       ae->a[i] = x[i];
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -388,9 +421,12 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_MAX,x.size());
+    ArithNonLinIntExprGuard g(ae);
     for (int i=x.size(); i--;)
       ae->a[i] = x[i];
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -398,9 +434,12 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_MULT,2);
+    ArithNonLinIntExprGuard g(ae);
     ae->a[0] = e0;
     ae->a[1] = e1;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -408,8 +447,11 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_SQR,1);
+    ArithNonLinIntExprGuard g(ae);
     ae->a[0] = e;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -417,8 +459,11 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_SQRT,1);
+    ArithNonLinIntExprGuard g(ae);
     ae->a[0] = e;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -426,8 +471,11 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_POW,1,n);
+    ArithNonLinIntExprGuard g(ae);
     ae->a[0] = e;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -435,8 +483,11 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_NROOT,1,n);
+    ArithNonLinIntExprGuard g(ae);
     ae->a[0] = e;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -444,9 +495,12 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_DIV,2);
+    ArithNonLinIntExprGuard g(ae);
     ae->a[0] = e0;
     ae->a[1] = e1;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -454,9 +508,12 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_MOD,2);
+    ArithNonLinIntExprGuard g(ae);
     ae->a[0] = e0;
     ae->a[1] = e1;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -464,10 +521,13 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_ELMNT,x.size()+1);
+    ArithNonLinIntExprGuard g(ae);
     for (int i=x.size(); i--;)
       ae->a[i] = x[i];
     ae->a[x.size()] = e;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -475,10 +535,13 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_ELMNT,x.size()+1);
+    ArithNonLinIntExprGuard g(ae);
     for (int i=x.size(); i--;)
       ae->a[i] = x[i];
     ae->a[x.size()] = e;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
   LinIntExpr
@@ -486,9 +549,12 @@ namespace Gecode {
     using namespace MiniModel;
     ArithNonLinIntExpr* ae =
       new ArithNonLinIntExpr(ArithNonLinIntExpr::ANLE_ITE,2,b);
+    ArithNonLinIntExprGuard g(ae);
     ae->a[0] = e0;
     ae->a[1] = e1;
-    return LinIntExpr(ae);
+    LinIntExpr r(ae);
+    g.release();
+    return r;
   }
 
 }

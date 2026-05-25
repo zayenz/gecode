@@ -148,14 +148,28 @@ namespace Gecode {
       // Resize
       if (d_fst == nullptr) {
         // Create new array
-        d_fst = alloc<Actor*>(4);
+        try {
+#ifdef GECODE_HAS_FAULT_INJECTION
+          Support::FailPoint::check(Support::FailPoint::Phase::SpaceDisposeNoticeArray);
+#endif
+          d_fst = alloc<Actor*>(4);
+        } catch (...) {
+          throw;
+        }
         d_cur = d_fst;
         d_lst = d_fst+4;
       } else {
         // Resize existing array
         unsigned int n = static_cast<unsigned int>(d_lst - d_fst);
         assert(n != 0);
-        d_fst = realloc<Actor*>(d_fst,n,2*n);
+        try {
+#ifdef GECODE_HAS_FAULT_INJECTION
+          Support::FailPoint::check(Support::FailPoint::Phase::SpaceDisposeNoticeArray);
+#endif
+          d_fst = realloc<Actor*>(d_fst,n,2*n);
+        } catch (...) {
+          throw;
+        }
         d_cur = d_fst+n;
         d_lst = d_fst+2*n;
       }
@@ -166,6 +180,9 @@ namespace Gecode {
   void
   Space::ap_ignore_dispose(Actor* a, bool duplicate) {
     // Note that a might be a marked pointer!
+    if (inPrematureDestructionMode())
+      return;
+
     assert(d_fst != nullptr);
     Actor** f = d_fst;
     if (duplicate) {
@@ -184,6 +201,13 @@ namespace Gecode {
   }
 
   Space::~Space(void) {
+    if (inPrematureDestructionMode()) {
+      if (pc.c.source != nullptr) {
+        recover(*pc.c.source);
+        pc.c.source = nullptr;
+      }
+      d_fst = d_cur = d_lst = nullptr;
+    }
     // Mark space as failed
     fail();
     // Delete actors that must be deleted
@@ -697,53 +721,64 @@ namespace Gecode {
 #ifdef GECODE_HAS_CBS
       var_id_counter(s.var_id_counter),
 #endif
-      d_fst(&Actor::sentinel) {
+      d_fst(&Actor::sentinel),d_cur(nullptr),d_lst(nullptr) {
 #ifdef GECODE_HAS_VAR_DISPOSE
     for (int i=0; i<AllVarConf::idx_d; i++)
       _vars_d[i] = nullptr;
 #endif
-    for (int i=0; i<AllVarConf::idx_c; i++)
-      pc.c.vars_u[i] = nullptr;
-    pc.c.vars_noidx = nullptr;
-    pc.c.local = nullptr;
-    // Copy all propagators
-    {
-      ActorLink* p = &pl;
-      ActorLink* e = &s.pl;
-      for (ActorLink* a = e->next(); a != e; a = a->next()) {
-        Actor* c = Actor::cast(a)->copy(*this);
-        // Link copied actor
-        p->next(ActorLink::cast(c)); ActorLink::cast(c)->prev(p);
-        // Note that forwarding is done in the constructors
-        p = c;
+    try {
+      for (int i=0; i<AllVarConf::idx_c; i++)
+        pc.c.vars_u[i] = nullptr;
+      pc.c.vars_noidx = nullptr;
+      pc.c.local = nullptr;
+      pc.c.source = &s;
+      pl.init();
+      bl.init();
+      b_status = b_commit = Brancher::cast(&bl);
+      // Copy all propagators
+      {
+        ActorLink* p = &pl;
+        ActorLink* e = &s.pl;
+        for (ActorLink* a = e->next(); a != e; a = a->next()) {
+          Actor* c = Actor::cast(a)->copy(*this);
+          // Link copied actor
+          p->next(ActorLink::cast(c)); ActorLink::cast(c)->prev(p);
+          // Note that forwarding is done in the constructors
+          p = c;
+        }
+        // Link last actor
+        p->next(&pl); pl.prev(p);
       }
-      // Link last actor
-      p->next(&pl); pl.prev(p);
-    }
-    // Copy all branchers
-    {
-      ActorLink* p = &bl;
-      ActorLink* e = &s.bl;
-      for (ActorLink* a = e->next(); a != e; a = a->next()) {
-        Actor* c = Actor::cast(a)->copy(*this);
-        // Link copied actor
-        p->next(ActorLink::cast(c)); ActorLink::cast(c)->prev(p);
-        // Note that forwarding is done in the constructors
-        p = c;
+      // Copy all branchers
+      {
+        ActorLink* p = &bl;
+        ActorLink* e = &s.bl;
+        for (ActorLink* a = e->next(); a != e; a = a->next()) {
+          Actor* c = Actor::cast(a)->copy(*this);
+          // Link copied actor
+          p->next(ActorLink::cast(c)); ActorLink::cast(c)->prev(p);
+          // Note that forwarding is done in the constructors
+          p = c;
+        }
+        // Link last actor
+        p->next(&bl); bl.prev(p);
       }
-      // Link last actor
-      p->next(&bl); bl.prev(p);
-    }
-    // Setup brancher pointers
-    if (s.b_status == &s.bl) {
-      b_status = Brancher::cast(&bl);
-    } else {
-      b_status = Brancher::cast(s.b_status->prev());
-    }
-    if (s.b_commit == &s.bl) {
-      b_commit = Brancher::cast(&bl);
-    } else {
-      b_commit = Brancher::cast(s.b_commit->prev());
+      // Setup brancher pointers
+      if (s.b_status == &s.bl) {
+        b_status = Brancher::cast(&bl);
+      } else {
+        b_status = Brancher::cast(s.b_status->prev());
+      }
+      if (s.b_commit == &s.bl) {
+        b_commit = Brancher::cast(&bl);
+      } else {
+        b_commit = Brancher::cast(s.b_commit->prev());
+      }
+    } catch (...) {
+      recover(s);
+      pc.c.source = nullptr;
+      mm.release(ssd.data().sm);
+      throw;
     }
   }
 
@@ -768,15 +803,26 @@ namespace Gecode {
         c->d_fst = c->d_cur = c->d_lst = nullptr;
       } else {
         // Leave one entry free
-        c->d_fst = c->alloc<Actor*>(n+1);
-        c->d_cur = c->d_fst;
-        c->d_lst = c->d_fst+n+1;
-        for (Actor** d_fst_iter = d_fst; d_fst_iter != d_cur; d_fst_iter++) {
-          ptrdiff_t m;
-          Actor* a = static_cast<Actor*>(Support::ptrsplit(*d_fst_iter,m));
-          if (a->prev())
-            *(c->d_cur++) = Actor::cast(static_cast<ActorLink*>
-                                        (Support::ptrjoin(a->prev(),m)));
+        try {
+#ifdef GECODE_HAS_FAULT_INJECTION
+          Support::FailPoint::check(Support::FailPoint::Phase::SpaceDisposalArray);
+#endif
+          c->d_fst = c->alloc<Actor*>(n+1);
+          c->d_cur = c->d_fst;
+          c->d_lst = c->d_fst+n+1;
+          for (Actor** d_fst_iter = d_fst; d_fst_iter != d_cur; d_fst_iter++) {
+            ptrdiff_t m;
+            Actor* a = static_cast<Actor*>(Support::ptrsplit(*d_fst_iter,m));
+            if (a->prev())
+              *(c->d_cur++) = Actor::cast(static_cast<ActorLink*>
+                                          (Support::ptrjoin(a->prev(),m)));
+          }
+        }
+        catch (...) {
+          c->recover(*this);
+          c->d_fst = c->d_cur = c->d_lst = nullptr;
+          delete c;
+          throw;
         }
       }
     }

@@ -298,17 +298,20 @@ namespace Gecode {
      * to be stored.
      */
     static void update(Space& home, ActorLink**& sub);
+    /// Recover copied variables after failed clone construction
+    static void revertHarmfulChangesOfUnfinishedClone(Space& home,
+                                                      ActorLink**& sub);
 
     /// Enter propagator to subscription array
     void enter(Space& home, Propagator* p, PropCond pc);
-    /// Enter advisor to subscription array
-    void enter(Space& home, Advisor* a);
+    /// Enter possibly marked advisor to subscription array
+    void enter(Space& home, ActorLink* a);
     /// Resize subscription array
     void resize(Space& home);
     /// Remove propagator from subscription array
     void remove(Space& home, Propagator* p, PropCond pc);
-    /// Remove advisor from subscription array
-    void remove(Space& home, Advisor* a);
+    /// Remove possibly marked advisor from subscription array
+    void remove(Space& home, ActorLink* a);
 
 
   protected:
@@ -1303,6 +1306,8 @@ namespace Gecode {
     static Advisor* cast(ActorLink* al);
     /// Static cast
     static const Advisor* cast(const ActorLink* al);
+    /// Cast to actor link
+    static ActorLink* link(Advisor& a);
   protected:
     /// Return the advisor's propagator
     Propagator& propagator(void) const;
@@ -1870,6 +1875,8 @@ namespace Gecode {
         VarImpBase* vars_noidx;
         /// Linked list of local objects
         LocalObject* local;
+        /// Source space during clone construction
+        Space* source;
       } c;
     } pc;
     /// Put propagator \a p into right queue
@@ -1891,6 +1898,15 @@ namespace Gecode {
     /// Update all cloned variables
     void update(ActorLink** sub);
     //@}
+
+    /// Update variables without indexing structure
+    void updateNoIdx(Space* space, bool recover);
+
+    /// Recover after failed clone construction
+    void recover(Space& source);
+
+    /// Test whether clone construction has not reached a disposable state
+    bool inPrematureDestructionMode(void) const;
 
     /// First actor for forced disposal
     Actor** d_fst;
@@ -3030,6 +3046,11 @@ namespace Gecode {
   }
 #endif
 
+  forceinline bool
+  Space::inPrematureDestructionMode(void) const {
+    return d_fst == &Actor::sentinel;
+  }
+
   // Space allocated entities: Actors, variable implementations, and advisors
   forceinline void
   Actor::operator delete(void*) {}
@@ -3902,6 +3923,11 @@ namespace Gecode {
     return static_cast<const Advisor*>(al);
   }
 
+  forceinline ActorLink*
+  Advisor::link(Advisor& a) {
+    return static_cast<ActorLink*>(&a);
+  }
+
   forceinline Propagator&
   Advisor::propagator(void) const {
     assert(!disposed());
@@ -4351,10 +4377,14 @@ namespace Gecode {
   template<class VIC>
   forceinline void
   VarImp<VIC>::schedule(Space& home, PropCond pc1, PropCond pc2, ModEvent me) {
-    ActorLink** b = actor(pc1);
-    ActorLink** p = actorNonZero(pc2+1);
-    while (p-- > b)
-      schedule(home,*Propagator::cast(*p),me);
+    if (b.base == nullptr)
+      return;
+    ActorLink** begin = actor(pc1);
+    ActorLink** end = actorNonZero(pc2+1);
+    while (end > begin) {
+      end--;
+      schedule(home,*Propagator::cast(*end),me);
+    }
   }
 
   template<class VIC>
@@ -4421,7 +4451,7 @@ namespace Gecode {
 
   template<class VIC>
   forceinline void
-  VarImp<VIC>::enter(Space& home, Advisor* a) {
+  VarImp<VIC>::enter(Space& home, ActorLink* a) {
     // Note that a might be a marked pointer
     // Count one new subscription
     home.pc.p.n_sub += 1;
@@ -4454,7 +4484,8 @@ namespace Gecode {
   forceinline void
   VarImp<VIC>::subscribe(Space& home, Advisor& a, bool assigned, bool fail) {
     if (!assigned) {
-      Advisor* ma = static_cast<Advisor*>(Support::ptrjoin(&a,fail ? 1 : 0));
+      ActorLink* ma = static_cast<ActorLink*>
+        (Support::ptrjoin(Advisor::link(a),fail ? 1 : 0));
       enter(home,ma);
     }
   }
@@ -4503,13 +4534,13 @@ namespace Gecode {
   template<class VIC>
   forceinline void
   VarImp<VIC>::cancel(Space& home, Propagator& p, PropCond pc) {
-    if (b.base != nullptr)
+    if ((b.base != nullptr) && !home.inPrematureDestructionMode())
       remove(home,&p,pc);
   }
 
   template<class VIC>
   void
-  VarImp<VIC>::remove(Space& home, Advisor* a) {
+  VarImp<VIC>::remove(Space& home, ActorLink* a) {
     // Note that a might be a marked pointer
     // Find actor in dependency array
     ActorLink** f = actorNonZero(pc_max+1);
@@ -4533,8 +4564,9 @@ namespace Gecode {
   template<class VIC>
   forceinline void
   VarImp<VIC>::cancel(Space& home, Advisor& a, bool fail) {
-    if (b.base != nullptr) {
-      Advisor* ma = static_cast<Advisor*>(Support::ptrjoin(&a,fail ? 1 : 0));
+    if ((b.base != nullptr) && !home.inPrematureDestructionMode()) {
+      ActorLink* ma = static_cast<ActorLink*>
+        (Support::ptrjoin(Advisor::link(a),fail ? 1 : 0));
       remove(home,ma);
     }
   }
@@ -4720,6 +4752,26 @@ namespace Gecode {
     VarImp<VIC>* x = static_cast<VarImp<VIC>*>(home.pc.c.vars_u[idx_c]);
     while (x != nullptr) {
       VarImp<VIC>* n = x->next(); x->forward()->update(x,sub); x = n;
+    }
+  }
+
+  template<class VIC>
+  forceinline void
+  VarImp<VIC>::revertHarmfulChangesOfUnfinishedClone(Space& home,
+                                                     ActorLink**&) {
+    VarImp<VIC>* x = static_cast<VarImp<VIC>*>(home.pc.c.vars_u[idx_c]);
+    while (x != nullptr) {
+      if (x->copied()) {
+        VarImp<VIC>* n = x->next();
+        VarImp<VIC>* copy = x->forward();
+        x->b.base = copy->b.base;
+        x->u.idx[0] = copy->u.idx[0];
+        if (pc_max > 0 && sizeof(ActorLink**) > sizeof(unsigned int))
+          x->u.idx[1] = copy->u.idx[1];
+        x = n;
+      } else {
+        break;
+      }
     }
   }
 

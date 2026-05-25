@@ -83,6 +83,10 @@ namespace Gecode {
     static void* operator new(size_t size);
     /// Memory management
     static void  operator delete(void* p,size_t size);
+#ifdef GECODE_HAS_FAULT_INJECTION
+    /// Number of live nodes for fault-injection tests
+    static int fault_live_nodes;
+#endif
   };
 
   /*
@@ -92,6 +96,20 @@ namespace Gecode {
   forceinline
   LinIntExpr::Node::Node(void) : use(1) {
   }
+
+#ifdef GECODE_HAS_FAULT_INJECTION
+  int LinIntExpr::Node::fault_live_nodes = 0;
+
+  void
+  LinIntExpr::fault_reset_allocations(void) {
+    Node::fault_live_nodes = 0;
+  }
+
+  int
+  LinIntExpr::fault_live_allocations(void) {
+    return Node::fault_live_nodes;
+  }
+#endif
 
   forceinline
   LinIntExpr::Node::~Node(void) {
@@ -113,11 +131,21 @@ namespace Gecode {
 
   forceinline void*
   LinIntExpr::Node::operator new(size_t size) {
-    return heap.ralloc(size);
+#ifdef GECODE_HAS_FAULT_INJECTION
+    Support::FailPoint::check(Support::FailPoint::Phase::MiniModel);
+#endif
+    void* p = heap.ralloc(size);
+#ifdef GECODE_HAS_FAULT_INJECTION
+    fault_live_nodes++;
+#endif
+    return p;
   }
 
   forceinline void
   LinIntExpr::Node::operator delete(void* p, size_t) {
+#ifdef GECODE_HAS_FAULT_INJECTION
+    fault_live_nodes--;
+#endif
     heap.rfree(p);
   }
   bool
@@ -139,7 +167,8 @@ namespace Gecode {
 
   LinIntExpr::LinIntExpr(const LinIntExpr& e)
     : n(e.n) {
-    n->use++;
+    if (n != nullptr)
+      n->use++;
   }
 
   int
@@ -357,15 +386,19 @@ namespace Gecode {
 
   NonLinIntExpr*
   LinIntExpr::nle(void) const {
-    return n->t == NT_NONLIN ? n->sum.ne : nullptr;
+    return ((n != nullptr) && (n->t == NT_NONLIN)) ? n->sum.ne : nullptr;
   }
+
+  LinIntExpr::LinIntExpr(NoNode) :
+    n(nullptr) {}
 
   LinIntExpr::LinIntExpr(void) :
     n(new Node) {
     n->n_int = n->n_bool = 0;
-    n->t = NT_VAR_INT;
+    n->t = NT_CONST;
     n->l = n->r = nullptr;
     n->a = 0;
+    n->c = 0;
   }
 
   LinIntExpr::LinIntExpr(int c) :
@@ -504,15 +537,17 @@ namespace Gecode {
   const LinIntExpr&
   LinIntExpr::operator =(const LinIntExpr& e) {
     if (this != &e) {
-      if (n->decrement())
+      if ((n != nullptr) && n->decrement())
         delete n;
-      n = e.n; n->use++;
+      n = e.n;
+      if (n != nullptr)
+        n->use++;
     }
     return *this;
   }
 
   LinIntExpr::~LinIntExpr(void) {
-    if (n->decrement())
+    if ((n != nullptr) && n->decrement())
       delete n;
   }
 

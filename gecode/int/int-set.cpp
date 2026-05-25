@@ -35,11 +35,48 @@
 
 namespace Gecode {
 
+#ifdef GECODE_HAS_FAULT_INJECTION
+  int IntSet::IntSetObject::fault_live_objects = 0;
+
+  void*
+  IntSet::IntSetObject::operator new(size_t s) {
+    fault_live_objects++;
+    return ::operator new(s);
+  }
+
+  void
+  IntSet::IntSetObject::operator delete(void* p) {
+    fault_live_objects--;
+    ::operator delete(p);
+  }
+
+  void
+  IntSet::fault_reset_allocations(void) {
+    IntSetObject::fault_live_objects = 0;
+  }
+
+  int
+  IntSet::fault_live_allocations(void) {
+    return IntSetObject::fault_live_objects;
+  }
+#endif
+
   IntSet::IntSetObject*
   IntSet::IntSetObject::allocate(int n) {
     IntSetObject* o = new IntSetObject;
+    o->size = 0U;
+    o->n = 0;
+    o->r = nullptr;
+    try {
+#ifdef GECODE_HAS_FAULT_INJECTION
+      Support::FailPoint::check(Support::FailPoint::Phase::IntSet);
+#endif
+      o->r = heap.alloc<Range>(n);
+    } catch (...) {
+      delete o;
+      throw;
+    }
     o->n = n;
-    o->r = heap.alloc<Range>(n);
     return o;
   }
 
@@ -73,7 +110,8 @@ namespace Gecode {
   }
 
   IntSet::IntSetObject::~IntSetObject(void) {
-    heap.free<Range>(r,n);
+    if (r != nullptr)
+      heap.free<Range>(r,n);
   }
 
   /// Sort ranges according to increasing minimum
@@ -188,4 +226,3 @@ namespace Gecode {
 }
 
 // STATISTICS: int-var
-

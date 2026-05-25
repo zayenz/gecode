@@ -241,9 +241,14 @@ namespace Gecode {
 
 namespace Gecode {
 
+  namespace MiniModel {
+    class ArithNonLinIntExpr;
+  }
+
   /// Linear expressions over integer variables
   class LinIntExpr {
     friend class LinIntRel;
+    friend class MiniModel::ArithNonLinIntExpr;
 #ifdef GECODE_HAS_SET_VARS
     friend class SetExpr;
 #endif
@@ -264,14 +269,24 @@ namespace Gecode {
       NT_MUL       ///< Multiplication by coefficient
     };
   private:
+    /// Tag for internal expression slots without a public zero node
+    struct NoNode {};
     /// Nodes for linear expressions
     class Node;
     /// The actual node
     Node* n;
+    /// Create internal expression slot without a node
+    LinIntExpr(NoNode);
   public:
     /// Default constructor
     GECODE_MINIMODEL_EXPORT
     LinIntExpr(void);
+#ifdef GECODE_HAS_FAULT_INJECTION
+    /// Reset live node accounting for fault-injection tests
+    GECODE_MINIMODEL_EXPORT static void fault_reset_allocations(void);
+    /// Return live node accounting for fault-injection tests
+    GECODE_MINIMODEL_EXPORT static int fault_live_allocations(void);
+#endif
     /// Create expression for constant \a c
     GECODE_MINIMODEL_EXPORT
     LinIntExpr(int c);
@@ -2494,4 +2509,3 @@ namespace Gecode {
 
 // IFDEF: GECODE_HAS_INT_VARS
 // STATISTICS: minimodel-any
-

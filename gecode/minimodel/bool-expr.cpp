@@ -92,6 +92,9 @@ namespace Gecode {
 
   void*
   BoolExpr::Node::operator new(size_t size) {
+#ifdef GECODE_HAS_FAULT_INJECTION
+    Support::FailPoint::check(Support::FailPoint::Phase::MiniModel);
+#endif
     return heap.ralloc(size);
   }
   void
@@ -194,7 +197,13 @@ namespace Gecode {
 #endif
 
   BoolExpr::BoolExpr(BoolExpr::Misc* m)
-    : n(new Node) {
+    : n(nullptr) {
+    try {
+      n = new Node;
+    } catch (...) {
+      delete m;
+      throw;
+    }
     n->same = 1;
     n->t    = NT_MISC;
     n->l    = nullptr;

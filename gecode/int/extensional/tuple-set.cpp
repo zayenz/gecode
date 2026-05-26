@@ -110,11 +110,29 @@ namespace Gecode {
     using namespace Int::Extensional;
     assert(!finalized());
 
+    n_free = -1;
+
     // Initialization
     if (n_tuples == 0) {
+      switch (epk) {
+      case EPK_AUTO:
+      case EPK_DENSE:
+        support_repr = SR_DENSE;
+        sparse = false;
+        break;
+      case EPK_SPARSE:
+        support_repr = SR_SPARSE;
+        sparse = true;
+        break;
+      case EPK_DENSE_COMPRESSED:
+        support_repr = SR_DENSE_COMPRESSED;
+        sparse = false;
+        break;
+      default:
+        GECODE_NEVER;
+      }
       heap.rfree(td);
       td=nullptr;
-      n_free = -1;
       return;
     }
 
@@ -157,7 +175,6 @@ namespace Gecode {
       }
       heap.rfree(td);
       td = new_td;
-      n_free = 0;
     }
     
     // Only now compute how many words are needed!
@@ -477,7 +494,6 @@ namespace Gecode {
     }
     if ((min < Int::Limits::min) || (max > Int::Limits::max))
       throw Int::OutOfLimits("TupleSet::finalize()");
-    n_free = -1;
     assert(finalized());
   }
 

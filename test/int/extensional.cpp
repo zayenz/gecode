@@ -1015,6 +1015,7 @@ namespace Test { namespace Int {
 
        virtual bool run(void) {
          using namespace Gecode;
+         using Gecode::Int::Extensional::TupleSetAccess;
          TupleSet ts(2);
          for (int i=0; i<100; i++)
            ts.add(IntArgs({i, (i*3) % 100}));
@@ -1023,13 +1024,18 @@ namespace Test { namespace Int {
            std::cerr << "ERROR: Sparse support not available" << std::endl;
            return false;
          }
-         if (ts.representation() == EPK_DENSE) {
+         if (TupleSetAccess::dense_support(ts)) {
            std::cerr << "ERROR: Dense support unexpectedly materialized"
                      << std::endl;
            return false;
          }
-         if (ts.representation() == EPK_DENSE_COMPRESSED) {
+         if (TupleSetAccess::dense_compressed_support(ts)) {
            std::cerr << "ERROR: Compressed support unexpectedly materialized"
+                     << std::endl;
+           return false;
+         }
+         if (!TupleSetAccess::sparse_support(ts)) {
+           std::cerr << "ERROR: Sparse support not materialized"
                      << std::endl;
            return false;
          }
@@ -1042,13 +1048,18 @@ namespace Test { namespace Int {
            std::cerr << "ERROR: Compressed support not available" << std::endl;
            return false;
          }
-         if (tc.representation() == EPK_DENSE) {
+         if (TupleSetAccess::dense_support(tc)) {
            std::cerr << "ERROR: Dense support unexpectedly materialized"
                      << std::endl;
            return false;
          }
-         if (tc.representation() == EPK_SPARSE) {
+         if (TupleSetAccess::sparse_support(tc)) {
            std::cerr << "ERROR: Sparse support unexpectedly materialized"
+                     << std::endl;
+           return false;
+         }
+         if (!TupleSetAccess::dense_compressed_support(tc)) {
+           std::cerr << "ERROR: Compressed support not materialized"
                      << std::endl;
            return false;
          }
@@ -1062,7 +1073,129 @@ namespace Test { namespace Int {
                      << std::endl;
            return false;
          }
+         if (!TupleSetAccess::dense_support(td)) {
+           std::cerr << "ERROR: Dense support not materialized"
+                     << std::endl;
+           return false;
+         }
+         if (TupleSetAccess::sparse_support(td) ||
+             TupleSetAccess::dense_compressed_support(td)) {
+           std::cerr << "ERROR: Extra support unexpectedly materialized"
+                     << std::endl;
+           return false;
+         }
+
+         TupleSet empty_sparse(2);
+         empty_sparse.finalize(EPK_SPARSE);
+         if (empty_sparse.representation() != EPK_SPARSE) {
+           std::cerr << "ERROR: Empty sparse table forgot representation"
+                     << std::endl;
+           return false;
+         }
+         TupleSet empty_compressed(2);
+         empty_compressed.finalize(EPK_DENSE_COMPRESSED);
+         if (empty_compressed.representation() != EPK_DENSE_COMPRESSED) {
+           std::cerr << "ERROR: Empty compressed table forgot representation"
+                     << std::endl;
+           return false;
+         }
          return true;
+       }
+     };
+
+     /// AUTO finalization should work with default tuple-set posting overloads
+     class TupleSetAutoDefaultDispatch : public ::Test::Base {
+     public:
+       TupleSetAutoDefaultDispatch(void)
+         : ::Test::Base("Extensional::TupleSet::Auto::DefaultDispatch") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         TupleSet dense(2);
+         dense.add(IntArgs({0,0})).add(IntArgs({1,1}));
+         dense.finalize(EPK_AUTO);
+         if (dense.representation() != EPK_DENSE) {
+           std::cerr << "ERROR: Small AUTO table did not select dense"
+                     << std::endl;
+           return false;
+         }
+
+         class PositiveSpace : public Space {
+         public:
+           IntVarArray x;
+           PositiveSpace(const TupleSet& t) : x(*this,2,0,1) {
+             extensional(*this, x, t);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           PositiveSpace(PositiveSpace& s) : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new PositiveSpace(*this);
+           }
+         };
+
+         PositiveSpace* dense_root = new PositiveSpace(dense);
+         DFS<PositiveSpace> dense_engine(dense_root);
+         delete dense_root;
+         int dense_solutions = 0;
+         while (PositiveSpace* sol = dense_engine.next()) {
+           if (sol->x[0].val() != sol->x[1].val()) {
+             delete sol;
+             return false;
+           }
+           dense_solutions++;
+           delete sol;
+         }
+         if (dense_solutions != 2)
+           return false;
+
+         const int n = 5000;
+         TupleSet compressed(2);
+         for (int i=0; i<n; i++)
+           compressed.add(IntArgs({i, (i*7) % n}));
+         compressed.finalize(EPK_AUTO);
+         if (compressed.representation() != EPK_DENSE_COMPRESSED) {
+           std::cerr << "ERROR: Large AUTO table did not select compressed"
+                     << std::endl;
+           return false;
+         }
+
+         class ReifiedSpace : public Space {
+         public:
+           IntVarArray x;
+           BoolVar b;
+           ReifiedSpace(const TupleSet& t, int n0)
+             : x(*this,2,0,n0-1), b(*this,0,1) {
+             extensional(*this, x, t, Reify(b,RM_EQV));
+             rel(*this, b, IRT_EQ, 1);
+             rel(*this, x[0], IRT_EQ, 3);
+             branch(*this, x, INT_VAR_NONE(), INT_VAL_MIN());
+           }
+           ReifiedSpace(ReifiedSpace& s) : Space(s) {
+             x.update(*this,s.x);
+             b.update(*this,s.b);
+           }
+           virtual Space* copy(void) {
+             return new ReifiedSpace(*this);
+           }
+         };
+
+         ReifiedSpace* compressed_root = new ReifiedSpace(compressed,n);
+         DFS<ReifiedSpace> compressed_engine(compressed_root);
+         delete compressed_root;
+         ReifiedSpace* compressed_sol = compressed_engine.next();
+         if (compressed_sol == nullptr)
+           return false;
+         const bool ok =
+           (compressed_sol->x[0].val() == 3) &&
+           (compressed_sol->x[1].val() == ((3*7) % n));
+         delete compressed_sol;
+         ReifiedSpace* extra = compressed_engine.next();
+         const bool no_extra = (extra == nullptr);
+         delete extra;
+         return ok && no_extra;
        }
      };
 
@@ -1580,6 +1713,7 @@ namespace Test { namespace Int {
      SparseTupleSetNegativeFallback sparse_tuple_set_negative_fallback;
      SparseTupleSetReifiedFallback sparse_tuple_set_reified_fallback;
      SparseTupleSetSingleRepresentation sparse_tuple_set_single_representation;
+     TupleSetAutoDefaultDispatch tuple_set_auto_default_dispatch;
      SparseTupleSetNegativeFail sparse_tuple_set_negative_fail;
      SparseTupleSetNegativePrune sparse_tuple_set_negative_prune;
      SparseTupleSetReifiedModes sparse_tuple_set_reified_modes;

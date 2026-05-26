@@ -727,10 +727,11 @@ if(BUILD_TESTING)
       Int::Extensional::TupleSet::DenseCompressed::-::Base
       Int::Extensional::TupleSet::Sparse::+::Base
       Int::Extensional::TupleSet::Sparse::-::Base
-      Int::Extensional::TupleSet::Sparse::IncrementalDelta
-      Int::Extensional::TupleSet::Sparse::NegativePrune
-      Int::Extensional::TupleSet::Sparse::ReifiedModes
-      Int::Extensional::TupleSet::Support::SingleRepresentation
+      Extensional::TupleSet::Sparse::IncrementalDelta
+      Extensional::TupleSet::Sparse::NegativePrune
+      Extensional::TupleSet::Sparse::ReifiedModes
+      Extensional::TupleSet::Auto::DefaultDispatch
+      Extensional::TupleSet::Support::SingleRepresentation
       Int::Linear::Bool::Int::Lq
       Int::MiniModel::LinExpr::Bool::352
       NoGoods::Queens

@@ -1316,10 +1316,11 @@ check: test
 			   -test Int::Extensional::TupleSet::DenseCompressed::-::Base \
 			   -test Int::Extensional::TupleSet::Sparse::+::Base \
 			   -test Int::Extensional::TupleSet::Sparse::-::Base \
-			   -test Int::Extensional::TupleSet::Sparse::IncrementalDelta \
-			   -test Int::Extensional::TupleSet::Sparse::NegativePrune \
-			   -test Int::Extensional::TupleSet::Sparse::ReifiedModes \
-			   -test Int::Extensional::TupleSet::Support::SingleRepresentation \
+			   -test Extensional::TupleSet::Sparse::IncrementalDelta \
+			   -test Extensional::TupleSet::Sparse::NegativePrune \
+			   -test Extensional::TupleSet::Sparse::ReifiedModes \
+			   -test Extensional::TupleSet::Auto::DefaultDispatch \
+			   -test Extensional::TupleSet::Support::SingleRepresentation \
 			   -test Int::Linear::Bool::Int::Lq \
 			   -test Int::MiniModel::LinExpr::Bool::352  \
 			   -test NoGoods::Queens \

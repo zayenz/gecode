@@ -971,6 +971,12 @@ namespace Gecode {
       GECODE_ES_FAIL(ES_FAILED);
       return;
     }
+    if (t.tuples() == 0) {
+      if (!pos)
+        return;
+      GECODE_ES_FAIL(ES_FAILED);
+      return;
+    }
 
     const Int::Extensional::DispatchKind dk =
       Int::Extensional::dispatch_kind(t,epk);
@@ -1017,6 +1023,29 @@ namespace Gecode {
 
     if (x.size() == 0) {
       const bool c = pos ? (t.tuples() > 0) : (t.tuples() == 0);
+      BoolView b(r.var());
+      switch (r.mode()) {
+      case RM_EQV:
+        if (c)
+          GECODE_ME_FAIL(b.one(home));
+        else
+          GECODE_ME_FAIL(b.zero(home));
+        break;
+      case RM_IMP:
+        if (!c)
+          GECODE_ME_FAIL(b.zero(home));
+        break;
+      case RM_PMI:
+        if (c)
+          GECODE_ME_FAIL(b.one(home));
+        break;
+      default:
+        GECODE_NEVER;
+      }
+      return;
+    }
+    if (t.tuples() == 0) {
+      const bool c = !pos;
       BoolView b(r.var());
       switch (r.mode()) {
       case RM_EQV:
@@ -1181,6 +1210,12 @@ namespace Gecode {
       GECODE_ES_FAIL(ES_FAILED);
       return;
     }
+    if (t.tuples() == 0) {
+      if (!pos)
+        return;
+      GECODE_ES_FAIL(ES_FAILED);
+      return;
+    }
 
     const Int::Extensional::DispatchKind dk =
       Int::Extensional::dispatch_kind(t,epk);
@@ -1229,6 +1264,29 @@ namespace Gecode {
 
     if (x.size() == 0) {
       const bool c = pos ? (t.tuples() > 0) : (t.tuples() == 0);
+      BoolView b(r.var());
+      switch (r.mode()) {
+      case RM_EQV:
+        if (c)
+          GECODE_ME_FAIL(b.one(home));
+        else
+          GECODE_ME_FAIL(b.zero(home));
+        break;
+      case RM_IMP:
+        if (!c)
+          GECODE_ME_FAIL(b.zero(home));
+        break;
+      case RM_PMI:
+        if (c)
+          GECODE_ME_FAIL(b.one(home));
+        break;
+      default:
+        GECODE_NEVER;
+      }
+      return;
+    }
+    if (t.tuples() == 0) {
+      const bool c = !pos;
       BoolView b(r.var());
       switch (r.mode()) {
       case RM_EQV:

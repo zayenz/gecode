@@ -1199,6 +1199,120 @@ namespace Test { namespace Int {
        }
      };
 
+     /// Dense-compressed iterators should skip unsupported value gaps
+     class DenseCompressedTupleSetWideGap : public ::Test::Base {
+     public:
+       DenseCompressedTupleSetWideGap(void)
+         : ::Test::Base("Extensional::TupleSet::DenseCompressed::WideGap") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+
+         const int gap = 1000000000;
+         TupleSet ts(1);
+         ts.add(IntArgs({0})).add(IntArgs({gap}));
+         ts.finalize(EPK_DENSE_COMPRESSED);
+
+         class NegativeSpace : public Space {
+         public:
+           IntVar x;
+           NegativeSpace(const TupleSet& t, int gap0)
+             : x(*this,0,gap0) {
+             extensional(*this, IntVarArgs({x}), t, false,
+                         IPL_DOM, EPK_DENSE_COMPRESSED);
+           }
+           NegativeSpace(NegativeSpace& s) : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new NegativeSpace(*this);
+           }
+         };
+
+         NegativeSpace* ns = new NegativeSpace(ts,gap);
+         if (ns->status() == SS_FAILED) {
+           delete ns;
+           return false;
+         }
+         if (ns->x.in(0) || ns->x.in(gap)) {
+           delete ns;
+           return false;
+         }
+         delete ns;
+
+         class ReifiedSpace : public Space {
+         public:
+           IntVar x;
+           BoolVar b;
+           ReifiedSpace(const TupleSet& t, int gap0, bool force)
+             : x(*this,0,gap0), b(*this,0,1) {
+             extensional(*this, IntVarArgs({x}), t, true,
+                         Reify(b,RM_EQV), IPL_DOM, EPK_DENSE_COMPRESSED);
+             if (force) {
+               rel(*this, b, IRT_EQ, 1);
+               rel(*this, x, IRT_EQ, 0);
+             }
+           }
+           ReifiedSpace(ReifiedSpace& s) : Space(s) {
+             x.update(*this,s.x);
+             b.update(*this,s.b);
+           }
+           virtual Space* copy(void) {
+             return new ReifiedSpace(*this);
+           }
+         };
+
+         ReifiedSpace* rs = new ReifiedSpace(ts,gap,false);
+         if (rs->status() == SS_FAILED) {
+           delete rs;
+           return false;
+         }
+         delete rs;
+
+         ReifiedSpace* rfs = new ReifiedSpace(ts,gap,true);
+         if (rfs->status() == SS_FAILED) {
+           delete rfs;
+           return false;
+         }
+         if (!rfs->x.assigned() || (rfs->x.val() != 0) ||
+             !rfs->b.assigned() || (rfs->b.val() != 1)) {
+           delete rfs;
+           return false;
+         }
+         delete rfs;
+
+         class PositiveDeltaSpace : public Space {
+         public:
+           IntVar x;
+           PositiveDeltaSpace(const TupleSet& t, int gap0)
+             : x(*this,0,gap0) {
+             extensional(*this, IntVarArgs({x}), t, true,
+                         IPL_DOM, EPK_DENSE_COMPRESSED);
+             rel(*this, x, IRT_NQ, 0);
+           }
+           PositiveDeltaSpace(PositiveDeltaSpace& s) : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new PositiveDeltaSpace(*this);
+           }
+         };
+
+         PositiveDeltaSpace* ps = new PositiveDeltaSpace(ts,gap);
+         if (ps->status() == SS_FAILED) {
+           delete ps;
+           return false;
+         }
+         if (!ps->x.assigned() || (ps->x.val() != gap)) {
+           delete ps;
+           return false;
+         }
+         delete ps;
+
+         return true;
+       }
+     };
+
      /// Sparse negative should fail if all combinations are forbidden
      class SparseTupleSetNegativeFail : public ::Test::Base {
      public:
@@ -1714,6 +1828,7 @@ namespace Test { namespace Int {
      SparseTupleSetReifiedFallback sparse_tuple_set_reified_fallback;
      SparseTupleSetSingleRepresentation sparse_tuple_set_single_representation;
      TupleSetAutoDefaultDispatch tuple_set_auto_default_dispatch;
+     DenseCompressedTupleSetWideGap dense_compressed_tuple_set_wide_gap;
      SparseTupleSetNegativeFail sparse_tuple_set_negative_fail;
      SparseTupleSetNegativePrune sparse_tuple_set_negative_prune;
      SparseTupleSetReifiedModes sparse_tuple_set_reified_modes;

@@ -731,6 +731,7 @@ if(BUILD_TESTING)
       Extensional::TupleSet::Sparse::NegativePrune
       Extensional::TupleSet::Sparse::ReifiedModes
       Extensional::TupleSet::Auto::DefaultDispatch
+      Extensional::TupleSet::DenseCompressed::WideGap
       Extensional::TupleSet::Support::SingleRepresentation
       Int::Linear::Bool::Int::Lq
       Int::MiniModel::LinExpr::Bool::352

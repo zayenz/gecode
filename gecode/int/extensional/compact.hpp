@@ -1314,16 +1314,34 @@ namespace Gecode { namespace Int { namespace Extensional {
       const TupleSet& ts;
       ViewRanges<View> xr;
       int i;
+      const Range* sr;
+      const Range* lst;
       int n;
       const CSupportWord* b;
       const CSupportWord* e;
       bool ok;
       void find(void) {
-        while (xr()) {
+        while (xr() && (sr <= lst)) {
           if (n < xr.min())
             n = xr.min();
           if (n > xr.max()) {
             ++xr;
+            if (xr())
+              n = xr.min();
+            continue;
+          }
+          while ((sr <= lst) && (n > sr->max))
+            sr++;
+          if (sr > lst)
+            break;
+          if (n < sr->min) {
+            n = sr->min;
+            continue;
+          }
+          if (n > xr.max()) {
+            ++xr;
+            if (xr())
+              n = xr.min();
             continue;
           }
           unsigned int gid = 0U;
@@ -1337,7 +1355,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       }
     public:
       ValidSupports(const CompactCompressed<View,pos>& p, CTAdvisor& a)
-        : ts(p.ts), xr(a.view()), i(a.index()), n(0),
+        : ts(p.ts), xr(a.view()), i(a.index()), sr(a.fst()), lst(a.lst()), n(0),
           b(nullptr), e(nullptr), ok(false) {
         if (xr()) {
           n = xr.min();
@@ -1345,7 +1363,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         }
       }
       ValidSupports(const TupleSet& ts0, int i0, View x)
-        : ts(ts0), xr(x), i(i0), n(0),
+        : ts(ts0), xr(x), i(i0), sr(ts0.fst(i0)), lst(ts0.lst(i0)), n(0),
           b(nullptr), e(nullptr), ok(false) {
         if (xr()) {
           n = xr.min();
@@ -1377,19 +1395,25 @@ namespace Gecode { namespace Int { namespace Extensional {
     protected:
       const CompactCompressed<View,pos>& p;
       CTAdvisor& a;
+      const Range* r;
+      const Range* lst;
       int l;
       int h;
       const CSupportWord* b;
       const CSupportWord* e;
       bool ok;
       void find(void) {
-        while (l <= h) {
-          if (l < a.fst()->min) {
-            l = a.fst()->min;
-          } else if (l > a.lst()->max) {
-            ok = false;
-            return;
-          }
+        while ((l <= h) && (r <= lst)) {
+          if (l < r->min)
+            l = r->min;
+          if (l > h)
+            break;
+          while ((r <= lst) && (l > r->max))
+            r++;
+          if (r > lst)
+            break;
+          if (l < r->min)
+            continue;
           unsigned int gid = 0U;
           if (TupleSetAccess::dense_compressed_support(p.ts,a.index(),l,b,e,gid)) {
             ok = true;
@@ -1402,7 +1426,8 @@ namespace Gecode { namespace Int { namespace Extensional {
     public:
       LostSupports(const CompactCompressed<View,pos>& p0, CTAdvisor& a0,
                    int l0, int h0)
-        : p(p0), a(a0), l(l0), h(h0), b(nullptr), e(nullptr), ok(false) {
+        : p(p0), a(a0), r(a0.fst()), lst(a0.lst()), l(l0), h(h0),
+          b(nullptr), e(nullptr), ok(false) {
         assert(pos);
         find();
       }

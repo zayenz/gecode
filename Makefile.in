@@ -1320,6 +1320,7 @@ check: test
 			   -test Extensional::TupleSet::Sparse::NegativePrune \
 			   -test Extensional::TupleSet::Sparse::ReifiedModes \
 			   -test Extensional::TupleSet::Auto::DefaultDispatch \
+			   -test Extensional::TupleSet::DenseCompressed::WideGap \
 			   -test Extensional::TupleSet::Support::SingleRepresentation \
 			   -test Int::Linear::Bool::Int::Lq \
 			   -test Int::MiniModel::LinExpr::Bool::352  \

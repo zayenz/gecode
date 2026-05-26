@@ -56,7 +56,7 @@ def repo_default() -> Path:
 
 
 def result_root(args: argparse.Namespace) -> Path:
-    return Path(args.results_root) / args.name
+    return (Path(args.results_root) / args.name).resolve()
 
 
 def load_words(repo: Path) -> dict[int, list[str]]:

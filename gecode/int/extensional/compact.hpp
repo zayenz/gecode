@@ -45,32 +45,15 @@ namespace Gecode { namespace Int { namespace Extensional {
   template<class View, bool pos>
   forceinline void
   Compact<View,pos>::CTAdvisor::adjust(void) {
-    if (pos) {
-      {
-        int n = view().min();
-        assert((_fst->min <= n) && (n <= _lst->max));
-        while (n > _fst->max)
-          _fst++;
-        assert((_fst->min <= n) && (n <= _lst->max));
-      }
-      {
-        int n = view().max();
-        assert((_fst->min <= n) && (n <= _lst->max));
-        while (n < _lst->min)
-          _lst--;
-        assert((_fst->min <= n) && (n <= _lst->max));
-      }
-    } else {
-      {
-        int n = view().min();
-        while ((_fst <= _lst) && (n > _fst->max))
-          _fst++;
-      }
-      {
-        int n = view().max();
-        while ((_fst <= _lst) && (n < _lst->min))
-          _lst--;
-      }
+    {
+      int n = view().min();
+      while ((_fst <= _lst) && (n > _fst->max))
+        _fst++;
+    }
+    {
+      int n = view().max();
+      while ((_fst <= _lst) && (n < _lst->min))
+        _lst--;
     }
   }
 
@@ -121,12 +104,11 @@ namespace Gecode { namespace Int { namespace Extensional {
   template<class View, bool pos>
   const typename Compact<View,pos>::Range*
   Compact<View,pos>::range(CTAdvisor& a, int n) {
-    assert((n > a.fst()->max) && (n < a.lst()->min));
+    if ((a.fst() > a.lst()) || (n < a.fst()->min) || (n > a.lst()->max))
+      return nullptr;
 
     const Range* f=a.fst()+1;
     const Range* l=a.lst()-1;
-
-    assert(!pos || (f<=l));
 
     while (f < l) {
       const Range* m = f + ((l-f) >> 1);
@@ -139,15 +121,10 @@ namespace Gecode { namespace Int { namespace Extensional {
       }
     }
 
-    if (pos) {
-      assert((f->min <= n) && (n <= f->max));
+    if ((f <= l) && (f->min <= n) && (n <= f->max))
       return f;
-    } else {
-      if ((f <= l) && (f->min <= n) && (n <= f->max))
-        return f;
-      else
-        return nullptr;
-    }
+
+    return nullptr;
   }
 
   template<class View, bool pos>
@@ -156,6 +133,8 @@ namespace Gecode { namespace Int { namespace Extensional {
     const Range* fnd;
     const Range* fst=a.fst();
     const Range* lst=a.lst();
+    if ((fst > lst) || (n < fst->min) || (n > lst->max))
+      return nullptr;
     if (pos) {
       if (n <= fst->max) {
         fnd=fst;
@@ -163,10 +142,10 @@ namespace Gecode { namespace Int { namespace Extensional {
         fnd=lst;
       } else {
         fnd=range(a,n);
+        if (!fnd)
+          return nullptr;
       }
     } else {
-      if ((n < fst->min) || (n > lst->max))
-        return nullptr;
       if (n <= fst->max) {
         fnd=fst;
       } else if (n >= lst->min) {
@@ -521,15 +500,28 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<class View, class Table>
   bool
+  PosCompact<View,Table>::bounds_pending(void) const {
+    for (Advisors<CTAdvisor> as(c); as(); ++as)
+      if (bounds(as.advisor()))
+        return true;
+    return false;
+  }
+
+  template<class View, class Table>
+  bool
   PosCompact<View,Table>::min_support(CTAdvisor& a, View x, int& n) {
+    if (a.fst() > a.lst())
+      return false;
     for (const Range* r=a.fst(); r<=a.lst(); r++) {
       const int low = std::max(x.min(), r->min);
       const int high = std::min(x.max(), r->max);
-      for (int v=low; v<=high; v++)
-        if (x.in(v) && table.intersects(supports(a,v))) {
+      for (int v=low; v<=high; v++) {
+        const BitSetData* s = supports(a,v);
+        if ((s != nullptr) && x.in(v) && table.intersects(s)) {
           n = v;
           return true;
         }
+      }
     }
     return false;
   }
@@ -537,15 +529,19 @@ namespace Gecode { namespace Int { namespace Extensional {
   template<class View, class Table>
   bool
   PosCompact<View,Table>::max_support(CTAdvisor& a, View x, int& n) {
+    if (a.fst() > a.lst())
+      return false;
     const Range* r = a.lst();
     while (true) {
       const int low = std::max(x.min(), r->min);
       const int high = std::min(x.max(), r->max);
-      for (int v=high; v>=low; v--)
-        if (x.in(v) && table.intersects(supports(a,v))) {
+      for (int v=high; v>=low; v--) {
+        const BitSetData* s = supports(a,v);
+        if ((s != nullptr) && x.in(v) && table.intersects(s)) {
           n = v;
           return true;
         }
+      }
       if (r == a.fst())
         break;
       r--;
@@ -568,7 +564,7 @@ namespace Gecode { namespace Int { namespace Extensional {
                                const TupleSet& ts,
                                const IntPropLevelArgs& ipl) {
     auto ct = new (home) PosCompact(home,x,ts,ipl);
-    assert((x.size() > 1) && (ts.tuples() > 1));
+    assert((x.size() > 0) && (ts.tuples() > 0));
     return ct->table.empty() ? ES_FAILED : ES_OK;
   }
 
@@ -608,7 +604,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       View x = a.view();
 
       // No point filtering variable if it was the only modified variable
-      if (touched.single(a) || x.assigned())
+      if (((!bounds(a)) && touched.single(a)) || x.assigned())
         continue;
 
       if (bounds(a)) {
@@ -667,7 +663,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     // Should not be in a failed state
     assert(!table.empty());
     // Subsume if there is at most one non-assigned variable
-    return atmostone() ? home.ES_SUBSUMED(*this) : ES_FIX;
+    return (!bounds_pending() && atmostone()) ? home.ES_SUBSUMED(*this) : ES_FIX;
   }
 
   template<class View, class Table>
@@ -694,8 +690,28 @@ namespace Gecode { namespace Int { namespace Extensional {
       
     if (x.assigned()) {
       // Variable is assigned -- intersect with its value
-      table.template intersect_with_mask<true>(supports(a,x.val()));
+      if (const BitSetData* s = supports(a,x.val()))
+        table.template intersect_with_mask<true>(s);
+      else
+        table.flush();
+      if (table.empty())
+        return Compact<View,true>::disabled() ?
+          home.ES_NOFIX_DISPOSE(c,a) : ES_FAILED;
       return home.ES_NOFIX_DISPOSE(c,a);
+    }
+
+    if (bounds(a)) {
+      a.adjust();
+      Region r;
+      BitSetData* mask = r.alloc<BitSetData>(table.size());
+      table.clear_mask(mask);
+      for (ValidSupports vs(*this,a); vs(); ++vs)
+        table.add_to_mask(vs.supports(),mask);
+      table.template intersect_with_mask<false>(mask);
+      if (table.empty())
+        return Compact<View,true>::disabled() ?
+          home.ES_NOFIX_DISPOSE(c,a) : ES_FAILED;
+      return ES_NOFIX;
     }
       
     if (!x.any(d) && (x.min(d) == x.max(d))) {
@@ -812,7 +828,8 @@ namespace Gecode { namespace Int { namespace Extensional {
       GECODE_ME_CHECK(prune_poscompact_initial(home,x[i],ts,i,&ipl));
     }
 
-    if ((x.size() <= 1) || (ts.tuples() <= 1))
+    if (((x.size() <= 1) || (ts.tuples() <= 1)) &&
+        tuple_set_all_domain(ipl))
       return ES_OK;
 
     switch (ts.words()) {
@@ -1388,30 +1405,15 @@ namespace Gecode { namespace Int { namespace Extensional {
       CTAdvisor(Space& home, CTAdvisor& a)
         : ViewAdvisor<View>(home,a), _fst(a._fst), _lst(a._lst), _idx(a._idx) {}
       void adjust(void) {
-        if (pos) {
-          {
-            int n = view().min();
-            assert((_fst->min <= n) && (n <= _lst->max));
-            while (n > _fst->max)
-              _fst++;
-          }
-          {
-            int n = view().max();
-            assert((_fst->min <= n) && (n <= _lst->max));
-            while (n < _lst->min)
-              _lst--;
-          }
-        } else {
-          {
-            int n = view().min();
-            while ((_fst <= _lst) && (n > _fst->max))
-              _fst++;
-          }
-          {
-            int n = view().max();
-            while ((_fst <= _lst) && (n < _lst->min))
-              _lst--;
-          }
+        {
+          int n = view().min();
+          while ((_fst <= _lst) && (n > _fst->max))
+            _fst++;
+        }
+        {
+          int n = view().max();
+          while ((_fst <= _lst) && (n < _lst->min))
+            _lst--;
         }
       }
       int index(void) const {
@@ -1708,6 +1710,13 @@ namespace Gecode { namespace Int { namespace Extensional {
       return (ipl != nullptr) && tuple_set_bounds_level(ipl[a.index()]);
     }
 
+    bool bounds_pending(void) const {
+      for (Advisors<CTAdvisor> as(c); as(); ++as)
+        if (bounds(as.advisor()))
+          return true;
+      return false;
+    }
+
     bool supported(CTAdvisor& a, int n) {
       const CSupportWord* b = nullptr;
       const CSupportWord* e = nullptr;
@@ -1715,6 +1724,8 @@ namespace Gecode { namespace Int { namespace Extensional {
     }
 
     bool min_support(CTAdvisor& a, View x, int& n) {
+      if (a.fst() > a.lst())
+        return false;
       for (const typename Base::Range* r=a.fst(); r<=a.lst(); r++) {
         const int low = std::max(x.min(), r->min);
         const int high = std::min(x.max(), r->max);
@@ -1728,6 +1739,8 @@ namespace Gecode { namespace Int { namespace Extensional {
     }
 
     bool max_support(CTAdvisor& a, View x, int& n) {
+      if (a.fst() > a.lst())
+        return false;
       const typename Base::Range* r = a.lst();
       while (true) {
         const int low = std::max(x.min(), r->min);
@@ -1814,7 +1827,7 @@ namespace Gecode { namespace Int { namespace Extensional {
     static ExecStatus post(Home home, ViewArray<View>& x, const TupleSet& ts,
                            const IntPropLevelArgs& ipl) {
       auto ct = new (home) PosCompactCompressed(home,x,ts,ipl);
-      assert((x.size() > 1) && (ts.tuples() > 1));
+      assert((x.size() > 0) && (ts.tuples() > 0));
       return ct->table.empty() ? ES_FAILED : ES_OK;
     }
 
@@ -1842,7 +1855,7 @@ namespace Gecode { namespace Int { namespace Extensional {
         CTAdvisor& a = as.advisor();
         View x = a.view();
 
-        if (touched.single(a) || x.assigned())
+        if (((!bounds(a)) && touched.single(a)) || x.assigned())
           continue;
 
         if (bounds(a)) {
@@ -1904,7 +1917,7 @@ namespace Gecode { namespace Int { namespace Extensional {
 
       status.none();
       assert(!table.empty());
-      return atmostone() ? home.ES_SUBSUMED(*this) : ES_FIX;
+      return (!bounds_pending() && atmostone()) ? home.ES_SUBSUMED(*this) : ES_FIX;
     }
 
     virtual ExecStatus advise(Space& home, Advisor& a0, const Delta& d) {
@@ -1926,7 +1939,22 @@ namespace Gecode { namespace Int { namespace Extensional {
           table.intersect_with_mask(CompressedSupport(bb,be));
         else
           table.flush();
+        if (table.empty())
+          return Base::disabled() ? home.ES_NOFIX_DISPOSE(c,a) : ES_FAILED;
         return home.ES_NOFIX_DISPOSE(c,a);
+      }
+
+      if (bounds(a)) {
+        a.adjust();
+        Region r;
+        BitSetData* mask = r.alloc<BitSetData>(table.size());
+        table.clear_mask(mask);
+        for (ValidSupports vs(*this,a); vs(); ++vs)
+          table.add_to_mask(vs.support(),mask);
+        table.template intersect_with_mask<false>(mask);
+        if (table.empty())
+          return Base::disabled() ? home.ES_NOFIX_DISPOSE(c,a) : ES_FAILED;
+        return ES_NOFIX;
       }
 
       if (!x.any(d) && (x.min(d) == x.max(d))) {
@@ -2020,7 +2048,8 @@ namespace Gecode { namespace Int { namespace Extensional {
     for (int i=0; i<x.size(); i++) {
       GECODE_ME_CHECK(prune_poscompact_initial(home,x[i],ts,i,&ipl));
     }
-    if ((x.size() <= 1) || (ts.tuples() <= 1))
+    if (((x.size() <= 1) || (ts.tuples() <= 1)) &&
+        tuple_set_all_domain(ipl))
       return ES_OK;
 
     switch (ts.words()) {

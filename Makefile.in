@@ -1314,6 +1314,9 @@ check: test
 			   -test Int::Distinct::Random \
 			   -test Int::Extensional::TupleSet::DenseCompressed::+::Base \
 			   -test Int::Extensional::TupleSet::DenseCompressed::-::Base \
+			   -test Int::Extensional::TupleSet::Bounds::AdvisorAfterPost \
+			   -test Int::Extensional::TupleSet::Bounds::NoEarlySubsumption \
+			   -test Int::Extensional::TupleSet::Bounds::AutoDispatch \
 			   -test Int::Extensional::TupleSet::Sparse::+::Base \
 			   -test Int::Extensional::TupleSet::Sparse::-::Base \
 			   -test Extensional::TupleSet::Sparse::IncrementalDelta \

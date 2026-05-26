@@ -725,6 +725,9 @@ if(BUILD_TESTING)
       Int::Distinct::Random
       Int::Extensional::TupleSet::DenseCompressed::+::Base
       Int::Extensional::TupleSet::DenseCompressed::-::Base
+      Int::Extensional::TupleSet::Bounds::AdvisorAfterPost
+      Int::Extensional::TupleSet::Bounds::NoEarlySubsumption
+      Int::Extensional::TupleSet::Bounds::AutoDispatch
       Int::Extensional::TupleSet::Sparse::+::Base
       Int::Extensional::TupleSet::Sparse::-::Base
       Extensional::TupleSet::Sparse::IncrementalDelta

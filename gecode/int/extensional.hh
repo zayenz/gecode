@@ -480,7 +480,7 @@ namespace Gecode { namespace Int { namespace Extensional {
       int n;
       /// The value's support
       const BitSetData* s;
-      /// Find a new value (only for negative case)
+      /// Find the next value present in both view and tuple-set ranges
       void find(void);
     public:
       /// Initialize from initialized propagator
@@ -625,6 +625,8 @@ namespace Gecode { namespace Int { namespace Extensional {
     int n_ipl;
     /// Whether advisor \a a uses bounds pruning
     bool bounds(CTAdvisor& a) const;
+    /// Whether any remaining advisor uses bounds pruning
+    bool bounds_pending(void) const;
     /// Find smallest value of \a x with an active tuple support
     bool min_support(CTAdvisor& a, View x, int& n);
     /// Find largest value of \a x with an active tuple support

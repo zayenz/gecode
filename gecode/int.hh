@@ -2796,8 +2796,8 @@ namespace Gecode {
    *     or IPL_DEF, and bounds pruning for entries with IPL_BND.
    * \li Bounds pruning checks supports in the current domains but only tightens
    *     variable bounds.
-   * \li Bounds pruning uses dense or dense-compressed compact-table
-   *     representations.
+   * \li Representation selection is automatic; bounds pruning uses dense or
+   *     dense-compressed compact-table representations.
    * \li Throws an exception of type Int::ArgumentSizeMismatch, if
    *     \a x, \a ipl, and \a t are of different size.
    *
@@ -2862,7 +2862,8 @@ namespace Gecode {
    *
    * Per-position bounds pruning is used for positive tables. Negative tables
    * use the domain-consistent propagator.
-   * Bounds pruning uses dense or dense-compressed compact-table representations.
+   * Representation selection is automatic; bounds pruning uses dense or
+   * dense-compressed compact-table representations.
    *
    * \ingroup TaskModelIntExt
    */
@@ -2994,8 +2995,8 @@ namespace Gecode {
    *     or IPL_DEF, and bounds pruning for entries with IPL_BND.
    * \li Bounds pruning checks supports in the current domains but only tightens
    *     variable bounds.
-   * \li Bounds pruning uses dense or dense-compressed compact-table
-   *     representations.
+   * \li Representation selection is automatic; bounds pruning uses dense or
+   *     dense-compressed compact-table representations.
    * \li Throws an exception of type Int::ArgumentSizeMismatch, if
    *     \a x, \a ipl, and \a t are of different size.
    *
@@ -3060,7 +3061,8 @@ namespace Gecode {
    *
    * Per-position bounds pruning is used for positive tables. Negative tables
    * use the domain-consistent propagator.
-   * Bounds pruning uses dense or dense-compressed compact-table representations.
+   * Representation selection is automatic; bounds pruning uses dense or
+   * dense-compressed compact-table representations.
    *
    * \ingroup TaskModelIntExt
    */

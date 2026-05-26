@@ -1032,7 +1032,7 @@ namespace Gecode {
   void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
               const IntPropLevelArgs& ipl) {
-    extensional(home,x,t,pos,ipl,EPK_DENSE);
+    extensional(home,x,t,pos,ipl,EPK_AUTO);
   }
 
   void
@@ -1314,7 +1314,7 @@ namespace Gecode {
   void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               const IntPropLevelArgs& ipl) {
-    extensional(home,x,t,pos,ipl,EPK_DENSE);
+    extensional(home,x,t,pos,ipl,EPK_AUTO);
   }
 
   void

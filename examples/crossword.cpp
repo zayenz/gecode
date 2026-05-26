@@ -40,6 +40,9 @@
 
 using namespace Gecode;
 
+#ifndef GECODE_CROSSWORD_TUPLESET_EPK
+#define GECODE_CROSSWORD_TUPLESET_EPK EPK_AUTO
+#endif
 
 // Grid data
 namespace {
@@ -174,7 +177,7 @@ public:
               ts.add(w);
             }
           }
-          ts.finalize(EPK_AUTO);
+          ts.finalize(GECODE_CROSSWORD_TUPLESET_EPK);
 
           // Array of all words of length w_l
           IntVarArgs words(*this,n,0,n_w-1);

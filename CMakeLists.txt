@@ -751,7 +751,7 @@ if(BUILD_TESTING)
         Set::Wait)
     endif()
 
-    set(GECODE_CHECK_ARGS -iter 2 -threads 0)
+    set(GECODE_CHECK_ARGS -iter 2 -threads 1)
     foreach(gecode_check_test ${GECODE_CHECK_TESTS})
       list(APPEND GECODE_CHECK_ARGS -test ${gecode_check_test})
     endforeach()

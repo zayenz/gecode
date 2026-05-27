@@ -43,7 +43,7 @@ namespace Gecode { namespace Int { namespace Extensional {
    */
   template<unsigned int sz>
   forceinline
-  TinyBitSet<sz>::TinyBitSet(Space&, unsigned int n) {
+  TinyBitSet<sz>::TinyBitSet(Space&, unsigned int n, bool) {
     assert(n <= sz);
     /// Set the active bits
       for (unsigned int i=0U; i<n; i++)
@@ -94,11 +94,34 @@ namespace Gecode { namespace Int { namespace Extensional {
   }
 
   template<unsigned int sz>
+  forceinline void
+  TinyBitSet<sz>::add_to_mask(const CompressedSupport& support,
+                              BitSetData* mask) const {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* w = find_support_word(support,i);
+      if (w != nullptr)
+        mask[i] = BitSetData::o(mask[i],*w);
+    }
+  }
+
+  template<unsigned int sz>
   template<bool sparse>
   forceinline void
   TinyBitSet<sz>::intersect_with_mask(const BitSetData* mask) {
     for (unsigned int i=0U; i<sz; i++)
       _bits[i] = BitSetData::a(_bits[i], mask[i]);
+  }
+
+  template<unsigned int sz>
+  forceinline void
+  TinyBitSet<sz>::intersect_with_mask(const CompressedSupport& support) {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* w = find_support_word(support,i);
+      if (w == nullptr)
+        _bits[i].init(false);
+      else
+        _bits[i] = BitSetData::a(_bits[i],*w);
+    }
   }
 
   template<unsigned int sz>
@@ -111,9 +134,37 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<unsigned int sz>
   forceinline void
+  TinyBitSet<sz>::intersect_with_masks(const CompressedSupport& a, const CompressedSupport& b) {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* sa = find_support_word(a,i);
+      const BitSetData* sb = find_support_word(b,i);
+      BitSetData m;
+      if (sa != nullptr) {
+        m = *sa;
+      } else {
+        m.init(false);
+      }
+      if (sb != nullptr)
+        m = BitSetData::o(m,*sb);
+      _bits[i] = BitSetData::a(_bits[i],m);
+    }
+  }
+
+  template<unsigned int sz>
+  forceinline void
   TinyBitSet<sz>::nand_with_mask(const BitSetData* b) {
     for (unsigned int i=0U; i<sz; i++)
       _bits[i] = BitSetData::a(_bits[i],~(b[i]));
+  }
+
+  template<unsigned int sz>
+  forceinline void
+  TinyBitSet<sz>::nand_with_mask(const CompressedSupport& support) {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* w = find_support_word(support,i);
+      if (w != nullptr)
+        _bits[i] = BitSetData::a(_bits[i],~(*w));
+    }
   }
 
   template<unsigned int sz>
@@ -134,12 +185,36 @@ namespace Gecode { namespace Int { namespace Extensional {
   }
 
   template<unsigned int sz>
+  forceinline bool
+  TinyBitSet<sz>::intersects(const CompressedSupport& support) {
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* w = find_support_word(support,i);
+      if ((w != nullptr) && !BitSetData::a(_bits[i],*w).none())
+        return true;
+    }
+    return false;
+  }
+
+  template<unsigned int sz>
   forceinline unsigned long long int
   TinyBitSet<sz>::ones(const BitSetData* b) const {
     unsigned long long int o = 0U;
     for (unsigned int i=0U; i<sz; i++)
       o += static_cast<unsigned long long int>
         (BitSetData::a(_bits[i],b[i]).ones());
+    return o;
+  }
+
+  template<unsigned int sz>
+  forceinline unsigned long long int
+  TinyBitSet<sz>::ones(const CompressedSupport& support) const {
+    unsigned long long int o = 0U;
+    for (unsigned int i=0U; i<sz; i++) {
+      const BitSetData* w = find_support_word(support,i);
+      if (w != nullptr)
+        o += static_cast<unsigned long long int>
+          (BitSetData::a(_bits[i],*w).ones());
+    }
     return o;
   }
     

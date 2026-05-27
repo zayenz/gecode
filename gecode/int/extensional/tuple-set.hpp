@@ -49,7 +49,11 @@ namespace Gecode {
   forceinline const TupleSet::BitSetData*
   TupleSet::Range::supports(unsigned int n_words, int n) const {
     assert((min <= n) && (n <= max));
-    return s + n_words * static_cast<unsigned int>(n - min);
+    assert(s != nullptr);
+    const unsigned long offset =
+      static_cast<unsigned long>(n_words) *
+      static_cast<unsigned long>(n - min);
+    return s + offset;
   }
 
   
@@ -64,7 +68,11 @@ namespace Gecode {
       min(Int::Limits::max), max(Int::Limits::min), key(0),
       td(heap.alloc<int>(n_initial_free * a)),
       vd(heap.alloc<ValueData>(a)),
-      range(nullptr), support(nullptr) {
+      range(nullptr), support(nullptr), support_repr(SR_NONE), sparse(false),
+      sparse_n_vals(0U), sparse_offsets(nullptr),
+      sparse_tuples(nullptr), sparse_tv(nullptr),
+      compressed_offsets(nullptr), compressed_words(nullptr),
+      compressed_n_entries(0U) {
   }
   
   forceinline bool
@@ -158,6 +166,13 @@ namespace Gecode {
       d->finalize();
   }
 
+  forceinline void
+  TupleSet::finalize(ExtensionalPropKind epk) {
+    Data* d = static_cast<Data*>(object());
+    if (!d->finalized())
+      d->finalize(epk);
+  }
+
   forceinline bool
   TupleSet::finalized(void) const {
     return static_cast<Data*>(object())->finalized();
@@ -228,6 +243,164 @@ namespace Gecode {
     return data().key;
   }
 
+  forceinline ExtensionalPropKind
+  TupleSet::representation(void) const {
+    switch (data().support_repr) {
+    case Data::SR_DENSE:
+      return EPK_DENSE;
+    case Data::SR_SPARSE:
+      return EPK_SPARSE;
+    case Data::SR_DENSE_COMPRESSED:
+      return EPK_DENSE_COMPRESSED;
+    case Data::SR_NONE:
+      return EPK_DENSE;
+    default:
+      GECODE_NEVER;
+      return EPK_DENSE;
+    }
+  }
+
+  forceinline bool
+  TupleSet::dense_support(void) const {
+    return (data().support != nullptr) || (data().n_tuples == 0);
+  }
+
+  forceinline bool
+  TupleSet::sparse_support(void) const {
+    return data().sparse;
+  }
+
+  forceinline bool
+  TupleSet::dense_compressed_support(void) const {
+    return (data().compressed_offsets != nullptr) || (data().n_tuples == 0);
+  }
+
+  forceinline unsigned int
+  TupleSet::sparse_values(void) const {
+    return data().sparse_n_vals;
+  }
+
+  forceinline const unsigned int*
+  TupleSet::sparse_tuple_value_ids(void) const {
+    return data().sparse_tv;
+  }
+
+  forceinline const unsigned int*
+  TupleSet::sparse_support_offsets(void) const {
+    return data().sparse_offsets;
+  }
+
+  forceinline bool
+  TupleSet::sparse_support(int p, int n,
+                           const unsigned int*& b,
+                           const unsigned int*& e,
+                           unsigned int& gid) const {
+    const Data& d = data();
+    if ((d.sparse_offsets == nullptr) ||
+        (d.sparse_tuples == nullptr) ||
+        (d.sparse_n_vals == 0U))
+      return false;
+    if ((p < 0) || (p >= d.arity))
+      return false;
+    const ValueData& v = d.vd[p];
+    unsigned int l = 0U, h = v.n;
+    while (l < h) {
+      const unsigned int m = l + ((h-l) >> 1);
+      if (n < v.r[m].min)
+        h = m;
+      else if (n > v.r[m].max)
+        l = m+1U;
+      else {
+        gid = v.r[m].sparse_base +
+          static_cast<unsigned int>(n - v.r[m].min);
+        b = d.sparse_tuples + d.sparse_offsets[gid];
+        e = d.sparse_tuples + d.sparse_offsets[gid+1U];
+        return true;
+      }
+    }
+    return false;
+  }
+
+  forceinline bool
+  TupleSet::dense_compressed_support(int p, int n,
+                                     const CSupportWord*& b,
+                                     const CSupportWord*& e,
+                                     unsigned int& gid) const {
+    const Data& d = data();
+    if ((d.compressed_offsets == nullptr) ||
+        (d.compressed_words == nullptr))
+      return false;
+    if ((p < 0) || (p >= d.arity))
+      return false;
+    const ValueData& v = d.vd[p];
+    unsigned int l = 0U, h = v.n;
+    while (l < h) {
+      const unsigned int m = l + ((h-l) >> 1);
+      if (n < v.r[m].min)
+        h = m;
+      else if (n > v.r[m].max)
+        l = m+1U;
+      else {
+        gid = v.r[m].sparse_base +
+          static_cast<unsigned int>(n - v.r[m].min);
+        b = d.compressed_words + d.compressed_offsets[gid];
+        e = d.compressed_words + d.compressed_offsets[gid+1U];
+        return true;
+      }
+    }
+    return false;
+  }
+
+  namespace Int { namespace Extensional {
+
+    forceinline bool
+    TupleSetAccess::dense_support(const TupleSet& ts) {
+      return ts.dense_support();
+    }
+
+    forceinline bool
+    TupleSetAccess::sparse_support(const TupleSet& ts) {
+      return ts.sparse_support();
+    }
+
+    forceinline bool
+    TupleSetAccess::dense_compressed_support(const TupleSet& ts) {
+      return ts.dense_compressed_support();
+    }
+
+    forceinline unsigned int
+    TupleSetAccess::sparse_values(const TupleSet& ts) {
+      return ts.sparse_values();
+    }
+
+    forceinline const unsigned int*
+    TupleSetAccess::sparse_tuple_value_ids(const TupleSet& ts) {
+      return ts.sparse_tuple_value_ids();
+    }
+
+    forceinline const unsigned int*
+    TupleSetAccess::sparse_support_offsets(const TupleSet& ts) {
+      return ts.sparse_support_offsets();
+    }
+
+    forceinline bool
+    TupleSetAccess::sparse_support(const TupleSet& ts, int p, int n,
+                                   const unsigned int*& b,
+                                   const unsigned int*& e,
+                                   unsigned int& gid) {
+      return ts.sparse_support(p,n,b,e,gid);
+    }
+
+    forceinline bool
+    TupleSetAccess::dense_compressed_support(const TupleSet& ts, int p, int n,
+                                             const TupleSet::CSupportWord*& b,
+                                             const TupleSet::CSupportWord*& e,
+                                             unsigned int& gid) {
+      return ts.dense_compressed_support(p,n,b,e,gid);
+    }
+
+  }}
+
 
   template<class Char, class Traits>
   std::basic_ostream<Char,Traits>&
@@ -287,4 +460,3 @@ namespace Gecode {
 }
 
 // STATISTICS: int-prop
-

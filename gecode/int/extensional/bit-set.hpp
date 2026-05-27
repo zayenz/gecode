@@ -37,6 +37,47 @@
 
 namespace Gecode { namespace Int { namespace Extensional {
 
+  forceinline
+  CompressedSupport::CompressedSupport(void)
+    : b(nullptr), e(nullptr) {}
+
+  forceinline
+  CompressedSupport::CompressedSupport(const TupleSet::CSupportWord* b0,
+                                       const TupleSet::CSupportWord* e0)
+    : b(b0), e(e0) {}
+
+  forceinline const TupleSet::CSupportWord*
+  CompressedSupport::begin(void) const {
+    return b;
+  }
+
+  forceinline const TupleSet::CSupportWord*
+  CompressedSupport::end(void) const {
+    return e;
+  }
+
+  forceinline bool
+  CompressedSupport::empty(void) const {
+    return (b == nullptr) || (b >= e);
+  }
+
+  forceinline const TupleSet::BitSetData*
+  find_support_word(const CompressedSupport& s, unsigned int widx) {
+    const TupleSet::CSupportWord* b = s.begin();
+    const TupleSet::CSupportWord* e = s.end();
+    while (b < e) {
+      const TupleSet::CSupportWord* m = b + ((e-b) >> 1);
+      if (widx < m->widx) {
+        e = m;
+      } else if (widx > m->widx) {
+        b = m+1;
+      } else {
+        return &m->bits;
+      }
+    }
+    return nullptr;
+  }
+
   template<class IndexType>
   forceinline unsigned int
   BitSet<IndexType>::limit(void) const {
@@ -74,14 +115,18 @@ namespace Gecode { namespace Int { namespace Extensional {
 
   template<class IndexType>
   forceinline
-  BitSet<IndexType>::BitSet(Space& home, unsigned int n)
-    : _limit(static_cast<IndexType>(n)), 
+  BitSet<IndexType>::BitSet(Space& home, unsigned int n, bool indexed)
+    : _limit(static_cast<IndexType>(n)),
+      _capacity(static_cast<IndexType>(n)),
       _index(home.alloc<IndexType>(n)),
-      _bits(home.alloc<BitSetData>(n)) {
+      _bits(home.alloc<BitSetData>(n)),
+      _pos(indexed ? home.alloc<IndexType>(n) : nullptr) {
     // Set all bits in all words (including the last)
     for (IndexType i=0; i<_limit; i++) {
       _bits[i].init(true);
       _index[i] = i;
+      if (_pos != nullptr)
+        _pos[i] = i+1;
     }
   }
 
@@ -91,12 +136,20 @@ namespace Gecode { namespace Int { namespace Extensional {
   BitSet<IndexType>::BitSet(Space& home,
                             const BitSet<OldIndexType>& bs)
     : _limit(static_cast<IndexType>(bs._limit)),
+      _capacity(static_cast<IndexType>(bs.width())),
       _index(home.alloc<IndexType>(_limit)),
-      _bits(home.alloc<BitSetData>(_limit)) {
+      _bits(home.alloc<BitSetData>(_limit)),
+      _pos((bs._pos != nullptr) ? home.alloc<IndexType>(_capacity) : nullptr) {
     assert(_limit > 0U);
     for (IndexType i=0; i<_limit; i++) {
       _bits[i] = bs._bits[i];
       _index[i] = static_cast<IndexType>(bs._index[i]);
+    }
+    if (_pos != nullptr) {
+      for (IndexType i=0; i<_capacity; i++)
+        _pos[i] = 0;
+      for (IndexType i=0; i<_limit; i++)
+        _pos[_index[i]] = i+1;
     }
   }
 
@@ -109,22 +162,26 @@ namespace Gecode { namespace Int { namespace Extensional {
     
   template<class IndexType>
   forceinline
-  BitSet<IndexType>::BitSet(Space&, const TinyBitSet<1U>&) {
+  BitSet<IndexType>::BitSet(Space&, const TinyBitSet<1U>&)
+    : _limit(0U), _capacity(0U), _index(nullptr), _bits(nullptr), _pos(nullptr) {
     GECODE_NEVER;
   }
   template<class IndexType>
   forceinline
-  BitSet<IndexType>::BitSet(Space&, const TinyBitSet<2U>&) {
+  BitSet<IndexType>::BitSet(Space&, const TinyBitSet<2U>&)
+    : _limit(0U), _capacity(0U), _index(nullptr), _bits(nullptr), _pos(nullptr) {
     GECODE_NEVER;
   }
   template<class IndexType>
   forceinline
-  BitSet<IndexType>::BitSet(Space&, const TinyBitSet<3U>&) {
+  BitSet<IndexType>::BitSet(Space&, const TinyBitSet<3U>&)
+    : _limit(0U), _capacity(0U), _index(nullptr), _bits(nullptr), _pos(nullptr) {
     GECODE_NEVER;
   }
   template<class IndexType>
   forceinline
-  BitSet<IndexType>::BitSet(Space&, const TinyBitSet<4U>&) {
+  BitSet<IndexType>::BitSet(Space&, const TinyBitSet<4U>&)
+    : _limit(0U), _capacity(0U), _index(nullptr), _bits(nullptr), _pos(nullptr) {
     GECODE_NEVER;
   }
 
@@ -137,9 +194,16 @@ namespace Gecode { namespace Int { namespace Extensional {
       _bits[i] = w;
       if (w.none()) {
         assert(_bits[i].none());
+        const IndexType removed_idx = _index[i];
         _limit--;
+        const IndexType moved_idx = _index[_limit];
         _bits[i] = _bits[_limit];
-        _index[i] = _index[_limit];
+        _index[i] = moved_idx;
+        if (_pos != nullptr) {
+          _pos[removed_idx] = 0;
+          if (i < _limit)
+            _pos[moved_idx] = i+1;
+        }
       }
     }
   }
@@ -160,6 +224,31 @@ namespace Gecode { namespace Int { namespace Extensional {
     assert(_limit > 0U);
     for (IndexType i=0; i<_limit; i++)
       mask[i] = BitSetData::o(mask[i],b[_index[i]]);
+  }
+
+  template<class IndexType>
+  forceinline void
+  BitSet<IndexType>::add_to_mask(const CompressedSupport& support,
+                                 BitSetData* mask) const {
+    if ((_limit == 0U) || support.empty())
+      return;
+    if (_pos == nullptr) {
+      for (IndexType i=0; i<_limit; i++) {
+        const BitSetData* w = find_support_word(support,_index[i]);
+        if (w != nullptr)
+          mask[i] = BitSetData::o(mask[i],*w);
+      }
+      return;
+    }
+    for (const TupleSet::CSupportWord* s=support.begin();
+         s<support.end(); ++s) {
+      if (s->widx >= static_cast<unsigned int>(_capacity))
+        continue;
+      const IndexType p = _pos[s->widx];
+      if (p == 0U)
+        continue;
+      mask[p-1] = BitSetData::o(mask[p-1],s->bits);
+    }
   }
 
   template<class IndexType>
@@ -185,6 +274,25 @@ namespace Gecode { namespace Int { namespace Extensional {
       }
     }
   }
+
+  template<class IndexType>
+  forceinline void
+  BitSet<IndexType>::intersect_with_mask(const CompressedSupport& support) {
+    if (_limit == 0U)
+      return;
+    for (IndexType i = _limit; i--; ) {
+      assert(!_bits[i].none());
+      const BitSetData* s = find_support_word(support,_index[i]);
+      BitSetData w;
+      if (s == nullptr) {
+        w.init(false);
+      } else {
+        w = BitSetData::a(_bits[i],*s);
+      }
+      replace_and_decrease(i,w);
+      assert(i == _limit || !_bits[i].none());
+    }
+  }
   
   template<class IndexType>
   forceinline void
@@ -198,6 +306,29 @@ namespace Gecode { namespace Int { namespace Extensional {
       BitSetData w_o = BitSetData::o(a[offset], b[offset]);
       BitSetData w_a = BitSetData::a(w_i,w_o);
       replace_and_decrease(i,w_a);
+      assert(i == _limit || !_bits[i].none());
+    }
+  }
+
+  template<class IndexType>
+  forceinline void
+  BitSet<IndexType>::intersect_with_masks(const CompressedSupport& a, const CompressedSupport& b) {
+    if (_limit == 0U)
+      return;
+    for (IndexType i = _limit; i--; ) {
+      assert(!_bits[i].none());
+      const BitSetData* sa = find_support_word(a,_index[i]);
+      const BitSetData* sb = find_support_word(b,_index[i]);
+      BitSetData m;
+      if (sa != nullptr) {
+        m = *sa;
+      } else {
+        m.init(false);
+      }
+      if (sb != nullptr)
+        m = BitSetData::o(m,*sb);
+      BitSetData w = BitSetData::a(_bits[i],m);
+      replace_and_decrease(i,w);
       assert(i == _limit || !_bits[i].none());
     }
   }
@@ -215,11 +346,65 @@ namespace Gecode { namespace Int { namespace Extensional {
   }
 
   template<class IndexType>
+  forceinline void
+  BitSet<IndexType>::nand_with_mask(const CompressedSupport& support) {
+    if ((_limit == 0U) || support.empty())
+      return;
+    if (_pos == nullptr) {
+      for (IndexType i = _limit; i--; ) {
+        assert(!_bits[i].none());
+        const BitSetData* w0 = find_support_word(support,_index[i]);
+        if (w0 != nullptr) {
+          BitSetData w = BitSetData::a(_bits[i],~(*w0));
+          replace_and_decrease(i,w);
+          assert(i == _limit || !_bits[i].none());
+        }
+      }
+      return;
+    }
+    for (const TupleSet::CSupportWord* s=support.begin();
+         s<support.end(); ++s) {
+      if (s->widx >= static_cast<unsigned int>(_capacity))
+        continue;
+      const IndexType p = _pos[s->widx];
+      if (p == 0U)
+        continue;
+      const IndexType i = p-1;
+      BitSetData w = BitSetData::a(_bits[i],~(s->bits));
+      replace_and_decrease(i,w);
+    }
+  }
+
+  template<class IndexType>
   forceinline bool
   BitSet<IndexType>::intersects(const BitSetData* b) const {
     for (IndexType i=0; i<_limit; i++)
       if (!BitSetData::a(_bits[i],b[_index[i]]).none())
         return true;
+    return false;
+  }
+
+  template<class IndexType>
+  forceinline bool
+  BitSet<IndexType>::intersects(const CompressedSupport& support) const {
+    if ((_limit == 0U) || support.empty())
+      return false;
+    if (_pos == nullptr) {
+      for (IndexType i=0; i<_limit; i++) {
+        const BitSetData* w = find_support_word(support,_index[i]);
+        if ((w != nullptr) && !BitSetData::a(_bits[i],*w).none())
+          return true;
+      }
+      return false;
+    }
+    for (const TupleSet::CSupportWord* s=support.begin();
+         s<support.end(); ++s) {
+      if (s->widx >= static_cast<unsigned int>(_capacity))
+        continue;
+      const IndexType p = _pos[s->widx];
+      if ((p != 0U) && !BitSetData::a(_bits[p-1],s->bits).none())
+        return true;
+    }
     return false;
   }
     
@@ -230,6 +415,34 @@ namespace Gecode { namespace Int { namespace Extensional {
     for (IndexType i=0; i<_limit; i++)
       o += static_cast<unsigned long long int>
         (BitSetData::a(_bits[i],b[_index[i]]).ones());
+    return o;
+  }
+
+  template<class IndexType>
+  forceinline unsigned long long int
+  BitSet<IndexType>::ones(const CompressedSupport& support) const {
+    unsigned long long int o = 0U;
+    if ((_limit == 0U) || support.empty())
+      return 0U;
+    if (_pos == nullptr) {
+      for (IndexType i=0; i<_limit; i++) {
+        const BitSetData* w = find_support_word(support,_index[i]);
+        if (w != nullptr)
+          o += static_cast<unsigned long long int>
+            (BitSetData::a(_bits[i],*w).ones());
+      }
+      return o;
+    }
+    for (const TupleSet::CSupportWord* s=support.begin();
+         s<support.end(); ++s) {
+      if (s->widx >= static_cast<unsigned int>(_capacity))
+        continue;
+      const IndexType p = _pos[s->widx];
+      if (p == 0U)
+        continue;
+      o += static_cast<unsigned long long int>
+        (BitSetData::a(_bits[p-1],s->bits).ones());
+    }
     return o;
   }
     

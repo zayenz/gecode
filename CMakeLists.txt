@@ -158,6 +158,11 @@ endif()
 
 if(GECODE_ENABLE_MPFR)
   find_package(MPFR)
+  if(NOT MPFR_FOUND)
+    message(WARNING
+      "GECODE_ENABLE_MPFR=ON but MPFR was not found; float-MPFR support will be disabled. "
+      "Set CMAKE_PREFIX_PATH, MPFR_ROOT, or a toolchain file (for example vcpkg) to locate MPFR.")
+  endif()
 endif()
 
 set(GECODE_HAS_QT_RUNTIME FALSE)
@@ -718,6 +723,16 @@ if(BUILD_TESTING)
       Int::Arithmetic::Max::Nary
       Int::Cumulative::Man::Fix::0::4
       Int::Distinct::Random
+      Int::Extensional::TupleSet::DenseCompressed::+::Base
+      Int::Extensional::TupleSet::DenseCompressed::-::Base
+      Int::Extensional::TupleSet::Sparse::+::Base
+      Int::Extensional::TupleSet::Sparse::-::Base
+      Extensional::TupleSet::Sparse::IncrementalDelta
+      Extensional::TupleSet::Sparse::NegativePrune
+      Extensional::TupleSet::Sparse::ReifiedModes
+      Extensional::TupleSet::Auto::DefaultDispatch
+      Extensional::TupleSet::DenseCompressed::WideGap
+      Extensional::TupleSet::Support::SingleRepresentation
       Int::Linear::Bool::Int::Lq
       Int::MiniModel::LinExpr::Bool::352
       NoGoods::Queens
@@ -742,12 +757,12 @@ if(BUILD_TESTING)
     get_property(GECODE_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
     if(GECODE_IS_MULTI_CONFIG)
       add_custom_target(check
-        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$" -C $<CONFIG>
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test" -C $<CONFIG>
         DEPENDS gecode-test
         USES_TERMINAL)
     else()
       add_custom_target(check
-        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test$"
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^test"
         DEPENDS gecode-test
         USES_TERMINAL)
     endif()

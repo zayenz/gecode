@@ -115,7 +115,7 @@ namespace {
       delete s;
     }
 
-    bishops.finalize();
+    bishops.finalize(EPK_AUTO);
   }
 }
 /**
@@ -420,4 +420,3 @@ main(int argc, char* argv[]) {
 }
 
 // STATISTICS: example-any
-

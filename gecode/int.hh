@@ -2313,7 +2313,43 @@ namespace Gecode {
 
 #include <gecode/int/extensional/dfa.hpp>
 
+namespace Gecode { namespace Int { namespace Extensional {
+
+  class TupleSetAccess;
+
+}}}
+
 namespace Gecode {
+
+  /**
+   * \brief Representation and posting selection for extensional tuple sets
+   *
+   * The selector controls which support representation is materialized by
+   * TupleSet::finalize(ExtensionalPropKind) and which propagator family is
+   * used by tuple-set extensional posting. Posting with EPK_DENSE or
+   * EPK_DENSE_COMPRESSED requires a tuple set finalized with a matching
+   * representation. EPK_SPARSE can also post from dense support data.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  enum class ExtensionalPropKind {
+    EPK_AUTO,   ///< Select representation and posting automatically
+    EPK_DENSE,  ///< Use dense support representation/posting
+    EPK_SPARSE, ///< Use sparse support representation/posting
+    EPK_DENSE_COMPRESSED ///< Use compressed dense support representation/posting
+  };
+  /// Select representation and posting automatically
+  static constexpr ExtensionalPropKind EPK_AUTO =
+    ExtensionalPropKind::EPK_AUTO;
+  /// Use dense support representation/posting
+  static constexpr ExtensionalPropKind EPK_DENSE =
+    ExtensionalPropKind::EPK_DENSE;
+  /// Use sparse support representation/posting
+  static constexpr ExtensionalPropKind EPK_SPARSE =
+    ExtensionalPropKind::EPK_SPARSE;
+  /// Use compressed dense support representation/posting
+  static constexpr ExtensionalPropKind EPK_DENSE_COMPRESSED =
+    ExtensionalPropKind::EPK_DENSE_COMPRESSED;
 
   /** \brief Class representing a set of tuples.
    *
@@ -2324,6 +2360,7 @@ namespace Gecode {
    * \ingroup TaskModelIntExt
    */
   class TupleSet : public SharedHandle {
+    friend class Int::Extensional::TupleSetAccess;
   public:
     /** \brief Type of a tuple
      *
@@ -2332,6 +2369,12 @@ namespace Gecode {
     typedef int* Tuple;
     /// Import bit set data type
     typedef Gecode::Support::BitSetData BitSetData;
+    /// Compressed support data for one tuple-word block
+    class CSupportWord {
+    public:
+      unsigned int widx; ///< Word index in tuple-word array
+      BitSetData bits;   ///< Support bits in that word
+    };
     /// Range information
     class Range {
     public:
@@ -2341,6 +2384,8 @@ namespace Gecode {
       int max;
       /// Begin of supports
       BitSetData* s;
+      /// Base index for sparse support values
+      unsigned int sparse_base;
       /// Return the width
       unsigned int width(void) const;
       /// Return the supports for value \a n
@@ -2366,6 +2411,14 @@ namespace Gecode {
       /// Initial number of free tuples
       static const int n_initial_free = 1024;
     public:
+      /// Support representation kind
+      enum SupportRepresentation {
+        SR_NONE,
+        SR_DENSE,
+        SR_SPARSE,
+        SR_DENSE_COMPRESSED
+      };
+    public:
       /// Arity
       int arity;
       /// Number of words for support
@@ -2388,6 +2441,24 @@ namespace Gecode {
       Range* range;
       /// Pointer to all support data
       BitSetData* support;
+      /// Support representation kind
+      SupportRepresentation support_repr;
+      /// Whether tuple set uses sparse (non-bitset) support representation
+      bool sparse;
+      /// Number of sparse support values
+      unsigned int sparse_n_vals;
+      /// Sparse support offsets (size sparse_n_vals+1)
+      unsigned int* sparse_offsets;
+      /// Sparse support tuple ids (size arity*n_tuples)
+      unsigned int* sparse_tuples;
+      /// Tuple cell to sparse support id map (size arity*n_tuples)
+      unsigned int* sparse_tv;
+      /// Compressed support offsets (size n_vals+1)
+      unsigned int* compressed_offsets;
+      /// Compressed support words (size compressed_n_entries)
+      CSupportWord* compressed_words;
+      /// Number of compressed support entries
+      unsigned int compressed_n_entries;
 
       /// Return newly added tuple
       Tuple add(void);
@@ -2406,11 +2477,15 @@ namespace Gecode {
       /// Finalize datastructure (disallows additions of more Tuples)
       GECODE_INT_EXPORT
       void finalize(void);
+      /// Finalize datastructure (disallows additions of more Tuples)
+      GECODE_INT_EXPORT
+      void finalize(ExtensionalPropKind epk);
       /// Resize tuple data
       GECODE_INT_EXPORT
       void resize(void);
       /// Is datastructure finalized
       bool finalized(void) const;
+
       /// Initialize as empty tuple set with arity \a a
       Data(int a);
       /// Delete implementation
@@ -2462,8 +2537,15 @@ namespace Gecode {
     TupleSet& add(const IntArgs& t);
     /// Is tuple set finalized
     bool finalized(void) const;
-    /// Finalize tuple set
+    /// Finalize tuple set with dense support data
     void finalize(void);
+    /// Finalize tuple set with representation \a epk
+    /**
+     * Explicit representation selection materializes only the selected
+     * support representation. Later posting with a different representation
+     * can throw OutOfLimits if that representation is unavailable.
+     */
+    void finalize(ExtensionalPropKind epk);
     //@}
 
     /// \name Tuple access
@@ -2482,6 +2564,32 @@ namespace Gecode {
     int max(void) const;
     /// Return hash key
     std::size_t hash(void) const;
+    /// Return materialized tuple-set representation
+    ExtensionalPropKind representation(void) const;
+  private:
+    /// Whether dense support representation is available
+    bool dense_support(void) const;
+    /// Whether tuple set uses sparse support representation
+    bool sparse_support(void) const;
+    /// Whether compressed dense support representation is available
+    bool dense_compressed_support(void) const;
+    /// Return number of sparse support values
+    unsigned int sparse_values(void) const;
+    /// Return tuple-value sparse ids (size tuples()*arity())
+    const unsigned int* sparse_tuple_value_ids(void) const;
+    /// Return sparse support offsets (size sparse_values()+1)
+    const unsigned int* sparse_support_offsets(void) const;
+    /// Return sparse support tuple id range for position/value, false if absent
+    bool sparse_support(int p, int n,
+                        const unsigned int*& b,
+                        const unsigned int*& e,
+                        unsigned int& gid) const;
+    /// Return compressed support words for position/value, false if absent
+    bool dense_compressed_support(int p, int n,
+                                  const CSupportWord*& b,
+                                  const CSupportWord*& e,
+                                  unsigned int& gid) const;
+  public:
     //@}
 
     /// \name Range access and iteration
@@ -2524,6 +2632,37 @@ namespace Gecode {
     };
     //@}
   };
+
+  namespace Int { namespace Extensional {
+
+    /// Internal access to finalized tuple-set support representations
+    class TupleSetAccess {
+    public:
+      /// Whether dense support representation is available
+      static bool dense_support(const TupleSet& ts);
+      /// Whether sparse support representation is available
+      static bool sparse_support(const TupleSet& ts);
+      /// Whether compressed dense support representation is available
+      static bool dense_compressed_support(const TupleSet& ts);
+      /// Return number of sparse support values
+      static unsigned int sparse_values(const TupleSet& ts);
+      /// Return tuple-value sparse ids
+      static const unsigned int* sparse_tuple_value_ids(const TupleSet& ts);
+      /// Return sparse support offsets
+      static const unsigned int* sparse_support_offsets(const TupleSet& ts);
+      /// Return sparse support tuple id range for position/value
+      static bool sparse_support(const TupleSet& ts, int p, int n,
+                                 const unsigned int*& b,
+                                 const unsigned int*& e,
+                                 unsigned int& gid);
+      /// Return compressed support words for position/value
+      static bool dense_compressed_support(const TupleSet& ts, int p, int n,
+                                           const TupleSet::CSupportWord*& b,
+                                           const TupleSet::CSupportWord*& e,
+                                           unsigned int& gid);
+    };
+
+  }}
 
 }
 
@@ -2577,6 +2716,18 @@ namespace Gecode {
   extensional(Home home, const IntVarArgs& x, const TupleSet& t,
               IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$x\in t\f$ using representation \a epk.
+   *
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::OutOfLimits if the requested
+   *     representation is not available in finalized tuple set \a t.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
   /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
    *
    * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
@@ -2592,6 +2743,30 @@ namespace Gecode {
   GECODE_INT_EXPORT void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
+   *
+   * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
+   *     and otherwise for \f$x\not\in t\f$.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x and \a t are of different size.
+   * \li Throws an exception of type Int::NotYetFinalized, if the tuple
+   *     set \a t has not been finalized.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              IntPropLevel ipl, ExtensionalPropKind epk);
 
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$.
    *
@@ -2607,6 +2782,14 @@ namespace Gecode {
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, Reify r,
               IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, Reify r,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$.
    *
    * \li If \a pos is true, it posts a propagator for \f$(x\in t)\equiv r\f$
@@ -2624,6 +2807,32 @@ namespace Gecode {
               Reify r,
               IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              Reify r, ExtensionalPropKind epk,
+              IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$.
+   *
+   * \li If \a pos is true, it posts a propagator for \f$(x\in t)\equiv r\f$
+   *     and otherwise for \f$(x\not\in t)\equiv r\f$.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x and \a t are of different size.
+   * \li Throws an exception of type Int::NotYetFinalized, if the tuple
+   *     set \a t has not been finalized.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              Reify r,
+              IntPropLevel ipl, ExtensionalPropKind epk);
+
   /** \brief Post propagator for \f$x\in t\f$.
    *
    * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
@@ -2637,6 +2846,18 @@ namespace Gecode {
   void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
               IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ using representation \a epk.
+   *
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::OutOfLimits if the requested
+   *     representation is not available in finalized tuple set \a t.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
 
   /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
    *
@@ -2654,6 +2875,30 @@ namespace Gecode {
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
+   *
+   * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
+   *     and otherwise for \f$x\not\in t\f$.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x and \a t are of different size.
+   * \li Throws an exception of type Int::NotYetFinalized, if the tuple
+   *     set \a t has not been finalized.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              IntPropLevel ipl, ExtensionalPropKind epk);
+
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$.
    *
    * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
@@ -2667,6 +2912,14 @@ namespace Gecode {
   void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, Reify r,
               IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, Reify r,
+              ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
 
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$.
    *
@@ -2684,6 +2937,32 @@ namespace Gecode {
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               Reify r,
               IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$ using representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              Reify r, ExtensionalPropKind epk,
+              IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$(x\in t)\equiv r\f$ or \f$(x\not\in t)\equiv r\f$.
+   *
+   * \li If \a pos is true, it posts a propagator for \f$(x\in t)\equiv r\f$
+   *     and otherwise for \f$(x\not\in t)\equiv r\f$.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x and \a t are of different size.
+   * \li Throws an exception of type Int::NotYetFinalized, if the tuple
+   *     set \a t has not been finalized.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              Reify r,
+              IntPropLevel ipl, ExtensionalPropKind epk);
 
 }
 
@@ -5849,4 +6128,3 @@ namespace Gecode {
 
 // IFDEF: GECODE_HAS_INT_VARS
 // STATISTICS: int-post
-

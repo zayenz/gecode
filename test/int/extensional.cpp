@@ -1468,6 +1468,475 @@ namespace Test { namespace Int {
        }
      };
 
+     /// Positive tuple-set bounds propagation should keep interior holes
+     class TupleSetBoundsKeepsInterior : public ::Test::Base {
+     public:
+       TupleSetBoundsKeepsInterior(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::KeepsInterior") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t)
+             : x(*this,2,0,4) {
+             rel(*this,x[1],IRT_EQ,0);
+             extensional(*this,x,t,true,IPL_BND);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({0,0}).add({2,0}).add({4,0});
+         ts.finalize();
+
+         BoundsSpace* s = new BoundsSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         (s->x[0].min() == 0) &&
+                         (s->x[0].max() == 4) &&
+                         (s->x[0].size() == 5);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Positive tuple-set bounds propagation should tighten unsupported bounds
+     class TupleSetBoundsTighten : public ::Test::Base {
+     public:
+       TupleSetBoundsTighten(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::Tighten") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t)
+             : x(*this,2,0,4) {
+             rel(*this,x[1],IRT_EQ,0);
+             extensional(*this,x,t,true,IPL_BND);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({1,0}).add({3,0});
+         ts.finalize();
+
+         BoundsSpace* s = new BoundsSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         (s->x[0].min() == 1) &&
+                         (s->x[0].max() == 3) &&
+                         (s->x[0].size() == 3);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Bounds pruning must re-check tuple supports against domain holes
+     class TupleSetBoundsDomainSupport : public ::Test::Base {
+     public:
+       TupleSetBoundsDomainSupport(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::DomainSupport") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t)
+             : x(*this,2,0,4) {
+             rel(*this,x[1],IRT_LQ,1);
+             extensional(*this,x,t,true,IPL_BND);
+             rel(*this,x[1],IRT_NQ,0);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({0,0}).add({4,1});
+         ts.finalize();
+
+         BoundsSpace* s = new BoundsSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         s->x[0].assigned() && (s->x[0].val() == 4) &&
+                         s->x[1].assigned() && (s->x[1].val() == 1);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Per-position levels should allow mixed bounds and domain pruning
+     class TupleSetMixedLevels : public ::Test::Base {
+     public:
+       TupleSetMixedLevels(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::MixedLevels") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class MixedSpace : public Space {
+         public:
+           IntVarArray x;
+           MixedSpace(const TupleSet& t)
+             : x(*this,2,0,4) {
+             IntPropLevelArgs ipls({IPL_BND, IPL_DOM});
+             extensional(*this,x,t,true,ipls);
+           }
+           MixedSpace(MixedSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new MixedSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({0,0}).add({4,2});
+         ts.finalize();
+
+         MixedSpace* s = new MixedSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         (s->x[0].min() == 0) &&
+                         (s->x[0].max() == 4) &&
+                         (s->x[0].size() == 5) &&
+                         (s->x[1].min() == 0) &&
+                         (s->x[1].max() == 2) &&
+                         (s->x[1].size() == 2) &&
+                         !s->x[1].in(1);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Per-position levels should also work for Boolean tuple sets
+     class TupleSetBoolMixedLevels : public ::Test::Base {
+     public:
+       TupleSetBoolMixedLevels(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::BoolMixedLevels") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class MixedSpace : public Space {
+         public:
+           BoolVarArray x;
+           MixedSpace(const TupleSet& t)
+             : x(*this,2,0,1) {
+             rel(*this,x[0],IRT_EQ,1);
+             IntPropLevelArgs ipls({IPL_BND, IPL_DOM});
+             extensional(*this,x,t,true,ipls);
+           }
+           MixedSpace(MixedSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new MixedSpace(*this);
+           }
+         };
+
+         TupleSet ts(2);
+         ts.add({0,0}).add({1,1});
+         ts.finalize();
+
+         MixedSpace* s = new MixedSpace(ts);
+         const bool ok = (s->status() != SS_FAILED) &&
+                         s->x[0].assigned() && (s->x[0].val() == 1) &&
+                         s->x[1].assigned() && (s->x[1].val() == 1);
+         delete s;
+         return ok;
+       }
+     };
+
+     /// Bounds pruning should work with compact-table tuple-set representations
+     class TupleSetBoundsRepresentations : public ::Test::Base {
+     public:
+       TupleSetBoundsRepresentations(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::Representations") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t, ExtensionalPropKind epk)
+             : x(*this,2,0,4) {
+             rel(*this,x[1],IRT_EQ,0);
+             extensional(*this,x,t,true,IPL_BND,epk);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+
+         ExtensionalPropKind epks[2] = {
+           EPK_DENSE, EPK_DENSE_COMPRESSED
+         };
+         for (int i=0; i<2; i++) {
+           TupleSet ts(2);
+           ts.add({1,0}).add({3,0});
+           ts.finalize(epks[i]);
+           BoundsSpace* s = new BoundsSpace(ts,epks[i]);
+           const bool ok = (s->status() != SS_FAILED) &&
+                           (s->x[0].min() == 1) &&
+                           (s->x[0].max() == 3) &&
+                           (s->x[0].size() == 3);
+           delete s;
+           if (!ok)
+             return false;
+         }
+         return true;
+       }
+     };
+
+     /// Bounds pruning must not subsume while interior values are unsupported
+     class TupleSetBoundsNoEarlySubsumption : public ::Test::Base {
+     public:
+       TupleSetBoundsNoEarlySubsumption(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::NoEarlySubsumption") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSearchSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSearchSpace(const TupleSet& t, ExtensionalPropKind epk)
+             : x(*this,2,0,3) {
+             rel(*this,x[1],IRT_EQ,0);
+             extensional(*this,x,t,true,IPL_BND,epk);
+             branch(*this,x,INT_VAR_NONE(),INT_VAL_MIN());
+           }
+           BoundsSearchSpace(BoundsSearchSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSearchSpace(*this);
+           }
+         };
+
+         ExtensionalPropKind epks[2] = {
+           EPK_DENSE, EPK_DENSE_COMPRESSED
+         };
+         for (int i=0; i<2; i++) {
+           TupleSet ts(2);
+           ts.add({1,0}).add({3,0});
+           ts.finalize(epks[i]);
+           BoundsSearchSpace* root = new BoundsSearchSpace(ts,epks[i]);
+           DFS<BoundsSearchSpace> e(root);
+           delete root;
+
+           int n = 0;
+           while (BoundsSearchSpace* sol = e.next()) {
+             const int v = sol->x[0].val();
+             if ((sol->x[1].val() != 0) || ((v != 1) && (v != 3))) {
+               delete sol;
+               return false;
+             }
+             n++;
+             delete sol;
+           }
+           if (n != 2)
+             return false;
+         }
+         return true;
+       }
+     };
+
+     /// Unary bounds tuple-set posting must keep an actor for interior values
+     class TupleSetBoundsUnarySearch : public ::Test::Base {
+     public:
+       TupleSetBoundsUnarySearch(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::UnarySearch") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class UnarySearchSpace : public Space {
+         public:
+           IntVarArray x;
+           UnarySearchSpace(const TupleSet& t, ExtensionalPropKind epk)
+             : x(*this,1,1,3) {
+             extensional(*this,x,t,true,IPL_BND,epk);
+             branch(*this,x,INT_VAR_NONE(),INT_VAL_MIN());
+           }
+           UnarySearchSpace(UnarySearchSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new UnarySearchSpace(*this);
+           }
+         };
+
+         ExtensionalPropKind epks[2] = {
+           EPK_DENSE, EPK_DENSE_COMPRESSED
+         };
+         for (int i=0; i<2; i++) {
+           TupleSet ts(1);
+           ts.add({1}).add({3});
+           ts.finalize(epks[i]);
+           UnarySearchSpace* root = new UnarySearchSpace(ts,epks[i]);
+           DFS<UnarySearchSpace> e(root);
+           delete root;
+
+           int n = 0;
+           while (UnarySearchSpace* sol = e.next()) {
+             const int v = sol->x[0].val();
+             if ((v != 1) && (v != 3)) {
+               delete sol;
+               return false;
+             }
+             n++;
+             delete sol;
+           }
+           if (n != 2)
+             return false;
+         }
+         return true;
+       }
+     };
+
+     /// Bounds advisors should tolerate unsupported exposed bounds
+     class TupleSetBoundsAdvisorAfterPost : public ::Test::Base {
+     public:
+       TupleSetBoundsAdvisorAfterPost(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::AdvisorAfterPost") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t, ExtensionalPropKind epk)
+             : x(*this,2,0,5) {
+             rel(*this,x[1],IRT_EQ,0);
+             extensional(*this,x,t,true,IPL_BND,epk);
+             rel(*this,x[0],IRT_NQ,0);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+
+         ExtensionalPropKind epks[2] = {
+           EPK_DENSE, EPK_DENSE_COMPRESSED
+         };
+         for (int i=0; i<2; i++) {
+           TupleSet ts(2);
+           ts.add({0,0}).add({5,0});
+           ts.finalize(epks[i]);
+           BoundsSpace* s = new BoundsSpace(ts,epks[i]);
+           const bool ok = (s->status() != SS_FAILED) &&
+                           s->x[0].assigned() && (s->x[0].val() == 5) &&
+                           s->x[1].assigned() && (s->x[1].val() == 0);
+           delete s;
+           if (!ok)
+             return false;
+         }
+         return true;
+       }
+     };
+
+     /// Per-position overloads should default to automatic representation
+     class TupleSetBoundsAutoDispatch : public ::Test::Base {
+     public:
+       TupleSetBoundsAutoDispatch(void)
+         : ::Test::Base("Extensional::TupleSet::Bounds::AutoDispatch") {}
+
+       virtual bool run(void) {
+         using namespace Gecode;
+         class BoundsSpace : public Space {
+         public:
+           IntVarArray x;
+           BoundsSpace(const TupleSet& t)
+             : x(*this,2,0,3) {
+             rel(*this,x[1],IRT_EQ,0);
+             IntPropLevelArgs ipls({IPL_BND, IPL_BND});
+             extensional(*this,x,t,true,ipls);
+           }
+           BoundsSpace(BoundsSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new BoundsSpace(*this);
+           }
+         };
+         class SparseDomainSpace : public Space {
+         public:
+           IntVarArray x;
+           SparseDomainSpace(const TupleSet& t, bool pos)
+             : x(*this,2,0,1) {
+             IntPropLevelArgs ipls({IPL_DOM, IPL_DOM});
+             extensional(*this,x,t,pos,ipls);
+           }
+           SparseDomainSpace(SparseDomainSpace& s)
+             : Space(s) {
+             x.update(*this,s.x);
+           }
+           virtual Space* copy(void) {
+             return new SparseDomainSpace(*this);
+           }
+         };
+
+         TupleSet dense_compressed(2);
+         dense_compressed.add({1,0}).add({3,0});
+         dense_compressed.finalize(EPK_DENSE_COMPRESSED);
+         BoundsSpace* b = new BoundsSpace(dense_compressed);
+         bool ok = (b->status() != SS_FAILED) &&
+                   (b->x[0].min() == 1) && (b->x[0].max() == 3);
+         delete b;
+         if (!ok)
+           return false;
+
+         TupleSet sparse(2);
+         sparse.add({0,0});
+         sparse.finalize(EPK_SPARSE);
+         if (sparse.representation() == EPK_DENSE)
+           return false;
+
+         SparseDomainSpace* p = new SparseDomainSpace(sparse,true);
+         ok = (p->status() != SS_FAILED) &&
+              p->x[0].assigned() && (p->x[0].val() == 0) &&
+              p->x[1].assigned() && (p->x[1].val() == 0);
+         delete p;
+         if (!ok)
+           return false;
+
+         SparseDomainSpace* n = new SparseDomainSpace(sparse,false);
+         ok = n->status() != SS_FAILED;
+         delete n;
+         return ok;
+       }
+     };
+
      /// %Test with large tuple set
      class TupleSetLarge : public Test {
      protected:
@@ -1832,6 +2301,16 @@ namespace Test { namespace Int {
      SparseTupleSetNegativeFail sparse_tuple_set_negative_fail;
      SparseTupleSetNegativePrune sparse_tuple_set_negative_prune;
      SparseTupleSetReifiedModes sparse_tuple_set_reified_modes;
+     TupleSetBoundsKeepsInterior tuple_set_bounds_keeps_interior;
+     TupleSetBoundsTighten tuple_set_bounds_tighten;
+     TupleSetBoundsDomainSupport tuple_set_bounds_domain_support;
+     TupleSetMixedLevels tuple_set_mixed_levels;
+     TupleSetBoolMixedLevels tuple_set_bool_mixed_levels;
+     TupleSetBoundsRepresentations tuple_set_bounds_representations;
+     TupleSetBoundsNoEarlySubsumption tuple_set_bounds_no_early_subsumption;
+     TupleSetBoundsUnarySearch tuple_set_bounds_unary_search;
+     TupleSetBoundsAdvisorAfterPost tuple_set_bounds_advisor_after_post;
+     TupleSetBoundsAutoDispatch tuple_set_bounds_auto_dispatch;
      //@}
 
    }

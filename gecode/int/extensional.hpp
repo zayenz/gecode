@@ -41,13 +41,31 @@ namespace Gecode {
 
   forceinline void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t,
+              const IntPropLevelArgs& ipl) {
+    extensional(home, x, t, true, ipl);
+  }
+
+  forceinline void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t,
               ExtensionalPropKind epk, IntPropLevel ipl) {
     extensional(home, x, t, true, ipl, epk);
   }
 
   forceinline void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, const IntPropLevelArgs& ipl) {
+    extensional(home, x, t, true, ipl, epk);
+  }
+
+  forceinline void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t,
               IntPropLevel ipl, ExtensionalPropKind epk) {
+    extensional(home, x, t, true, ipl, epk);
+  }
+
+  forceinline void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t,
+              const IntPropLevelArgs& ipl, ExtensionalPropKind epk) {
     extensional(home, x, t, true, ipl, epk);
   }
 
@@ -89,13 +107,31 @@ namespace Gecode {
 
   forceinline void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
+              const IntPropLevelArgs& ipl) {
+    extensional(home, x, t, true, ipl);
+  }
+
+  forceinline void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
               ExtensionalPropKind epk, IntPropLevel ipl) {
     extensional(home, x, t, true, ipl, epk);
   }
 
   forceinline void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, const IntPropLevelArgs& ipl) {
+    extensional(home, x, t, true, ipl, epk);
+  }
+
+  forceinline void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
               IntPropLevel ipl, ExtensionalPropKind epk) {
+    extensional(home, x, t, true, ipl, epk);
+  }
+
+  forceinline void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
+              const IntPropLevelArgs& ipl, ExtensionalPropKind epk) {
     extensional(home, x, t, true, ipl, epk);
   }
 

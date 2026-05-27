@@ -1000,6 +1000,77 @@ namespace Gecode {
     IPL_BITS_ = 4 ///< Number of bits required (internal)
   };
 
+  class IntPropLevelArgs;
+
+  /// Traits of %IntPropLevelArgs
+  template<>
+  class ArrayTraits<ArgArray<IntPropLevel>> {
+  public:
+    typedef IntPropLevelArgs StorageType;
+    typedef IntPropLevel     ValueType;
+    typedef IntPropLevelArgs ArgsType;
+  };
+
+  /// Argument array for propagation levels
+  class IntPropLevelArgs : public ArgArray<IntPropLevel> {
+  public:
+    /// Allocate empty array
+    IntPropLevelArgs(void);
+    /// Allocate array with \a n elements
+    explicit IntPropLevelArgs(int n);
+    /// Initialize from vector \a x
+    IntPropLevelArgs(const std::vector<IntPropLevel>& x);
+    /// Initialize from initializer list \a x
+    IntPropLevelArgs(std::initializer_list<IntPropLevel> x);
+    /// Initialize from InputIterator \a first and \a last
+    template<class InputIterator>
+    IntPropLevelArgs(InputIterator first, InputIterator last);
+    /// Allocate array with \a n elements and initialize with elements from \a e
+    IntPropLevelArgs(int n, const IntPropLevel* e);
+    /// Initialize from argument array \a a
+    IntPropLevelArgs(const ArgArray<IntPropLevel>& a);
+    /// Assignment operator
+    IntPropLevelArgs& operator =(const IntPropLevelArgs&) = default;
+  };
+
+  /// Traits of %IntPropLevelArgs
+  template<>
+  class ArrayTraits<IntPropLevelArgs> {
+  public:
+    typedef IntPropLevelArgs StorageType;
+    typedef IntPropLevel     ValueType;
+    typedef IntPropLevelArgs ArgsType;
+  };
+
+  forceinline
+  IntPropLevelArgs::IntPropLevelArgs(void)
+    : ArgArray<IntPropLevel>(0) {}
+
+  forceinline
+  IntPropLevelArgs::IntPropLevelArgs(int n)
+    : ArgArray<IntPropLevel>(n) {}
+
+  forceinline
+  IntPropLevelArgs::IntPropLevelArgs(const std::vector<IntPropLevel>& x)
+    : ArgArray<IntPropLevel>(x) {}
+
+  forceinline
+  IntPropLevelArgs::IntPropLevelArgs(std::initializer_list<IntPropLevel> x)
+    : ArgArray<IntPropLevel>(x) {}
+
+  template<class InputIterator>
+  forceinline
+  IntPropLevelArgs::IntPropLevelArgs(InputIterator first, InputIterator last)
+    : ArgArray<IntPropLevel>(first,last) {}
+
+  forceinline
+  IntPropLevelArgs::IntPropLevelArgs(int n, const IntPropLevel* e)
+    : ArgArray<IntPropLevel>(n,e) {}
+
+  forceinline
+  IntPropLevelArgs::IntPropLevelArgs(const ArgArray<IntPropLevel>& a)
+    : ArgArray<IntPropLevel>(a) {}
+
   /// Extract value, bounds, or domain propagation from propagation level
   IntPropLevel vbd(IntPropLevel ipl);
 
@@ -2704,7 +2775,10 @@ namespace Gecode {
 
   /** \brief Post propagator for \f$x\in t\f$.
    *
-   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) and bounds
+   *     pruning (\a ipl = IPL_BND).
+   * \li Bounds pruning uses dense or dense-compressed compact-table
+   *     representations.
    * \li Throws an exception of type Int::ArgumentSizeMismatch, if
    *     \a x and \a t are of different size.
    * \li Throws an exception of type Int::NotYetFinalized, if the tuple
@@ -2716,11 +2790,31 @@ namespace Gecode {
   extensional(Home home, const IntVarArgs& x, const TupleSet& t,
               IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$x\in t\f$ with per-position propagation levels.
+   *
+   * \li Supports domain consistency for positions with \a ipl entry IPL_DOM
+   *     or IPL_DEF, and bounds pruning for entries with IPL_BND.
+   * \li Bounds pruning checks supports in the current domains but only tightens
+   *     variable bounds.
+   * \li Representation selection is automatic; bounds pruning uses dense or
+   *     dense-compressed compact-table representations.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x, \a ipl, and \a t are of different size.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t,
+              const IntPropLevelArgs& ipl);
+
   /** \brief Post propagator for \f$x\in t\f$ using representation \a epk.
    *
-   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) and bounds
+   *     pruning (\a ipl = IPL_BND).
    * \li Throws an exception of type Int::OutOfLimits if the requested
    *     representation is not available in finalized tuple set \a t.
+   * \li Throws an exception of type Int::OutOfLimits if bounds pruning is
+   *     requested with a sparse tuple-set representation.
    *
    * \ingroup TaskModelIntExt
    */
@@ -2728,11 +2822,31 @@ namespace Gecode {
   extensional(Home home, const IntVarArgs& x, const TupleSet& t,
               ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$x\in t\f$ using representation \a epk and per-position propagation levels.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, const IntPropLevelArgs& ipl);
+
+  /** \brief Post propagator for \f$x\in t\f$ using per-position propagation levels and representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t,
+              const IntPropLevelArgs& ipl, ExtensionalPropKind epk);
+
   /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
    *
    * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
    *     and otherwise for \f$x\not\in t\f$.
-   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) and bounds
+   *     pruning (\a ipl = IPL_BND) for positive tables. Negative tables use
+   *     the domain-consistent propagator.
+   * \li Bounds pruning uses dense or dense-compressed compact-table
+   *     representations.
    * \li Throws an exception of type Int::ArgumentSizeMismatch, if
    *     \a x and \a t are of different size.
    * \li Throws an exception of type Int::NotYetFinalized, if the tuple
@@ -2743,6 +2857,19 @@ namespace Gecode {
   GECODE_INT_EXPORT void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ with per-position propagation levels.
+   *
+   * Per-position bounds pruning is used for positive tables. Negative tables
+   * use the domain-consistent propagator.
+   * Representation selection is automatic; bounds pruning uses dense or
+   * dense-compressed compact-table representations.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              const IntPropLevelArgs& ipl);
 
   /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ using representation \a epk.
    *
@@ -2756,7 +2883,11 @@ namespace Gecode {
    *
    * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
    *     and otherwise for \f$x\not\in t\f$.
-   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) and bounds
+   *     pruning (\a ipl = IPL_BND) for positive tables. Negative tables use
+   *     the domain-consistent propagator.
+   * \li Bounds pruning uses dense or dense-compressed compact-table
+   *     representations.
    * \li Throws an exception of type Int::ArgumentSizeMismatch, if
    *     \a x and \a t are of different size.
    * \li Throws an exception of type Int::NotYetFinalized, if the tuple
@@ -2767,6 +2898,14 @@ namespace Gecode {
   GECODE_INT_EXPORT void
   extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel ipl, ExtensionalPropKind epk);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ using per-position propagation levels and representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const IntVarArgs& x, const TupleSet& t, bool pos,
+              const IntPropLevelArgs& ipl, ExtensionalPropKind epk);
 
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$.
    *
@@ -2835,7 +2974,10 @@ namespace Gecode {
 
   /** \brief Post propagator for \f$x\in t\f$.
    *
-   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) and bounds
+   *     pruning (\a ipl = IPL_BND).
+   * \li Bounds pruning uses dense or dense-compressed compact-table
+   *     representations.
    * \li Throws an exception of type Int::ArgumentSizeMismatch, if
    *     \a x and \a t are of different size.
    * \li Throws an exception of type Int::NotYetFinalized, if the tuple
@@ -2847,11 +2989,31 @@ namespace Gecode {
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
               IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$x\in t\f$ with per-position propagation levels.
+   *
+   * \li Supports domain consistency for positions with \a ipl entry IPL_DOM
+   *     or IPL_DEF, and bounds pruning for entries with IPL_BND.
+   * \li Bounds pruning checks supports in the current domains but only tightens
+   *     variable bounds.
+   * \li Representation selection is automatic; bounds pruning uses dense or
+   *     dense-compressed compact-table representations.
+   * \li Throws an exception of type Int::ArgumentSizeMismatch, if
+   *     \a x, \a ipl, and \a t are of different size.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
+              const IntPropLevelArgs& ipl);
+
   /** \brief Post propagator for \f$x\in t\f$ using representation \a epk.
    *
-   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) and bounds
+   *     pruning (\a ipl = IPL_BND).
    * \li Throws an exception of type Int::OutOfLimits if the requested
    *     representation is not available in finalized tuple set \a t.
+   * \li Throws an exception of type Int::OutOfLimits if bounds pruning is
+   *     requested with a sparse tuple-set representation.
    *
    * \ingroup TaskModelIntExt
    */
@@ -2859,11 +3021,31 @@ namespace Gecode {
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
               ExtensionalPropKind epk, IntPropLevel ipl=IPL_DEF);
 
+  /** \brief Post propagator for \f$x\in t\f$ using representation \a epk and per-position propagation levels.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
+              ExtensionalPropKind epk, const IntPropLevelArgs& ipl);
+
+  /** \brief Post propagator for \f$x\in t\f$ using per-position propagation levels and representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t,
+              const IntPropLevelArgs& ipl, ExtensionalPropKind epk);
+
   /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$.
    *
    * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
    *     and otherwise for \f$x\not\in t\f$.
-   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) and bounds
+   *     pruning (\a ipl = IPL_BND) for positive tables. Negative tables use
+   *     the domain-consistent propagator.
+   * \li Bounds pruning uses dense or dense-compressed compact-table
+   *     representations.
    * \li Throws an exception of type Int::ArgumentSizeMismatch, if
    *     \a x and \a t are of different size.
    * \li Throws an exception of type Int::NotYetFinalized, if the tuple
@@ -2874,6 +3056,19 @@ namespace Gecode {
   GECODE_INT_EXPORT void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel ipl=IPL_DEF);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ with per-position propagation levels.
+   *
+   * Per-position bounds pruning is used for positive tables. Negative tables
+   * use the domain-consistent propagator.
+   * Representation selection is automatic; bounds pruning uses dense or
+   * dense-compressed compact-table representations.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              const IntPropLevelArgs& ipl);
 
   /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ using representation \a epk.
    *
@@ -2887,7 +3082,11 @@ namespace Gecode {
    *
    * \li If \a pos is true, it posts a propagator for \f$x\in t\f$
    *     and otherwise for \f$x\not\in t\f$.
-   * \li Supports domain consistency (\a ipl = IPL_DOM, default) only.
+   * \li Supports domain consistency (\a ipl = IPL_DOM, default) and bounds
+   *     pruning (\a ipl = IPL_BND) for positive tables. Negative tables use
+   *     the domain-consistent propagator.
+   * \li Bounds pruning uses dense or dense-compressed compact-table
+   *     representations.
    * \li Throws an exception of type Int::ArgumentSizeMismatch, if
    *     \a x and \a t are of different size.
    * \li Throws an exception of type Int::NotYetFinalized, if the tuple
@@ -2898,6 +3097,14 @@ namespace Gecode {
   GECODE_INT_EXPORT void
   extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
               IntPropLevel ipl, ExtensionalPropKind epk);
+
+  /** \brief Post propagator for \f$x\in t\f$ or \f$x\not\in t\f$ using per-position propagation levels and representation \a epk.
+   *
+   * \ingroup TaskModelIntExt
+   */
+  GECODE_INT_EXPORT void
+  extensional(Home home, const BoolVarArgs& x, const TupleSet& t, bool pos,
+              const IntPropLevelArgs& ipl, ExtensionalPropKind epk);
 
   /** \brief Post propagator for \f$(x\in t)\equiv r\f$.
    *

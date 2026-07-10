@@ -660,6 +660,38 @@ if(HAVE_FORCE_INLINE)
   set(forceinline "__forceinline")
 endif()
 
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles("#include <spawn.h>
+#ifndef POSIX_SPAWN_CLOEXEC_DEFAULT
+#error POSIX_SPAWN_CLOEXEC_DEFAULT is unavailable
+#endif
+int main() {
+  posix_spawn_file_actions_t actions;
+  return posix_spawn_file_actions_addinherit_np(&actions, 2);
+}" HAVE_POSIX_SPAWN_CLOEXEC_DEFAULT_AND_ADDINHERIT_NP)
+if(HAVE_POSIX_SPAWN_CLOEXEC_DEFAULT_AND_ADDINHERIT_NP)
+  set(GECODE_HAS_POSIX_SPAWN_CLOEXEC_DEFAULT 1)
+  set(GECODE_HAS_POSIX_SPAWN_ADDINHERIT_NP 1)
+endif()
+
+check_cxx_source_compiles("#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
+#include <spawn.h>
+int main() {
+  posix_spawn_file_actions_t actions;
+  return posix_spawn_file_actions_addclosefrom_np(&actions, 3);
+}" HAVE_POSIX_SPAWN_ADDCLOSEFROM_NP)
+if(HAVE_POSIX_SPAWN_ADDCLOSEFROM_NP)
+  set(GECODE_HAS_POSIX_SPAWN_ADDCLOSEFROM_NP 1)
+endif()
+
+if((GECODE_HAS_POSIX_SPAWN_CLOEXEC_DEFAULT AND
+    GECODE_HAS_POSIX_SPAWN_ADDINHERIT_NP) OR
+   GECODE_HAS_POSIX_SPAWN_ADDCLOSEFROM_NP)
+  set(GECODE_HAS_POSIX_BLACKBOX_EXEC 1)
+endif()
+
 check_c_source_compiles("int main() { return __builtin_ffsll(0); }" HAVE_BUILTIN_FFSLL)
 if(HAVE_BUILTIN_FFSLL)
   set(GECODE_HAS_BUILTIN_FFSLL "/**/")
@@ -1251,6 +1283,16 @@ if(BUILD_TESTING)
     set(GECODE_CAN_BUILD_TESTS FALSE)
   endif()
 
+  if(GECODE_ENABLE_FLATZINC)
+    add_executable(gecode-test-blackbox-exec
+      ${GECODE_TEST_BLACKBOX_EXEC_SOURCE})
+    target_compile_features(gecode-test-blackbox-exec PRIVATE cxx_std_17)
+
+    add_library(gecode-test-blackbox-dll SHARED
+      ${GECODE_TEST_BLACKBOX_DLL_SOURCE})
+    target_compile_features(gecode-test-blackbox-dll PRIVATE cxx_std_17)
+  endif()
+
   set(GECODE_TEST_SOURCES_SELECTED ${GECODE_TEST_SOURCES})
   if(NOT GECODE_ENABLE_SET_VARS)
     list(FILTER GECODE_TEST_SOURCES_SELECTED EXCLUDE REGEX "^test/set(/|\\.cpp)")
@@ -1269,6 +1311,18 @@ if(BUILD_TESTING)
       list(APPEND GECODE_TEST_LINK_LIBS gecodeflatzinc)
     endif()
     target_link_libraries(gecode-test PRIVATE ${GECODE_TEST_LINK_LIBS})
+    if(GECODE_ENABLE_FLATZINC)
+      add_dependencies(gecode-test
+        gecode-test-blackbox-exec
+        gecode-test-blackbox-dll)
+      set(GECODE_TEST_BLACKBOX_LOG
+        "${CMAKE_CURRENT_BINARY_DIR}/gecode-test-blackbox")
+      set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+        "${GECODE_TEST_BLACKBOX_LOG}.exec_parallel"
+        "${GECODE_TEST_BLACKBOX_LOG}.exec_descendant"
+        "${GECODE_TEST_BLACKBOX_LOG}.dll_model"
+        "${GECODE_TEST_BLACKBOX_LOG}.dll_parallel")
+    endif()
 
     set(GECODE_CHECK_TESTS
       Branch::Int::Dense::3
@@ -1282,7 +1336,9 @@ if(BUILD_TESTING)
       NoGoods::Queens
       Search::DFS::Sol::Binary::Nary::Binary::1::1::1)
     if(GECODE_ENABLE_FLATZINC)
-      list(INSERT GECODE_CHECK_TESTS 1 FlatZinc::magic_square)
+      list(INSERT GECODE_CHECK_TESTS 1
+        FlatZinc::magic_square
+        FlatZinc::blackbox)
     endif()
     if(GECODE_ENABLE_SET_VARS)
       list(APPEND GECODE_CHECK_TESTS
@@ -1333,6 +1389,14 @@ if(BUILD_TESTING)
     add_test(NAME test COMMAND gecode-test ${GECODE_CHECK_ARGS})
     set_tests_properties(test PROPERTIES
       FIXTURES_REQUIRED gecode-test-built)
+    if(GECODE_ENABLE_FLATZINC)
+      set(GECODE_TEST_BLACKBOX_ENV
+        "GECODE_TEST_BLACKBOX_EXEC=$<TARGET_FILE:gecode-test-blackbox-exec>"
+        "GECODE_TEST_BLACKBOX_DLL=$<TARGET_FILE:gecode-test-blackbox-dll>"
+        "GECODE_TEST_BLACKBOX_LOG=${GECODE_TEST_BLACKBOX_LOG}")
+      set_tests_properties(test PROPERTIES
+        ENVIRONMENT "${GECODE_TEST_BLACKBOX_ENV}")
+    endif()
     set(GECODE_CHECK_DEPENDS gecode-test)
     if(GECODE_ENABLE_FLOAT_VARS)
       add_custom_target(verify-gecode-check-tests
@@ -1344,10 +1408,24 @@ if(BUILD_TESTING)
         VERBATIM)
       list(APPEND GECODE_CHECK_DEPENDS verify-gecode-check-tests)
     endif()
-    add_custom_target(check
-      COMMAND $<TARGET_FILE:gecode-test> ${GECODE_CHECK_ARGS}
-      DEPENDS ${GECODE_CHECK_DEPENDS}
-      USES_TERMINAL)
+    if(GECODE_ENABLE_FLATZINC)
+      list(APPEND GECODE_CHECK_DEPENDS
+        gecode-test-blackbox-exec
+        gecode-test-blackbox-dll)
+      add_custom_target(check
+        COMMAND ${CMAKE_COMMAND} -E env
+                GECODE_TEST_BLACKBOX_EXEC=$<TARGET_FILE:gecode-test-blackbox-exec>
+                GECODE_TEST_BLACKBOX_DLL=$<TARGET_FILE:gecode-test-blackbox-dll>
+                GECODE_TEST_BLACKBOX_LOG=${GECODE_TEST_BLACKBOX_LOG}
+                $<TARGET_FILE:gecode-test> ${GECODE_CHECK_ARGS}
+        DEPENDS ${GECODE_CHECK_DEPENDS}
+        USES_TERMINAL)
+    else()
+      add_custom_target(check
+        COMMAND $<TARGET_FILE:gecode-test> ${GECODE_CHECK_ARGS}
+        DEPENDS ${GECODE_CHECK_DEPENDS}
+        USES_TERMINAL)
+    endif()
   else()
     message(WARNING "Skipping gecode-test/check targets because required modules are disabled")
     add_custom_target(check
@@ -1438,6 +1516,7 @@ if(GECODE_INSTALL)
       PATTERN "**.hpp"
       PATTERN "LICENSE_1_0.txt"
       PATTERN "mznlib" EXCLUDE
+      PATTERN "flatzinc/blackbox.hh" EXCLUDE
       PATTERN "exampleplugin" EXCLUDE
       PATTERN "standalone-example" EXCLUDE
       PATTERN "abi*" EXCLUDE)

@@ -264,6 +264,7 @@ set(GECODE_TEST_SOURCES
   test/flatzinc/battleships5.cpp
   test/flatzinc/battleships7.cpp
   test/flatzinc/battleships9.cpp
+  test/flatzinc/blackbox.cpp
   test/flatzinc/blocksworld_instance_1.cpp
   test/flatzinc/blocksworld_instance_2.cpp
   test/flatzinc/bool_clause.cpp
@@ -422,5 +423,8 @@ set(GECODE_TEST_SOURCES
   test/set/sequence.cpp
   test/test.cpp
 )
+
+set(GECODE_TEST_BLACKBOX_EXEC_SOURCE test/flatzinc/blackbox-exec.cpp)
+set(GECODE_TEST_BLACKBOX_DLL_SOURCE test/flatzinc/blackbox-dll.cpp)
 
 set(GECODE_FLATZINC_EXE_SOURCE tools/flatzinc/fzn-gecode.cpp)

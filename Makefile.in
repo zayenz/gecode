@@ -76,6 +76,7 @@ export EXAMPLES_EXTRA_CXXFLAGS = @EXAMPLES_EXTRA_CXXFLAGS@
 export QT_CPPFLAGS = @QTDEFINES@ @QTINCLUDES@
 export LINKQT = @QTLIBS@
 export LINKCPPROFILER = @LINKCPPROFILER@
+export LINKDL = @GECODE_DL_LIBS@
 export MPFR_CPPFLAGS = @GMP_CPPFLAGS@ @MPFR_CPPFLAGS@
 ifeq "@enable_mpfr@" "yes"
 export LINKMPFR = @MPFR_LIB_PATH@ @GMP_LIB_PATH@ @MPFR_LINK@ @GMP_LINK@
@@ -823,11 +824,14 @@ FLATZINCSRC0 = flatzinc.cpp registry.cpp branch.cpp blackbox.cpp
 FLATZINC_GENSRC0 = parser.tab.cpp lexer.yy.cpp
 FLATZINCHDR0 = ast.hh conexpr.hh option.hh parser.hh \
 	plugin.hh registry.hh symboltable.hh varspec.hh \
-	branch.hh branch.hpp lastval.hh complete.hh blackbox.hh
+	branch.hh branch.hpp lastval.hh complete.hh
+FLATZINCPRIVATEHDR0 = blackbox.hh
 
 FLATZINCSRC = $(FLATZINCSRC0:%=gecode/flatzinc/%)
 FLATZINC_GENSRC = $(FLATZINC_GENSRC0:%=gecode/flatzinc/%)
 FLATZINCHDR = $(FLATZINCHDR0:%=gecode/flatzinc/%) gecode/flatzinc.hh
+FLATZINCPRIVATEHDR = $(FLATZINCPRIVATEHDR0:%=gecode/flatzinc/%)
+FLATZINCALLHDR = $(FLATZINCHDR) $(FLATZINCPRIVATEHDR)
 
 FLATZINCOBJ = \
 	$(FLATZINCSRC:%.cpp=%$(OBJSUFFIX)) \
@@ -1167,6 +1171,7 @@ FLATZINCTESTSRC0 = \
   test/flatzinc/battleships5.cpp \
   test/flatzinc/battleships7.cpp \
   test/flatzinc/battleships9.cpp \
+  test/flatzinc/blackbox.cpp \
   test/flatzinc/blocksworld_instance_1.cpp \
   test/flatzinc/blocksworld_instance_2.cpp \
   test/flatzinc/cumulatives.cpp \
@@ -1248,13 +1253,17 @@ SEARCHTESTSRC0 = \
 ARRAYTESTSRC0 = \
 	test/array.cpp
 
+BLACKBOXEXECSRC = test/flatzinc/blackbox-exec.cpp
+BLACKBOXDLLSRC = test/flatzinc/blackbox-dll.cpp
+BLACKBOXSRC = $(BLACKBOXEXECSRC) $(BLACKBOXDLLSRC)
+
 TESTSRC0 = test/test.cpp test/afc.cpp test/ldsb.cpp test/region.cpp \
 	test/groups.cpp
 
 TESTSRC = \
 	$(TESTSRC0) $(INTTESTSRC0) $(SETTESTSRC0) $(FLOATTESTSRC0) \
 	$(BRANCHTESTSRC0) $(SEARCHTESTSRC0) \
-	$(ARRAYTESTSRC0) $(FLATZINCTESTSRC0)
+	$(ARRAYTESTSRC0) $(FLATZINCTESTSRC0) $(BLACKBOXSRC)
 
 TESTHDR0 = \
 	test.hh test.hpp int.hh int.hpp set.hh set.hpp float.hh float.hpp \
@@ -1268,6 +1277,18 @@ TESTOBJ	= $(INTTESTOBJ) $(SETTESTOBJ) $(FLOATTESTOBJ) \
 	$(TESTSRC0:%.cpp=%$(OBJSUFFIX))
 TESTSBJ	= $(TESTOBJ:%$(OBJSUFFIX)=%$(SBJSUFFIX))
 TESTEXE	= test/test$(EXESUFFIX)
+BLACKBOXEXECOBJ = $(BLACKBOXEXECSRC:%.cpp=%$(OBJSUFFIX))
+BLACKBOXDLLOBJ = $(BLACKBOXDLLSRC:%.cpp=%$(OBJSUFFIX))
+BLACKBOXEXEC = test/flatzinc/blackbox-exec$(EXESUFFIX)
+BLACKBOXDLL = test/flatzinc/blackbox-dll$(DLLSUFFIX)
+BLACKBOXDLLLIB = $(BLACKBOXDLL:%$(DLLSUFFIX)=%$(LIBSUFFIX))
+BLACKBOXLOG = $(abspath test/flatzinc/blackbox)
+ifeq "@enable_flatzinc@" "yes"
+BLACKBOXFIXTURES = $(BLACKBOXEXEC) $(BLACKBOXDLL)
+else
+BLACKBOXFIXTURES =
+endif
+
 TESTBUILDDIRS = \
 	test test/int test/set test/float \
 	test/branch test/assign \
@@ -1300,7 +1321,7 @@ compilelib: mkcompiledirs
 
 compileexamples: $(EXAMPLEEXE)
 
-test: mkcompiledirs
+test: mkcompiledirs $(BLACKBOXFIXTURES)
 	@$(MAKE) $(VARIMP) $(TESTEXE)
 
 CHECKTESTS = Branch::Int::Dense::3 \
@@ -1318,6 +1339,14 @@ CHECKTESTS = Branch::Int::Dense::3 \
 	Set::RelOp::ConstSSI::Union \
 	Set::Sequence::SeqU1 \
 	Set::Wait
+
+ifeq "@enable_flatzinc@" "yes"
+CHECKTESTS += FlatZinc::blackbox
+BLACKBOXCHECKENV = \
+	GECODE_TEST_BLACKBOX_EXEC=$(abspath $(BLACKBOXEXEC)) \
+	GECODE_TEST_BLACKBOX_DLL=$(abspath $(BLACKBOXDLL)) \
+	GECODE_TEST_BLACKBOX_LOG=$(BLACKBOXLOG)
+endif
 
 ifeq "@enable_float_vars@" "yes"
 FLOATCHECKTESTS = Float::Arithmetic::PositiveNRootBounds \
@@ -1346,7 +1375,8 @@ check: test
 			exit 1; \
 		fi; \
 	done
-	$(RUNENVIRONMENT) $(TESTEXE) -iter 2 -threads 0 -fixprob 1 \
+	$(BLACKBOXCHECKENV) $(RUNENVIRONMENT) \
+		$(TESTEXE) -iter 2 -threads 0 -fixprob 1 \
 		$(CHECKTESTS:%=-test %)
 
 .PHONY: regenerate
@@ -1390,6 +1420,8 @@ gecode/kernel/var-type.hpp: $(VISDEP)
 	$(UVRUN) $(top_srcdir)/misc/genvarimp.py -typehpp $(VIS) > $@
 gecode/kernel/var-imp.hpp: $(VISDEP)
 	$(UVRUN) $(top_srcdir)/misc/genvarimp.py -header $(VIS) > $@
+
+$(ALLOBJ) $(ALLSBJ) $(TESTOBJ) $(TESTSBJ): $(VARIMP)
 
 #
 # Object targets
@@ -1562,7 +1594,7 @@ else
 export LINKALL = \
 	$(LINKFLATZINC) $(LINKDRIVER) $(LINKGIST) \
 	$(LINKSEARCH) $(LINKMM) $(LINKSET) $(LINKFLOAT) $(LINKMPFR) $(LINKINT) \
-	$(LINKKERNEL) $(LINKSUPPORT)
+	$(LINKKERNEL) $(LINKSUPPORT) $(LINKDL)
 endif
 
 $(SUPPORTDLL): $(SUPPORTOBJ)
@@ -1623,7 +1655,7 @@ $(FLATZINCDLL): $(FLATZINCOBJ) $(SUPPORTDLL) $(KERNELDLL) $(SEARCHDLL) \
 	$(CXX) $(DLLFLAGS) $(FLATZINCOBJ) $(FLATZINCSONAME) \
 		@DLLPATH@ $(LINKSUPPORT) $(LINKKERNEL) $(LINKSEARCH) $(LINKINT) \
 		$(LINKSET) $(LINKFLOAT) $(LINKMM) $(LINKGIST) $(LINKDRIVER) $(LINKQT) \
-		@LINKOUTPUT@$(FLATZINCDLL)
+		$(LINKDL) @LINKOUTPUT@$(FLATZINCDLL)
 	$(CREATELINK) $@ $(@:%$(DLLSUFFIX)=%$(SOLINKSUFFIX))
 	$(CREATELINK) $@ $(@:%$(DLLSUFFIX)=%$(SOSUFFIX))
 else
@@ -1725,13 +1757,13 @@ $(GISTDLL) $(GISTLIB): $(GISTOBJ) $(GISTRES) \
 		    -outputresource:$(GISTDLL)\;2
 ifeq "@enable_resource@" "yes"
 $(FLATZINCRC):
-	$(RCGEN) $(FLATZINCDLL) $(FLATZINCHDR) $(FLATZINCSRC) > $@
+	$(RCGEN) $(FLATZINCDLL) $(FLATZINCALLHDR) $(FLATZINCSRC) > $@
 endif
 $(FLATZINCDLL) $(FLATZINCLIB): $(FLATZINCOBJ) $(FLATZINCRES) \
 	$(SUPPORTDLL) $(KERNELDLL) $(SEARCHDLL) $(INTDLL) \
 	$(SETDLL) $(FLOATDLL) $(GISTDLL) $(MMDLL) $(DRIVERDLL)
 	$(CXX) $(DLLFLAGS) $(FLATZINCOBJ) $(FLATZINCRES) \
-		@DLLPATH@ @LINKOUTPUT@$(FLATZINCDLL) $(GLDFLAGS) $(LINKQT)
+		@DLLPATH@ @LINKOUTPUT@$(FLATZINCDLL) $(GLDFLAGS) $(LINKQT) $(LINKDL)
 	$(FIXMANIFEST) $(FLATZINCDLL).manifest
 	$(MANIFEST) -manifest $(FLATZINCDLL).manifest \
 		    -outputresource:$(FLATZINCDLL)\;2
@@ -1837,6 +1869,22 @@ $(TESTEXE): $(TESTOBJ) $(TESTRES) $(ALLLIB)
 	$(LINKALL) $(GLDFLAGS) $(LINKQT) $(LINKCPPROFILER)
 	$(FIXMANIFEST) $@.manifest $(DLLSUFFIX)
 	$(MANIFEST) -manifest $@.manifest -outputresource:$@\;1
+
+$(BLACKBOXEXECOBJ) $(BLACKBOXDLLOBJ): | mkcompiledirs
+
+$(BLACKBOXEXEC): $(BLACKBOXEXECOBJ)
+	$(CXX) @EXEOUTPUT@$@ $(BLACKBOXEXECOBJ) $(CXXFLAGS)
+
+ifeq "$(DLLSUFFIX)" "$(LIBSUFFIX)"
+$(BLACKBOXDLL): $(BLACKBOXDLLOBJ)
+	$(CXX) $(DLLFLAGS) $(BLACKBOXDLLOBJ) @LINKOUTPUT@$@
+else
+$(BLACKBOXDLL) $(BLACKBOXDLLLIB): $(BLACKBOXDLLOBJ)
+	$(CXX) $(DLLFLAGS) $(BLACKBOXDLLOBJ) @LINKOUTPUT@$(BLACKBOXDLL) $(GLDFLAGS)
+	$(FIXMANIFEST) $(BLACKBOXDLL).manifest
+	$(MANIFEST) -manifest $(BLACKBOXDLL).manifest \
+		    -outputresource:$(BLACKBOXDLL)\;2
+endif
 
 .PHONY: flatzinc
 ifeq "@enable_flatzinc@" "yes"
@@ -2087,6 +2135,13 @@ clean:
 		 changelog.hh doxygen.hh license.hh header.html
 	$(RMF) $(ALLOBJ) $(ALLSBJ) $(ALLOBJ:%$(OBJSUFFIX)=%.pdb)
 	$(RMF) $(TESTOBJ) $(TESTSBJ) $(TESTOBJ:%$(OBJSUFFIX)=%.pdb)
+	$(RMF) $(BLACKBOXEXECOBJ) $(BLACKBOXDLLOBJ) \
+		$(BLACKBOXEXECOBJ:%$(OBJSUFFIX)=%.pdb) \
+		$(BLACKBOXDLLOBJ:%$(OBJSUFFIX)=%.pdb)
+	$(RMF) $(BLACKBOXEXECOBJ:%$(OBJSUFFIX)=%.gcno) \
+		$(BLACKBOXDLLOBJ:%$(OBJSUFFIX)=%.gcno)
+	$(RMF) $(BLACKBOXEXECOBJ:%$(OBJSUFFIX)=%.gcda) \
+		$(BLACKBOXDLLOBJ:%$(OBJSUFFIX)=%.gcda)
 	$(RMF) $(GISTMOCSRC)
 	$(RMF) $(LIBTARGETS:%$(DLLSUFFIX)=%$(MANIFESTSUFFIX)) \
 		$(LIBTARGETS:%$(DLLSUFFIX)=%$(RCSUFFIX)) \
@@ -2096,6 +2151,13 @@ clean:
 		$(EXAMPLEEXE:%=%.rc) $(EXAMPLEEXE:%=%.res)
 	$(RMF) $(TESTEXE:%.exe=%.pdb) $(TESTEXE:%=%.manifest) \
 		$(TESTEXE:%=%.rc) $(TESTEXE:%=%.res)
+	$(RMF) $(BLACKBOXEXEC:%.exe=%.pdb) $(BLACKBOXEXEC:%=%.manifest) \
+		$(BLACKBOXDLL:%$(DLLSUFFIX)=%$(LIBSUFFIX)) \
+		$(BLACKBOXDLL:%$(DLLSUFFIX)=%$(PDBSUFFIX)) \
+		$(BLACKBOXDLL:%$(DLLSUFFIX)=%$(EXPSUFFIX)) \
+		$(BLACKBOXDLL:%$(DLLSUFFIX)=%$(MANIFESTSUFFIX))
+	$(RMF) $(BLACKBOXLOG).exec_parallel $(BLACKBOXLOG).exec_descendant \
+		$(BLACKBOXLOG).dll_model $(BLACKBOXLOG).dll_parallel
 	$(RMF) $(FLATZINCEXE:%.exe=%.pdb) $(FLATZINCEXE:%=%.manifest) \
 		$(FLATZINCEXE:%=%.rc) $(FLATZINCEXE:%=%.res)
 
@@ -2107,6 +2169,7 @@ veryclean: clean
 		$(LIBTARGETS:%$(DLLSUFFIX)=%$(SOSUFFIX))
 	$(RMF) $(EXAMPLEEXE)
 	$(RMF) $(TESTEXE)
+	$(RMF) $(BLACKBOXFIXTURES)
 	$(RMF) $(FLATZINCEXE)
 	$(RMF) doc ChangeLog
 	$(RMF) $(ALLOBJ:%$(OBJSUFFIX)=%.gcno) $(TESTOBJ:%$(OBJSUFFIX)=%.gcno)

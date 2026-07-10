@@ -31,11 +31,12 @@
  *
  */
 
-#ifndef __FLATZINC_BLACKBOX_HH__
-#define __FLATZINC_BLACKBOX_HH__
+#ifndef GECODE_FLATZINC_BLACKBOX_HH
+#define GECODE_FLATZINC_BLACKBOX_HH
 
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -44,65 +45,110 @@
 #ifdef GECODE_HAS_FLOAT_VARS
 #include <gecode/float.hh>
 #endif
+#ifdef GECODE_HAS_THREADS
+#include <thread>
+#endif
 
 #ifdef _WIN32
-#define NOMINMAX // Ensure the words min/max remain available
-#include <Windows.h>
+#define GECODE_BLACKBOX_CALL __stdcall
 #else
-// NOLINTNEXTLINE(bugprone-reserved-identifier)
-#define __stdcall
+#define GECODE_BLACKBOX_CALL
 #endif
 
 namespace Gecode {
 namespace FlatZinc {
 
-/// Abstract class implemented by different methods to run blackbox functions
+/// Abstract class implemented by different methods to run blackbox functions.
+///
+/// A blackbox function must be deterministic in the FlatZinc sense: the same
+/// integer and float inputs must always produce the same integer and float
+/// outputs. Implementations may keep internal caches or other private state,
+/// provided that this state does not make the observable result depend on call
+/// order.
 class BlackBoxFn : public SharedHandle::Object {
 public:
+  virtual ~BlackBoxFn(void) {}
   virtual void run(const std::vector<int64_t> &int_in,
                    const std::vector<double> &float_in,
                    std::vector<int64_t> &int_out,
                    std::vector<double> &float_out) = 0;
 };
 
+/// Access to FlatZincSpace state used only while posting blackbox constraints
+class BlackBoxAccess {
+public:
+  static SharedHandle& state(FlatZincSpace& s);
+};
+
 /// Implementation of a black box function that dynamically loads a library and
 /// run a contained function.
-class BlackBoxDLL : public BlackBoxFn {
+///
+/// A library backend belongs to one blackbox constraint. If the library exports
+/// fzn_init, it creates a root instance for that constraint. With threads, the
+/// root is a prototype: each calling thread receives and reuses its own clone,
+/// and the same clone is never used by concurrent calls. Without threads,
+/// fzn_blackbox receives the root instance. A library without fzn_init is
+/// stateless: fzn_blackbox receives a null instance and can be called
+/// concurrently.
+class GECODE_FLATZINC_EXPORT BlackBoxLibrary : public BlackBoxFn {
 public:
-  BlackBoxDLL(const std::string &name, const std::vector<std::string> &args);
-  ~BlackBoxDLL();
+  BlackBoxLibrary(const std::string &name,
+                  const std::vector<std::string> &args);
+  ~BlackBoxLibrary();
   void run(const std::vector<int64_t> &int_in,
-           const std::vector<double> &float_in, std::vector<int64_t> &int_out,
-           std::vector<double> &float_out) override {
-    dll_fzn_blackbox(int_in.data(), int_in.size(), float_in.data(),
-                     float_in.size(), int_out.data(), int_out.size(),
-                     float_out.data(), float_out.size());
-  }
+           const std::vector<double> &float_in,
+           std::vector<int64_t> &int_out,
+           std::vector<double> &float_out) override;
 
 protected:
   void *library;
-  void(__stdcall *dll_fzn_blackbox)(const int64_t *, size_t, const double *,
-                                    size_t, int64_t *, size_t, double *, size_t);
+  void *(GECODE_BLACKBOX_CALL *library_fzn_init)(const char **, size_t);
+  void *(GECODE_BLACKBOX_CALL *library_fzn_clone)(void *);
+  void (GECODE_BLACKBOX_CALL *library_fzn_blackbox)(
+      void *, const int64_t *, size_t, const double *, size_t, int64_t *,
+      size_t, double *, size_t);
+  void (GECODE_BLACKBOX_CALL *library_fzn_free)(void *);
+  void *root_instance;
+
+#ifdef GECODE_HAS_THREADS
+  class Instance;
+  /// Mutex protecting the worker-to-instance table.
+  Support::Mutex mutex;
+  /// Cloned instances, one for each calling worker.
+  std::vector<Instance *> instances;
+
+  Instance *instance(void);
+#endif
 };
 
-/// Implementation of a black function that starts a seperate process to
-/// repeatedly run a blackbox function, communication I/O over pipe.
-class BlackBoxExec : public BlackBoxFn {
+/// Implementation of a blackbox function that starts a separate process to
+/// repeatedly run a blackbox function, communicating over standard I/O.
+///
+/// Parallel search workers do not share a process stream: each calling thread
+/// gets its own persistent process session, created lazily and reused by that
+/// thread until the shared blackbox object is destroyed.
+class GECODE_FLATZINC_EXPORT BlackBoxExec : public BlackBoxFn {
 public:
   BlackBoxExec(const std::string &program, const std::vector<std::string> &args);
   ~BlackBoxExec();
   void run(const std::vector<int64_t> &int_in,
-           const std::vector<double> &float_in, std::vector<int64_t> &int_out,
+           const std::vector<double> &float_in,
+           std::vector<int64_t> &int_out,
            std::vector<double> &float_out) override;
 
 protected:
-#ifdef _WIN32
-  HANDLE pipe_send;
-  HANDLE pipe_receive;
-#else
-  int pipe_send;
-  FILE *file_receive;
-#endif
+  class Session;
+
+  /// The executable to run for each worker-thread session.
+  std::string program;
+  /// Arguments passed to each executable session.
+  std::vector<std::string> args;
+  /// Mutex protecting the session table.
+  Support::Mutex mutex;
+  /// One persistent process session for each calling thread.
+  std::vector<Session *> sessions;
+
+  Session &session(void);
 };
 
 class BlackBoxHandle : public SharedHandle {
@@ -115,6 +161,31 @@ public:
   BlackBoxFn *operator()() { return static_cast<BlackBoxFn *>(object()); };
 };
 
+/// Typed handle retained by blackbox propagators and search support.
+class BlackBoxStateHandle : public SharedHandle {
+public:
+  BlackBoxStateHandle(void) : SharedHandle() {}
+  BlackBoxStateHandle(const SharedHandle &handle) : SharedHandle(handle) {}
+  BlackBoxStateHandle(const BlackBoxStateHandle &handle)
+      : SharedHandle(handle) {}
+  BlackBoxStateHandle &operator=(const BlackBoxStateHandle &handle) {
+    return static_cast<BlackBoxStateHandle &>(SharedHandle::operator=(handle));
+  }
+
+  /// Initialize the model-local state held by \a handle, if necessary
+  static BlackBoxStateHandle init(SharedHandle &handle);
+  /// Return a cached blackbox backend, creating it if necessary
+  BlackBoxHandle blackBox(const std::string &mode,
+                          const std::string &instantiation,
+                          const std::vector<std::string> &args) const;
+  /// Record the first exception raised while propagating a blackbox
+  void fail(std::exception_ptr e) const;
+  /// Whether a blackbox propagator has failed with an exception
+  bool failed(void) const;
+  /// Rethrow the first exception raised by a propagating blackbox
+  void rethrow(void) const;
+};
+
 class BlackBox : public Propagator {
 protected:
   /// Integer variables considered as the integer input to the blackbox function
@@ -123,9 +194,11 @@ protected:
   ViewArray<Int::IntView> int_output;
 
 #ifdef GECODE_HAS_FLOAT_VARS
-  /// Floating-point variables considered as the integer input to the blackbox function
+  /// Floating-point variables considered as the floating-point input to the
+  /// blackbox function
   ViewArray<Float::FloatView> float_input;
-  /// Floating-point variables set to the integer output of the blackbox function
+  /// Floating-point variables set to the floating-point output of the blackbox
+  /// function
   ViewArray<Float::FloatView> float_output;
 #endif
 
@@ -134,10 +207,13 @@ protected:
   /// The handle ensures that the function implementation can be shared between
   /// copies of the propagator.
   BlackBoxHandle black_box;
+  /// State shared by all blackbox propagators in the model
+  BlackBoxStateHandle black_box_state;
 
   /// Constructor for cloning \a p
   BlackBox(Space &home, BlackBox &p)
-      : Propagator(home, p), black_box(p.black_box) {
+      : Propagator(home, p), black_box(p.black_box),
+        black_box_state(p.black_box_state) {
     int_input.update(home, p.int_input);
     int_output.update(home, p.int_output);
 #ifdef GECODE_HAS_FLOAT_VARS
@@ -154,19 +230,21 @@ public:
            ViewArray<Float::FloatView> &float_in,
            ViewArray<Float::FloatView> &float_out,
 #endif
-           BlackBoxFn *black_box)
+           const BlackBoxHandle &black_box0,
+           const BlackBoxStateHandle &black_box_state0)
       : Propagator(home), int_input(int_in), int_output(int_out),
 #ifdef GECODE_HAS_FLOAT_VARS
         float_input(float_in), float_output(float_out),
 #endif
-        black_box(black_box) {
+        black_box(black_box0), black_box_state(black_box_state0) {
     int_input.subscribe(home, *this, Int::PC_INT_VAL);
 #ifdef GECODE_HAS_FLOAT_VARS
     float_input.subscribe(home, *this, Float::PC_FLOAT_VAL);
 #endif
+    home.notice(*this, AP_DISPOSE);
   }
   /// Cost function (defined as exponential)
-  PropCost cost(const Space &home, const ModEventDelta &med) const override {
+  PropCost cost(const Space &, const ModEventDelta &) const override {
     return PropCost::crazy(PropCost::HI, int_input.size()
 #ifdef GECODE_HAS_FLOAT_VARS
     + float_input.size()
@@ -175,9 +253,9 @@ public:
   };
   /// Schedule function
   void reschedule(Space &home) override {
-    int_input.cancel(home, *this, Int::PC_INT_VAL);
+    int_input.reschedule(home, *this, Int::PC_INT_VAL);
 #ifdef GECODE_HAS_FLOAT_VARS
-    float_input.cancel(home, *this, Float::PC_FLOAT_VAL);
+    float_input.reschedule(home, *this, Float::PC_FLOAT_VAL);
 #endif
   }
   /// Delete propagator and return its size
@@ -186,8 +264,10 @@ public:
 #ifdef GECODE_HAS_FLOAT_VARS
     float_input.cancel(home, *this, Float::PC_FLOAT_VAL);
 #endif
+    home.ignore(*this, AP_DISPOSE);
+    black_box.~BlackBoxHandle();
+    black_box_state.~BlackBoxStateHandle();
     (void)Propagator::dispose(home);
-    // destroy plugin container
     return sizeof(*this);
   };
 
@@ -203,34 +283,59 @@ public:
                          ViewArray<Float::FloatView> &float_input,
                          ViewArray<Float::FloatView> &float_output,
 #endif
+                         const BlackBoxStateHandle &black_box_state,
                          const std::string &mode,
                          const std::string &instantiation,
                          const std::vector<std::string> &args) {
-    BlackBoxFn *black_box(nullptr);
-    if (mode == "dll") {
-      black_box = new BlackBoxDLL(instantiation, args);
-    } else if (mode == "exec") {
-      black_box = new BlackBoxExec(instantiation, args);
-    } else {
-      throw Error("Blackbox", "Unknown blackbox protocol `" + mode + "'");
+    BlackBoxHandle black_box_handle =
+        black_box_state.blackBox(mode, instantiation, args);
+    if ((int_input.size() == 0)
+#ifdef GECODE_HAS_FLOAT_VARS
+        && (float_input.size() == 0)
+#endif
+    ) {
+      std::vector<int64_t> int_in;
+      std::vector<int64_t> int_out(int_output.size());
+      std::vector<double> float_in;
+      std::vector<double> float_out;
+#ifdef GECODE_HAS_FLOAT_VARS
+      float_out.resize(float_output.size());
+#endif
+      black_box_handle()->run(int_in, float_in, int_out, float_out);
+      for (int i = 0; i < int_output.size(); i++) {
+        if (me_failed(int_output[i].eq(
+                home, static_cast<int>(int_out[i])))) {
+          return ES_FAILED;
+        }
+      }
+#ifdef GECODE_HAS_FLOAT_VARS
+      for (int i = 0; i < float_output.size(); i++) {
+        if (me_failed(float_output[i].eq(home, float_out[i]))) {
+          return ES_FAILED;
+        }
+      }
+#endif
+      return ES_OK;
     }
 
     new (home) BlackBox(home, int_input, int_output,
 #ifdef GECODE_HAS_FLOAT_VARS
                         float_input, float_output,
 #endif
-                        black_box);
+                        black_box_handle, black_box_state);
     return ES_OK;
   }
 };
 
 class BlackBoxBounds : public Propagator {
 protected:
-  /// Integer variables whose bounds are input and computed by the blackbox function (in order).
+  /// Integer variables whose bounds are input and computed by the blackbox
+  /// function, in order.
   ViewArray<Int::IntView> ivar;
 
 #ifdef GECODE_HAS_FLOAT_VARS
-  /// Floating-point variables whose bounds are input and computed by the blackbox function (in order).
+  /// Floating-point variables whose bounds are input and computed by the
+  /// blackbox function, in order.
   ViewArray<Float::FloatView> fvar;
 #endif
 
@@ -251,6 +356,8 @@ protected:
   /// The handle ensures that the function implementation can be shared between
   /// copies of the propagator.
   BlackBoxHandle black_box;
+  /// State shared by all blackbox propagators in the model
+  BlackBoxStateHandle black_box_state;
 
   /// Constructor for cloning \a p
   BlackBoxBounds(Space &home, BlackBoxBounds &p)
@@ -258,7 +365,7 @@ protected:
 #ifdef GECODE_HAS_FLOAT_VARS
         sub_float(p.sub_float),
 #endif
-        black_box(p.black_box) {
+        black_box(p.black_box), black_box_state(p.black_box_state) {
     ivar.update(home, p.ivar);
 #ifdef GECODE_HAS_FLOAT_VARS
     fvar.update(home, p.fvar);
@@ -275,7 +382,8 @@ public:
 #ifdef GECODE_HAS_FLOAT_VARS
            SharedArray<bool> sub_float0,
 #endif
-           BlackBoxFn *black_box)
+           const BlackBoxHandle &black_box0,
+           const BlackBoxStateHandle &black_box_state0)
       : Propagator(home), ivar(ivar),
 #ifdef GECODE_HAS_FLOAT_VARS
         fvar(fvar),
@@ -284,7 +392,7 @@ public:
 #ifdef GECODE_HAS_FLOAT_VARS
         sub_float(sub_float0),
 #endif
-        black_box(black_box) {
+        black_box(black_box0), black_box_state(black_box_state0) {
     for (int i = 0; i < ivar.size(); i++) {
       if (sub_int[i]) {
         ivar[i].subscribe(home, *this, Int::PC_INT_BND);
@@ -297,9 +405,11 @@ public:
       }
     }
 #endif
+    home.notice(*this, AP_DISPOSE);
+    home.notice(*this, AP_WEAKLY);
   }
   /// Cost function (defined as exponential)
-  PropCost cost(const Space &home, const ModEventDelta &med) const override {
+  PropCost cost(const Space &, const ModEventDelta &) const override {
     return PropCost::crazy(PropCost::HI, ivar.size()
 #ifdef GECODE_HAS_FLOAT_VARS
     + fvar.size()
@@ -335,12 +445,26 @@ public:
       }
     }
 #endif
+    home.ignore(*this, AP_DISPOSE);
+    home.ignore(*this, AP_WEAKLY);
+    black_box.~BlackBoxHandle();
+    black_box_state.~BlackBoxStateHandle();
+    sub_int.~SharedArray<bool>();
+#ifdef GECODE_HAS_FLOAT_VARS
+    sub_float.~SharedArray<bool>();
+#endif
     (void)Propagator::dispose(home);
-    // destroy plugin container
     return sizeof(*this);
   };
 
   ExecStatus propagate(Space &home, const ModEventDelta &) override;
+
+  static ExecStatus evaluate(Home home, ViewArray<Int::IntView> &ivar,
+#ifdef GECODE_HAS_FLOAT_VARS
+                             ViewArray<Float::FloatView> &fvar,
+#endif
+                             BlackBoxHandle &black_box,
+                             const BlackBoxStateHandle &black_box_state);
 
   Propagator *copy(Space &home) override {
     return new (home) BlackBoxBounds(home, *this);
@@ -354,16 +478,27 @@ public:
 #ifdef GECODE_HAS_FLOAT_VARS
                          SharedArray<bool> sub_float,
 #endif
+                         const BlackBoxStateHandle &black_box_state,
                          const std::string &mode,
                          const std::string &instantiation,
                          const std::vector<std::string> &args) {
-    BlackBoxFn *black_box(nullptr);
-    if (mode == "dll") {
-      black_box = new BlackBoxDLL(instantiation, args);
-    } else if (mode == "exec") {
-      black_box = new BlackBoxExec(instantiation, args);
-    } else {
-      throw Error("Blackbox", "Unknown blackbox protocol `" + mode + "'");
+    BlackBoxHandle black_box_handle =
+        black_box_state.blackBox(mode, instantiation, args);
+    bool has_subscription = false;
+    for (int i = 0; i < ivar.size(); i++) {
+      has_subscription = has_subscription || sub_int[i];
+    }
+#ifdef GECODE_HAS_FLOAT_VARS
+    for (int i = 0; i < fvar.size(); i++) {
+      has_subscription = has_subscription || sub_float[i];
+    }
+#endif
+    if (!has_subscription) {
+      return evaluate(home, ivar,
+#ifdef GECODE_HAS_FLOAT_VARS
+                      fvar,
+#endif
+                      black_box_handle, black_box_state);
     }
 
     new (home) BlackBoxBounds(home, ivar,
@@ -374,19 +509,21 @@ public:
 #ifdef GECODE_HAS_FLOAT_VARS
                         sub_float,
 #endif
-                        black_box);
+                        black_box_handle, black_box_state);
     return ES_OK;
   }
 };
 
-void blackbox(Home home, const IntVarArgs &int_in, const IntVarArgs &int_out,
+void blackbox(Home home, SharedHandle &black_box_state,
+              const IntVarArgs &int_in, const IntVarArgs &int_out,
 #ifdef GECODE_HAS_FLOAT_VARS
               const FloatVarArgs &float_in, const FloatVarArgs &float_out,
 #endif
               const std::string &mode, const std::string &instantiation,
               const std::vector<std::string> &args);
 
-void blackbox_bounds(Home home, const IntVarArgs &ivar,
+void blackbox_bounds(Home home, SharedHandle &black_box_state,
+                     const IntVarArgs &ivar,
 #ifdef GECODE_HAS_FLOAT_VARS
               const FloatVarArgs &fvar,
 #endif
@@ -397,4 +534,4 @@ void blackbox_bounds(Home home, const IntVarArgs &ivar,
 } // namespace FlatZinc
 } // namespace Gecode
 
-#endif //__FLATZINC_BLACKBOX_HH__
+#endif // GECODE_FLATZINC_BLACKBOX_HH

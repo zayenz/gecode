@@ -36,6 +36,7 @@
  */
 
 #include <gecode/flatzinc.hh>
+#include <gecode/flatzinc/blackbox.hh>
 #include <gecode/flatzinc/registry.hh>
 #include <gecode/flatzinc/plugin.hh>
 #include <gecode/flatzinc/branch.hh>
@@ -767,6 +768,9 @@ namespace Gecode { namespace FlatZinc {
     /// Hash table of DFAs
     DFASet dfaSet;
 
+    /// Opaque state shared by blackbox propagators in this model
+    SharedHandle blackBoxState;
+
     /// Initialize
     FlatZincSpaceInitData(void) {}
   };
@@ -860,6 +864,12 @@ namespace Gecode { namespace FlatZinc {
     _random(random),
     _solveAnnotations(nullptr), needAuxVars(true) {
     branchInfo.init();
+  }
+
+  SharedHandle&
+  BlackBoxAccess::state(FlatZincSpace& s) {
+    assert(s._initData != nullptr);
+    return s._initData->blackBoxState;
   }
 
   void
@@ -1737,6 +1747,23 @@ namespace Gecode { namespace FlatZinc {
 
 #endif
 
+  class FlatZincStop : public Search::Stop {
+  protected:
+    Search::Stop* stop_object;
+    BlackBoxStateHandle black_box_state;
+  public:
+    FlatZincStop(Search::Stop* stop_object0,
+                 const BlackBoxStateHandle& black_box_state0)
+      : stop_object(stop_object0), black_box_state(black_box_state0) {}
+    bool stop(const Search::Statistics& s, const Search::Options& o) override {
+      return black_box_state.failed() ||
+        ((stop_object != nullptr) && stop_object->stop(s,o));
+    }
+    ~FlatZincStop(void) {
+      delete stop_object;
+    }
+  };
+
   template<template<class> class Engine>
   void
   FlatZincSpace::runEngine(std::ostream& out, const Printer& p,
@@ -1832,9 +1859,13 @@ namespace Gecode { namespace FlatZinc {
                          const FlatZincOptions& opt, Support::Timer& t_total) {
 #ifdef GECODE_HAS_GIST
     if (opt.mode() == SM_GIST) {
+      BlackBoxStateHandle black_box_state(BlackBoxAccess::state(*this));
+      (void) status();
+      black_box_state.rethrow();
       FZPrintingInspector<FlatZincSpace> pi(p);
       FZPrintingComparator<FlatZincSpace> pc(p);
       (void) GistEngine<Engine<FlatZincSpace> >::explore(this,opt,&pi,&pc);
+      black_box_state.rethrow();
       return;
     }
 #endif
@@ -1845,9 +1876,14 @@ namespace Gecode { namespace FlatZinc {
     if (status(sstat) != SS_FAILED) {
       n_p = PropagatorGroup::all.size(*this);
     }
+    BlackBoxStateHandle black_box_state(BlackBoxAccess::state(*this));
+    black_box_state.rethrow();
     Search::Options o;
-    o.stop = Driver::CombinedStop::create(opt.node(), opt.fail(), opt.time(), opt.restart_limit(),
-                                          true);
+    o.stop = Driver::CombinedStop::create(opt.node(), opt.fail(), opt.time(),
+                                          opt.restart_limit(), true);
+    if (black_box_state) {
+      o.stop = new FlatZincStop(o.stop, black_box_state);
+    }
     o.c_d = opt.c_d();
     o.a_d = opt.a_d();
 
@@ -1871,68 +1907,94 @@ namespace Gecode { namespace FlatZinc {
     o.cutoff  = new Search::CutoffAppend(new Search::CutoffConstant(0), 1, Driver::createCutoff(opt));
     if (opt.interrupt())
       Driver::CombinedStop::installCtrlHandler(true);
-    {
-      Meta<FlatZincSpace,Engine> se(this,o);
-      int noOfSolutions = opt.solutions();
-      if (noOfSolutions == -1) {
-        noOfSolutions = (_method == SAT) ? 1 : 0;
-      }
-      bool printAll = _method == SAT || opt.allSolutions() || noOfSolutions != 0;
-      int findSol = noOfSolutions;
-      FlatZincSpace* sol = nullptr;
-      while (FlatZincSpace* next_sol = se.next()) {
-        delete sol;
-        sol = next_sol;
-        if (printAll) {
-          sol->print(out, p);
-          out << "----------" << std::endl;
+    int noOfSolutions = opt.solutions();
+    if (noOfSolutions == -1) {
+      noOfSolutions = (_method == SAT) ? 1 : 0;
+    }
+    bool printAll = _method == SAT || opt.allSolutions() || noOfSolutions != 0;
+    int findSol = noOfSolutions;
+    bool solution_limit_reached = false;
+    bool engine_stopped = false;
+    Gecode::Search::Statistics stat;
+    FlatZincSpace* sol = nullptr;
+    try {
+      {
+        Meta<FlatZincSpace,Engine> se(this,o);
+        while (FlatZincSpace* next_sol = se.next()) {
+          if (black_box_state.failed()) {
+            delete next_sol;
+            break;
+          }
+          delete sol;
+          sol = next_sol;
+          if (printAll) {
+            sol->print(out, p);
+            out << "----------" << std::endl;
+          }
+          if (--findSol == 0) {
+            solution_limit_reached = true;
+            break;
+          }
         }
-        if (--findSol==0)
-          goto stopped;
+        engine_stopped = se.stopped();
+        if (opt.mode() == SM_STAT) {
+          stat = se.statistics();
+        }
       }
-      if (sol && !printAll) {
-        sol->print(out, p);
-        out << "----------" << std::endl;
-      }
-      if (!se.stopped()) {
+    } catch (...) {
+      delete sol;
+      if (opt.interrupt())
+        Driver::CombinedStop::installCtrlHandler(false);
+      delete o.stop;
+      delete o.tracer;
+      throw;
+    }
+    if (opt.interrupt())
+      Driver::CombinedStop::installCtrlHandler(false);
+    delete o.stop;
+    delete o.tracer;
+    if (black_box_state.failed()) {
+      delete sol;
+      black_box_state.rethrow();
+    }
+    if (sol && !printAll) {
+      sol->print(out, p);
+      out << "----------" << std::endl;
+    }
+    if (!solution_limit_reached) {
+      if (!engine_stopped) {
         if (sol) {
           out << "==========" << std::endl;
         } else {
           out << "=====UNSATISFIABLE=====" << std::endl;
         }
       } else if (!sol) {
-          out << "=====UNKNOWN=====" << std::endl;
-      }
-      delete sol;
-      stopped:
-      if (opt.interrupt())
-        Driver::CombinedStop::installCtrlHandler(false);
-      if (opt.mode() == SM_STAT) {
-        Gecode::Search::Statistics stat = se.statistics();
-        double totalTime = (t_total.stop() / 1000.0);
-        double solveTime = (t_solve.stop() / 1000.0);
-        double initTime = totalTime - solveTime;
-        out << std::endl
-            << "%%%mzn-stat: initTime=" << initTime
-            << std::endl;
-        out << "%%%mzn-stat: solveTime=" << solveTime
-            << std::endl;
-        out << "%%%mzn-stat: solutions="
-            << std::abs(noOfSolutions - findSol) << std::endl
-            << "%%%mzn-stat: variables="
-            << (intVarCount + boolVarCount + setVarCount) << std::endl
-            << "%%%mzn-stat: propagators=" << n_p << std::endl
-            << "%%%mzn-stat: propagations=" << sstat.propagate+stat.propagate << std::endl
-            << "%%%mzn-stat: nodes=" << stat.node << std::endl
-            << "%%%mzn-stat: failures=" << stat.fail << std::endl
-            << "%%%mzn-stat: restarts=" << stat.restart << std::endl
-            << "%%%mzn-stat: peakDepth=" << stat.depth << std::endl
-            << "%%%mzn-stat-end" << std::endl
-            << std::endl;
+        out << "=====UNKNOWN=====" << std::endl;
       }
     }
-    delete o.stop;
-    delete o.tracer;
+    delete sol;
+    if (opt.mode() == SM_STAT) {
+      double totalTime = (t_total.stop() / 1000.0);
+      double solveTime = (t_solve.stop() / 1000.0);
+      double initTime = totalTime - solveTime;
+      out << std::endl
+          << "%%%mzn-stat: initTime=" << initTime
+          << std::endl;
+      out << "%%%mzn-stat: solveTime=" << solveTime
+          << std::endl;
+      out << "%%%mzn-stat: solutions="
+          << std::abs(noOfSolutions - findSol) << std::endl
+          << "%%%mzn-stat: variables="
+          << (intVarCount + boolVarCount + setVarCount) << std::endl
+          << "%%%mzn-stat: propagators=" << n_p << std::endl
+          << "%%%mzn-stat: propagations=" << sstat.propagate+stat.propagate << std::endl
+          << "%%%mzn-stat: nodes=" << stat.node << std::endl
+          << "%%%mzn-stat: failures=" << stat.fail << std::endl
+          << "%%%mzn-stat: restarts=" << stat.restart << std::endl
+          << "%%%mzn-stat: peakDepth=" << stat.depth << std::endl
+          << "%%%mzn-stat-end" << std::endl
+          << std::endl;
+    }
   }
 
 #ifdef GECODE_HAS_QT

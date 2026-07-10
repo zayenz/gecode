@@ -1668,29 +1668,55 @@ namespace Gecode { namespace FlatZinc {
     void blackbox_source(AST::Node* ann, std::string& mode,
                          std::string& instantiation,
                          std::vector<std::string>& args) {
+      auto string_arg = [](AST::Node* n, const char* what) {
+        if ((n == nullptr) || !n->isString()) {
+          throw FlatZinc::Error("Registry",
+                                std::string("Malformed blackbox annotation: ") +
+                                what + " must be a string.");
+        }
+        return n->getString();
+      };
       AST::Call* c = nullptr;
-      if (ann->hasCall("blackbox_dll")) {
+      bool has_dll = (ann != nullptr) && ann->hasCall("blackbox_dll");
+      bool has_exec = (ann != nullptr) && ann->hasCall("blackbox_exec");
+      if (has_dll && has_exec) {
+        throw FlatZinc::Error(
+            "Registry", "Blackbox constraint has multiple execution method annotations.");
+      } else if (has_dll) {
         c = ann->getCall("blackbox_dll");
         mode = "dll";
-      } else if (ann->hasCall("blackbox_exec")) {
+      } else if (has_exec) {
         c = ann->getCall("blackbox_exec");
         mode = "exec";
       } else {
+        throw FlatZinc::Error(
+            "Registry", "Blackbox constraint is missing a valid annotation specifying "
+            "execution method.");
+      }
+      if ((c == nullptr) || (c->args == nullptr)) {
         throw FlatZinc::Error("Registry",
-        "Blackbox constraint is missing a valid annotation specifying execution method.");
+                              "Malformed blackbox annotation: missing target.");
       }
       // For a single-argument call `args` is the bare argument node; for the
       // `(target, args)` form it is an array of the two arguments.
       if (AST::Array* arr = dynamic_cast<AST::Array*>(c->args)) {
-        instantiation = arr->a[0]->getString();
-        if (arr->a.size() > 1) {
-          AST::Array* al = arr->a[1]->getArray();
-          for (unsigned int i = 0; i < al->a.size(); i++) {
-            args.push_back(al->a[i]->getString());
-          }
+        if (arr->a.size() != 2) {
+          throw FlatZinc::Error(
+              "Registry", "Malformed blackbox annotation: expected a target string and "
+              "an argument array.");
+        }
+        instantiation = string_arg(arr->a[0], "target");
+        if (!arr->a[1]->isArray()) {
+          throw FlatZinc::Error(
+              "Registry", "Malformed blackbox annotation: argument list must be an array "
+              "of strings.");
+        }
+        AST::Array* al = arr->a[1]->getArray();
+        for (unsigned int i = 0; i < al->a.size(); i++) {
+          args.push_back(string_arg(al->a[i], "argument"));
         }
       } else {
-        instantiation = c->args->getString();
+        instantiation = string_arg(c->args, "target");
       }
     }
 
@@ -1710,7 +1736,7 @@ namespace Gecode { namespace FlatZinc {
         "Blackbox propagator cannot use floating point values when Gecode is compiled without floating point decision variable support.");
       }
 #endif
-      FlatZinc::blackbox(s, int_input, int_output,
+      FlatZinc::blackbox(s, BlackBoxAccess::state(s), int_input, int_output,
 #ifdef GECODE_HAS_FLOAT_VARS
 float_input, float_output,
 #endif
@@ -1736,7 +1762,7 @@ float_input, float_output,
       for (int i = 0; i < flat_reason.size(); i++) {
         reason[i] = flat_reason[i];
       }
-      FlatZinc::blackbox_bounds(s, ivar,
+      FlatZinc::blackbox_bounds(s, BlackBoxAccess::state(s), ivar,
 #ifdef GECODE_HAS_FLOAT_VARS
 fvar,
 #endif

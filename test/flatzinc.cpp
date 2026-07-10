@@ -33,12 +33,24 @@
 
 #include "test/flatzinc.hh"
 
+#include <memory>
+
 namespace Test { namespace FlatZinc {
 
   FlatZincTest::FlatZincTest(const std::string& name, const std::string& source,
-                             const std::string& expected, bool allSolutions, std::vector<std::string> cmdlineOpt)
+                             const std::string& expected, bool allSolutions,
+                             std::vector<std::string> cmdlineOpt,
+                             OutputCheck check, BeforeRun before)
     : Base("FlatZinc::"+name), _name(name), _source(source), _expected(expected),
-      _allSolutions(allSolutions), _cmdlineOpt(cmdlineOpt) {}
+      _allSolutions(allSolutions), _cmdlineOpt(cmdlineOpt),
+      _check(check), _before(before) {}
+
+  FlatZincErrorTest::FlatZincErrorTest(const std::string& name,
+                                       const std::string& source,
+                                       std::vector<std::string> cmdlineOpt,
+                                       std::string expectedMessage)
+    : FlatZincTest(name, source, "", false, cmdlineOpt),
+      _expectedMessage(expectedMessage) {}
 
   bool
   FlatZincTest::run(void) {
@@ -58,10 +70,13 @@ namespace Test { namespace FlatZinc {
     }
     fznopt.allSolutions(_allSolutions);
     Gecode::FlatZinc::Printer p;
-    Gecode::FlatZinc::FlatZincSpace* fg = nullptr;
     try {
+      if (_before) {
+        _before();
+      }
       std::stringstream ss(_source);
-      fg = Gecode::FlatZinc::parse(ss, p, olog);
+      std::unique_ptr<Gecode::FlatZinc::FlatZincSpace> fg(
+        Gecode::FlatZinc::parse(ss, p, olog));
 
       if (fg) {
         fg->createBranchers(p, fg->solveAnnotations(), fznopt,
@@ -70,25 +85,74 @@ namespace Test { namespace FlatZinc {
         std::ostringstream os;
         fg->run(os, p, fznopt, t_total);
 
-        if (_expected == os.str()) {
+        const std::string output = os.str();
+        fg.reset();
+        if (_check ? _check(output) : (_expected == output)) {
           return true;
-        } else {
-          if (opt.log)
-            olog << "FlatZinc produced the following output:\n" << os.str() << "\n";
-          return false;
         }
+        if (opt.log)
+          olog << "FlatZinc produced the following output:\n" << output << "\n";
+        return false;
       } else {
         if (opt.log)
           olog << "Could not parse input\n";
         return false;
       }
-      delete fg;
     } catch (Gecode::FlatZinc::Error& e) {
       if (opt.log)
         olog << ind(2) << "FlatZinc error : " << e.toString() << std::endl;
       return false;
     }
     return true;
+  }
+
+  bool
+  FlatZincErrorTest::run(void) {
+    using namespace Gecode;
+    Support::Timer t_total;
+    t_total.start();
+    Gecode::FlatZinc::FlatZincOptions fznopt("Gecode/FlatZinc");
+    if (!_cmdlineOpt.empty()) {
+      std::string cmd("fzn-gecode");
+      int argc = static_cast<int>(_cmdlineOpt.size()) + 1;
+      std::vector<char*> argv(argc);
+      argv[0] = const_cast<char*>(cmd.data());
+      for (int i = 1; i < argc; ++i) {
+        argv[i] = const_cast<char*>(_cmdlineOpt[i-1].data());
+      }
+      fznopt.parse(argc, argv.data());
+    }
+    Gecode::FlatZinc::Printer p;
+    std::ostringstream os;
+    try {
+      std::stringstream ss(_source);
+      std::unique_ptr<Gecode::FlatZinc::FlatZincSpace> fg(
+        Gecode::FlatZinc::parse(ss, p, olog));
+      if (fg) {
+        fg->createBranchers(p, fg->solveAnnotations(), fznopt,
+                            false, olog);
+        fg->shrinkArrays(p);
+        fg->run(os, p, fznopt, t_total);
+      }
+      return false;
+    } catch (Gecode::FlatZinc::Error& e) {
+      const std::string message = e.toString();
+      if (opt.log)
+        olog << ind(2) << "Expected FlatZinc error : "
+             << message << std::endl;
+      return (os.str().find("----------") == std::string::npos) &&
+        (_expectedMessage.empty() ||
+         (message.find(_expectedMessage) != std::string::npos));
+    } catch (Gecode::Exception& e) {
+      const std::string message = e.what();
+      if (opt.log)
+        olog << ind(2) << "Expected Gecode exception : "
+             << message << std::endl;
+      return (os.str().find("----------") == std::string::npos) &&
+        (_expectedMessage.empty() ||
+         (message.find(_expectedMessage) != std::string::npos));
+    }
+    return false;
   }
 
 }}

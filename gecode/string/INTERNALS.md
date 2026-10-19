@@ -127,6 +127,13 @@ performs the inverse conversion. These operations do not infer byte order or
 strip a BOM: `U+FEFF` is preserved as an ordinary scalar value. Byte-oriented
 UTF-16 transport must resolve endian and BOM policy before calling the codec.
 
+Legacy `std::string` helpers (`val`, `min_str`, `known_pref`, `known_suff`,
+`char2int`, and `int2char`) mean one byte per solver symbol. They must reject
+symbols outside `0..255`, never truncate them. Core propagation uses
+`StringVal` or scalar sequences; byte fast paths are permitted only after an
+explicit `try_val_bytes` check. Numeric string channels remain intentionally
+ASCII.
+
 Replacement runs each operation-specific transformation as one complete pass.
 An explicit outer loop repeats that pass only for the assignment combinations
 that previously caused an immediate recursive restart, preserving the posting

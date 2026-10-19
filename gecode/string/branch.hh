@@ -162,7 +162,7 @@ namespace Gecode { namespace String { namespace Branch {
 
     forceinline void
     complete(Space& home, int pos) {
-      ModEvent me = x[pos].eq(home, x[pos].domain().min_str());
+      ModEvent me = x[pos].eq(home, x[pos].domain().min_value());
       assert(!me_failed(me));
       (void) me;
     }

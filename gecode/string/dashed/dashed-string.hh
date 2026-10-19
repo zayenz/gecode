@@ -375,9 +375,11 @@ namespace Gecode { namespace String {
 
   bool known() const;
 
+  /// Return the known prefix as legacy bytes, rejecting non-byte symbols.
   string known_pref() const;
   std::vector<StringSymbol> known_pref_symbols() const;
 
+  /// Return the known suffix as legacy bytes, rejecting non-byte symbols.
   string known_suff() const;
   std::vector<StringSymbol> known_suff_symbols() const;
 
@@ -436,8 +438,10 @@ namespace Gecode { namespace String {
 
   bool increasing(Space&h, bool strict);
 
-  /// Return a shortest concrete string represented by this domain.
+  /// Return a shortest concrete legacy byte string represented by this domain.
   string min_str() const;
+  /// Return a shortest concrete encoding-neutral value represented by this domain.
+  StringVal min_value() const;
 
   void commit(Space&, Branch::Level, Branch::Value, Branch::Block, unsigned);
 

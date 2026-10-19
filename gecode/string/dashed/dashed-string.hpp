@@ -5,7 +5,11 @@ namespace Gecode { namespace String {
   forceinline double min(double a, double b) { return std::min<double>(a, b); }
   forceinline double max(double a, double b) { return std::max<double>(a, b); }
   forceinline unsigned char2int(unsigned char c) { return (unsigned) c; }
-  forceinline unsigned char int2char(unsigned i) { return (unsigned char) i; }
+  forceinline unsigned char int2char(unsigned i) {
+    if (i > 255)
+      throw OutOfLimitsDS("int2char");
+    return static_cast<unsigned char>(i);
+  }
   forceinline int divl(int a, int b) { return b == 0 ? 0 : a / b; }
   forceinline int divu(int a, int b) { return b == 0 ?
     String::DashedString::_MAX_STR_LENGTH : ceil(a / b);
@@ -320,8 +324,10 @@ namespace Gecode { namespace String {
     Gecode::Set::BndSetRanges i(s);
     os << "{";
     while (i()) {
-      char mi = int2char(i.min());
-      char ma = int2char(i.max());
+      const string mi =
+        StringVal::from_symbols({i.min()}).to_utf8();
+      const string ma =
+        StringVal::from_symbols({i.max()}).to_utf8();
       if (mi == ma)
         os << mi;
       else
@@ -452,8 +458,12 @@ namespace Gecode { namespace String {
   operator<<(std::ostream& os, const DSBlock& b) {
     if (b.null())
       return os << "";
-    if (b.known())
-      return os << "\"" <<  string(b.l, b.S.min()) << "\"";
+    if (b.known()) {
+      std::vector<StringSymbol> symbols(b.l, b.S.min());
+      return os << "\""
+                << StringVal::from_symbols(std::move(symbols)).to_utf8()
+                << "\"";
+    }
     else
       return os << b.S << "^(" << b.l << ", " << b.u << ")";
   }
@@ -1668,7 +1678,7 @@ namespace Gecode { namespace String {
     std::vector<float> x_succ = min_succ(*this);
     NSBlocks x_min = lex_least(x_succ);
     if (that.known()) {
-      string sx = x_min.val(), sy = that.val();
+      StringVal sx = x_min.val_symbols(), sy = that.val_symbols();
       if ((lt && sx >= sy) || (!lt && sx > sy))
         return false;
     }
@@ -2157,26 +2167,31 @@ namespace Gecode { namespace String {
     return StringVal::from_symbols(std::move(symbols));
   }
 
-  forceinline string
-  DashedString::min_str() const {
+  forceinline StringVal
+  DashedString::min_value() const {
     int lower = 0;
     for (int i = 0; i < _blocks.length(); ++i)
       lower += at(i).l;
 
     int remaining = _min_length - lower;
     assert(remaining >= 0);
-    string value;
+    std::vector<StringSymbol> value;
     value.reserve(_min_length);
     for (int i = 0; i < _blocks.length(); ++i) {
       const DSBlock& block = at(i);
       int length = block.l + min(remaining, block.u - block.l);
       if (length > 0)
-        value.append(length, int2char(block.S.min()));
+        value.insert(value.end(), length, block.S.min());
       remaining -= length - block.l;
     }
     assert(remaining == 0);
     assert(static_cast<int>(value.size()) == _min_length);
-    return value;
+    return StringVal::from_symbols(std::move(value));
+  }
+
+  forceinline string
+  DashedString::min_str() const {
+    return min_value().to_bytes();
   }
 
   forceinline bool
@@ -2587,16 +2602,7 @@ namespace Gecode { namespace String {
   forceinline std::ostream&
   operator<<(std::ostream& os, const DashedString& ds) {
     if (ds.known()) {
-      if (ds.null())
-        os << "\"\"";
-      else {
-        os << "\"";
-        for (int i = 0; i < ds._blocks.length(); ++i) {
-          const DSBlock& b = ds.at(i);
-          os << std::string(b.l, int2char(b.S.min()));
-        }
-        os << "\"";
-      }
+      os << "\"" << ds.val_symbols().to_utf8() << "\"";
     }
     else {
       int n = ds.length();

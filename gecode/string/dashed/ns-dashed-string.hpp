@@ -1664,8 +1664,13 @@ namespace Gecode { namespace String {
       pref.reserve(length);
       for (unsigned i = 0; i < end; ++i) {
         const NSBlock& b = at(i);
-        if (!b.null())
-          pref.append(b.l, unsigned(b.S.min()));
+        if (!b.null()) {
+          const int symbol = b.S.min();
+          if (symbol < 0 || symbol > 255)
+            throw OutOfLimitsDS("NSBlocks::known_pref");
+          pref.append(b.l,
+            static_cast<char>(static_cast<unsigned char>(symbol)));
+        }
       }
       return pref;
     }
@@ -1715,8 +1720,13 @@ namespace Gecode { namespace String {
       suff.reserve(length);
       for (int i = begin; i < static_cast<int>(this->size()); ++i) {
         const NSBlock& b = at(i);
-        if (!b.null())
-          suff.append(b.l, unsigned(b.S.min()));
+        if (!b.null()) {
+          const int symbol = b.S.min();
+          if (symbol < 0 || symbol > 255)
+            throw OutOfLimitsDS("NSBlocks::known_suff");
+          suff.append(b.l,
+            static_cast<char>(static_cast<unsigned char>(symbol)));
+        }
       }
       return suff;
     }

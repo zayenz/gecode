@@ -128,6 +128,30 @@ namespace {
     }
   };
 
+  class UnicodeDomainLexModel : public Space {
+  public:
+    StringVar left;
+    StringVar right;
+
+    UnicodeDomainLexModel(void)
+      : left(), right(*this, StringVal::from_symbols({0x1F600})) {
+      NSIntSet symbols(0x65E5);
+      symbols.include(0x1F600);
+      left = StringVar(*this, symbols, 1, 1);
+      rel(*this, left, STRT_LEXLT, right);
+    }
+
+    UnicodeDomainLexModel(UnicodeDomainLexModel& model)
+      : Space(model) {
+      left.update(*this, model.left);
+      right.update(*this, model.right);
+    }
+
+    virtual Space* copy(void) {
+      return new UnicodeDomainLexModel(*this);
+    }
+  };
+
   bool
   check_pair(const NSBlocks& left_domain, const NSBlocks& right_domain,
              bool strict) {
@@ -212,6 +236,10 @@ main(void) {
   assert(unicode_greater.status() != SS_FAILED);
   assert(unicode_greater.result.assigned() &&
          unicode_greater.result.val() == 0);
+
+  UnicodeDomainLexModel unicode_domain;
+  assert(unicode_domain.status() != SS_FAILED);
+  assert(unicode_domain.left.may_chars().in(0x65E5));
 
   std::vector<NSBlock> blocks;
   const std::string alphabet("ab");

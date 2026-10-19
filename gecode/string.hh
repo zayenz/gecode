@@ -150,6 +150,7 @@ namespace Gecode {
     StringVar(Space& home, int a, int b,
               const String::StringAlphabet& alphabet);
 
+    /// Initialize using the legacy one-byte-per-symbol interpretation
     GECODE_STRING_EXPORT
     StringVar(Space& home, const string& s);
 
@@ -167,10 +168,11 @@ namespace Gecode {
 
 
     /**
-    * \brief Return assigned value
+    * \brief Return assigned legacy byte value
     *
     * Throws an exception of type String::ValOfUnassignedVar if variable
-    * is not yet assigned.
+    * is not yet assigned, and String::OutOfLimitsDS if a symbol cannot be
+    * represented as one byte. Use val_symbols() for encoding-neutral values.
     *
     */
     string val(void) const;

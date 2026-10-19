@@ -1,6 +1,7 @@
 #include <gecode/string.hh>
 
 #include <cassert>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -631,6 +632,30 @@ namespace {
     }
   };
 
+  class MixedGCCSpace : public Gecode::Space {
+  public:
+    Gecode::StringVar value;
+    Gecode::IntVarArray counts;
+
+    MixedGCCSpace(void)
+      : value(*this, StringVal::from_bytes("A")),
+        counts(*this, 2, 0, 1) {
+      Gecode::IntArgs characters;
+      characters << 'A' << 0x1F600;
+      Gecode::gcc(*this, value, characters, counts);
+    }
+
+    MixedGCCSpace(MixedGCCSpace& other)
+      : Gecode::Space(other) {
+      value.update(*this, other.value);
+      counts.update(*this, other.counts);
+    }
+
+    virtual Gecode::Space* copy(void) {
+      return new MixedGCCSpace(*this);
+    }
+  };
+
   class UnicodeStrToNatSpace : public Gecode::Space {
   public:
     Gecode::StringVar value;
@@ -941,6 +966,7 @@ int main(void) {
   assert(unicode_space->value.max_length() == 3);
   assert(unicode_space->value.val_symbols() == decoded);
   assert(unicode_space->value.val_symbols().to_utf16() == japanese_utf16);
+  assert(unicode_space->value.domain().min_value() == decoded);
   assert(unicode_space->value.may_chars().in(0x65E5));
   assert(unicode_space->value.may_chars().in(0x672C));
   assert(unicode_space->value.may_chars().in(0x8A9E));
@@ -952,6 +978,29 @@ int main(void) {
     rejected_legacy_value = true;
   }
   assert(rejected_legacy_value);
+
+  bool rejected_legacy_minimum = false;
+  try {
+    (void) unicode_space->value.domain().min_str();
+  } catch (const std::out_of_range&) {
+    rejected_legacy_minimum = true;
+  }
+  assert(rejected_legacy_minimum);
+
+  bool rejected_int2char = false;
+  try {
+    (void) Gecode::String::int2char(0x100);
+  } catch (const Gecode::String::OutOfLimitsDS&) {
+    rejected_int2char = true;
+  }
+  assert(rejected_int2char);
+
+  std::ostringstream printed_unicode;
+  printed_unicode << unicode_space->value.domain();
+  assert(printed_unicode.str() == "\"日本語\"");
+  std::ostringstream printed_unicode_block;
+  printed_unicode_block << unicode_space->value.domain().at(0);
+  assert(printed_unicode_block.str() == "\"日\"");
 
   FixedStringValSpace* unicode_clone =
     static_cast<FixedStringValSpace*>(unicode_space->clone());
@@ -1252,6 +1301,14 @@ int main(void) {
   assert(unicode_gcc->counts[3].assigned() &&
          unicode_gcc->counts[3].val() == 0);
   delete unicode_gcc;
+
+  MixedGCCSpace* mixed_gcc = new MixedGCCSpace;
+  assert(mixed_gcc->status() != Gecode::SS_FAILED);
+  assert(mixed_gcc->counts[0].assigned() &&
+         mixed_gcc->counts[0].val() == 1);
+  assert(mixed_gcc->counts[1].assigned() &&
+         mixed_gcc->counts[1].val() == 0);
+  delete mixed_gcc;
 
   UnicodeReplaceSpace* replace_first =
     new UnicodeReplaceSpace(UnicodeReplaceSpace::First);

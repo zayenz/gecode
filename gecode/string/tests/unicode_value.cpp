@@ -39,6 +39,16 @@ namespace {
     assert(rejected);
   }
 
+  void expect_bad_utf16(const std::u16string& input) {
+    bool rejected = false;
+    try {
+      (void) StringVal::decode_utf16(input);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
+
   void expect_bad_symbol(StringSymbol symbol) {
     bool rejected = false;
     try {
@@ -840,6 +850,15 @@ int main(void) {
   assert(face[0] == 0x1F600);
   assert(face.to_utf8() == emoji);
 
+  const std::u16string japanese_utf16 =
+    {0x65E5, 0x672C, 0x8A9E};
+  assert(StringVal::decode_utf16(japanese_utf16) == decoded);
+  assert(decoded.to_utf16() == japanese_utf16);
+
+  const std::u16string emoji_utf16 = {0xD83D, 0xDE00};
+  assert(StringVal::decode_utf16(emoji_utf16) == face);
+  assert(face.to_utf16() == emoji_utf16);
+
   const std::string byte_sequence("\xE6\x97\xA5", 3);
   const StringVal bytes = StringVal::from_bytes(byte_sequence);
   assert(bytes.size() == 3);
@@ -852,6 +871,16 @@ int main(void) {
     {0, 0x7F, 0x80, 0x7FF, 0x800, 0xD7FF, 0xE000, 0xFFFF, 0x10000,
      0x10FFFF});
   assert(StringVal::decode_utf8(boundaries.to_utf8()) == boundaries);
+  const std::u16string boundary_utf16 =
+    {0, 0x7F, 0x80, 0x7FF, 0x800, 0xD7FF, 0xE000, 0xFFFF,
+     0xD800, 0xDC00, 0xDBFF, 0xDFFF};
+  assert(boundaries.to_utf16() == boundary_utf16);
+  assert(StringVal::decode_utf16(boundary_utf16) == boundaries);
+
+  const std::u16string bom(1, static_cast<char16_t>(0xFEFF));
+  assert(StringVal::decode_utf16(bom) ==
+         StringVal::from_symbols({0xFEFF}));
+  assert(StringVal::from_symbols({0xFEFF}).to_utf16() == bom);
 
   expect_bad_utf8(std::string("\x80", 1));
   expect_bad_utf8(std::string("\xC0\xAF", 2));
@@ -862,6 +891,12 @@ int main(void) {
   expect_bad_utf8(std::string("\xF4\x90\x80\x80", 4));
   expect_bad_utf8(std::string("\xF5\x80\x80\x80", 4));
   expect_bad_utf8(std::string("\xE2\x28\xA1", 3));
+
+  expect_bad_utf16(std::u16string(1, static_cast<char16_t>(0xD800)));
+  expect_bad_utf16({0xD800, 0x0041});
+  expect_bad_utf16({0xD800, 0xD800});
+  expect_bad_utf16(std::u16string(1, static_cast<char16_t>(0xDC00)));
+  expect_bad_utf16({0xDC00, 0xD800});
 
   expect_bad_symbol(-1);
   expect_bad_symbol(0xD800);
@@ -905,6 +940,7 @@ int main(void) {
   assert(unicode_space->value.min_length() == 3);
   assert(unicode_space->value.max_length() == 3);
   assert(unicode_space->value.val_symbols() == decoded);
+  assert(unicode_space->value.val_symbols().to_utf16() == japanese_utf16);
   assert(unicode_space->value.may_chars().in(0x65E5));
   assert(unicode_space->value.may_chars().in(0x672C));
   assert(unicode_space->value.may_chars().in(0x8A9E));

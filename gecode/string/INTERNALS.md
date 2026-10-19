@@ -120,6 +120,13 @@ alphabet; scalar values and ranges observed in Unicode literals, charsets, and
 regular expressions extend that model-specific alphabet for unconstrained
 string variables.
 
+`StringVal` is also the explicit UTF-16 boundary. `decode_utf16` accepts
+strictly valid `std::u16string` code units and combines surrogate pairs into one
+scalar value; isolated or malformed surrogates are rejected. `to_utf16`
+performs the inverse conversion. These operations do not infer byte order or
+strip a BOM: `U+FEFF` is preserved as an ordinary scalar value. Byte-oriented
+UTF-16 transport must resolve endian and BOM policy before calling the codec.
+
 Replacement runs each operation-specific transformation as one complete pass.
 An explicit outer loop repeats that pass only for the assignment combinations
 that previously caused an immediate recursive restart, preserving the posting

@@ -68,6 +68,12 @@ namespace Gecode { namespace String {
       return std::invalid_argument(os.str());
     }
 
+    static std::invalid_argument utf16_error(size_type offset) {
+      std::ostringstream os;
+      os << "Invalid UTF-16 sequence at code unit offset " << offset;
+      return std::invalid_argument(os.str());
+    }
+
     static bool continuation(unsigned char c) {
       return (c & 0xC0U) == 0x80U;
     }
@@ -174,6 +180,38 @@ namespace Gecode { namespace String {
       return StringVal(std::move(symbols));
     }
 
+    /// Decode strictly valid UTF-16 code units into Unicode scalar values.
+    static StringVal decode_utf16(const std::u16string& input) {
+      std::vector<StringSymbol> symbols;
+      symbols.reserve(input.size());
+
+      size_type i = 0;
+      while (i < input.size()) {
+        const size_type start = i;
+        const unsigned int first = static_cast<unsigned int>(input[i++]);
+
+        if (first >= 0xD800U && first <= 0xDBFFU) {
+          if (i >= input.size())
+            throw utf16_error(start);
+          const unsigned int second =
+            static_cast<unsigned int>(input[i++]);
+          if (second < 0xDC00U || second > 0xDFFFU)
+            throw utf16_error(start);
+          symbols.push_back(static_cast<StringSymbol>(
+            0x10000U + ((first - 0xD800U) << 10) +
+            (second - 0xDC00U)));
+          continue;
+        }
+
+        if (first >= 0xDC00U && first <= 0xDFFFU)
+          throw utf16_error(start);
+
+        symbols.push_back(static_cast<StringSymbol>(first));
+      }
+
+      return StringVal(std::move(symbols));
+    }
+
     /// Encode the stored Unicode scalar values as UTF-8.
     std::string to_utf8(void) const {
       std::string output;
@@ -198,6 +236,32 @@ namespace Gecode { namespace String {
           output.push_back(static_cast<char>(0x80 | ((c >> 12) & 0x3F)));
           output.push_back(static_cast<char>(0x80 | ((c >> 6) & 0x3F)));
           output.push_back(static_cast<char>(0x80 | (c & 0x3F)));
+        }
+      }
+
+      return output;
+    }
+
+    /// Encode the stored Unicode scalar values as UTF-16 code units.
+    std::u16string to_utf16(void) const {
+      std::u16string output;
+      output.reserve(_symbols.size());
+
+      for (size_type i = 0; i < _symbols.size(); ++i) {
+        const StringSymbol c = _symbols[i];
+        if (!is_unicode_scalar_value(c))
+          throw std::out_of_range(
+            "StringVal contains an invalid Unicode scalar value");
+
+        if (c <= 0xFFFF) {
+          output.push_back(static_cast<char16_t>(c));
+        } else {
+          const unsigned int supplementary =
+            static_cast<unsigned int>(c - 0x10000);
+          output.push_back(static_cast<char16_t>(
+            0xD800U + (supplementary >> 10)));
+          output.push_back(static_cast<char16_t>(
+            0xDC00U + (supplementary & 0x3FFU)));
         }
       }
 

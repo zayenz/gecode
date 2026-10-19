@@ -1620,7 +1620,7 @@ namespace Gecode { namespace String {
     // std::cerr<<"y_succ = ["; for (auto& v:y_succ) std::cerr<<v<< ", "; std::cerr<<"]\n";
     NSBlocks y_max = that.lex_greatest(y_succ);
     if (known()) {
-      string sx = val(), sy = y_max.val();
+      StringVal sx = val_symbols(), sy = y_max.val_symbols();
       if ((lt && sx >= sy) || (!lt && sx > sy))
         return false;
     }
@@ -1718,8 +1718,8 @@ namespace Gecode { namespace String {
       return false;
     y_succ = max_succ(that);
     y_max = that.lex_greatest(y_succ);
-    const string sx = x_min.val();
-    const string sy = y_max.val();
+    const StringVal sx = x_min.val_symbols();
+    const StringVal sy = y_max.val_symbols();
     return lt ? sx < sy : sx <= sy;
   }
 
@@ -1729,8 +1729,8 @@ namespace Gecode { namespace String {
     NSBlocks x_min = lex_least(x_succ);
     std::vector<float> y_succ = max_succ(that);
     NSBlocks y_max = that.lex_greatest(y_succ);
-    const string sx = x_min.val();
-    const string sy = y_max.val();
+    const StringVal sx = x_min.val_symbols();
+    const StringVal sy = y_max.val_symbols();
     return lt ? sx < sy : sx <= sy;
   }
 

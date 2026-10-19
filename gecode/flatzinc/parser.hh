@@ -207,12 +207,16 @@ namespace Gecode { namespace FlatZinc {
     ParserState(const std::string& b, std::ostream& err0,
                 Gecode::FlatZinc::FlatZincSpace* fg0)
     : buf(b.c_str()), pos(0), length(b.size()), fg(fg0),
-      hadError(false), err(err0), stringParserState(NULL) {}
+      stringAlphabet(Gecode::String::StringAlphabet::bytes().symbols()),
+      hadError(false), err(err0),
+      stringParserState(NULL) {}
 
     ParserState(char* buf0, int length0, std::ostream& err0,
                 Gecode::FlatZinc::FlatZincSpace* fg0)
     : buf(buf0), pos(0), length(length0), fg(fg0),
-      hadError(false), err(err0), stringParserState(NULL) {}
+      stringAlphabet(Gecode::String::StringAlphabet::bytes().symbols()),
+      hadError(false), err(err0),
+      stringParserState(NULL) {}
 
     void* yyscanner;
     const char* buf;
@@ -235,6 +239,7 @@ namespace Gecode { namespace FlatZinc {
 
     std::vector<ConExpr*> domainConstraints;
 
+    Gecode::String::NSIntSet stringAlphabet;
     int status_idx = -1;
     int complete_idx = -1;
     std::vector<std::array<int, 2>> last_val_int;

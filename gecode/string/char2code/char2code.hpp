@@ -35,12 +35,22 @@ namespace Gecode { namespace String {
     }
 
     NSIntSet possible_chars = x0.may_chars();
-    IntArgs values;
     if (x0.min_length() == 0)
-      values << -1;
-    for (NSIntSet::iterator value(possible_chars); value(); ++value)
-      values << *value;
-    IntSet allowed(values);
+      possible_chars.add(-1);
+    class Ranges {
+    private:
+      NSRange* current;
+    public:
+      explicit Ranges(const NSIntSet& values) : current(values.first()) {}
+      bool operator ()(void) const { return current != NULL; }
+      void operator ++(void) { current = current->next; }
+      int min(void) const { return current->l; }
+      int max(void) const { return current->u; }
+      unsigned int width(void) const {
+        return static_cast<unsigned int>(current->u - current->l + 1);
+      }
+    } ranges(possible_chars);
+    IntSet allowed(ranges);
     IntSetRanges allowed_ranges(allowed);
     GECODE_ME_CHECK(x1.inter_r(home, allowed_ranges));
 
@@ -52,10 +62,10 @@ namespace Gecode { namespace String {
       GECODE_ME_CHECK(x0.lb(home, 1));
 
     NSIntSet allowed_chars;
-    for (Gecode::Int::ViewValues<Gecode::Int::IntView> value(x1);
-         value(); ++value)
-      if (value.val() >= 0)
-        allowed_chars.add(value.val());
+    for (Gecode::Int::ViewRanges<Gecode::Int::IntView> range(x1);
+         range(); ++range)
+      if (range.max() >= 0)
+        allowed_chars.include(NSIntSet(std::max(0, range.min()), range.max()));
     NSBlocks refined(x0.domain().blocks());
     for (NSBlock& block : refined) {
       block.S.intersect(allowed_chars);

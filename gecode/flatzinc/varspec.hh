@@ -188,6 +188,12 @@ namespace Gecode { namespace FlatZinc {
       alias = false; assigned = true;
       domain = Option<AST::StringDom*>::some(new AST::StringDom(value0));
     }
+    StringVarSpec(const Gecode::String::StringVal& value0,
+                  bool introduced, bool funcDep)
+    : VarSpec(introduced,funcDep) {
+      alias = false; assigned = true;
+      domain = Option<AST::StringDom*>::some(new AST::StringDom(value0));
+    }
     StringVarSpec(const Alias& eq, bool introduced, bool funcDep)
     : VarSpec(introduced,funcDep) {
       alias = true; assigned = false; i = eq.v;

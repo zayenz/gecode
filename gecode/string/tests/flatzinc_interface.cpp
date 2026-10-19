@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 using namespace Gecode;
@@ -52,6 +53,26 @@ satisfiable(const std::string& model) {
   return result;
 }
 
+bool
+parse_rejected(const std::string& model) {
+  FlatZinc::Printer printer;
+  std::ostringstream errors;
+  std::istringstream input(model);
+  try {
+    FlatZinc::FlatZincSpace* root =
+      FlatZinc::parse(input, printer, errors);
+    const bool rejected = root == NULL || !errors.str().empty();
+    delete root;
+    return rejected;
+  } catch (const std::runtime_error&) {
+    return true;
+  } catch (const std::invalid_argument&) {
+    return true;
+  } catch (const FlatZinc::AST::TypeError&) {
+    return true;
+  }
+}
+
 int
 main(void) {
   assert(String::DashedString::_DECOMP_REGEX);
@@ -99,6 +120,40 @@ main(void) {
     "solve satisfy;\n") == "n = 2;\n");
 
   assert(solve(
+    "var string: text :: output_var;\n"
+    "constraint str_eq(text, \"日本😀\");\n"
+    "solve satisfy;\n") == "text = 日本😀;\n");
+
+  assert(solve(
+    "var int: n :: output_var;\n"
+    "var string: text = \"日本😀\";\n"
+    "constraint str_len(text, n);\n"
+    "solve satisfy;\n") == "n = 3;\n");
+
+  assert(solve(
+    "var int: n :: output_var;\n"
+    "var string: text = \"\\u65E5\\u672C\\u{1F600}\";\n"
+    "constraint str_len(text, n);\n"
+    "solve satisfy;\n") == "n = 3;\n");
+
+  assert(solve(
+    "var int: code :: output_var;\n"
+    "constraint str_char2code(\"\\u{1F600}\", code);\n"
+    "solve satisfy;\n") == "code = 128512;\n");
+
+  assert(solve(
+    "var int: raw_length :: output_var;\n"
+    "var int: byte_length :: output_var;\n"
+    "constraint str_len(\"é\", raw_length);\n"
+    "constraint str_len(\"\\xC3\\xA9\", byte_length);\n"
+    "solve satisfy;\n") ==
+      "byte_length = 2;\nraw_length = 1;\n");
+
+  assert(solve(
+    "var string: text :: output_var = \"\\xFF\";\n"
+    "solve satisfy;\n") == "text = ÿ;\n");
+
+  assert(solve(
     "var int: code :: output_var;\n"
     "var string(1) of {\"\\x00\"}: text;\n"
     "constraint str_len(text, 1);\n"
@@ -137,6 +192,66 @@ main(void) {
   assert(!satisfiable(
     "constraint str_reg(\"x\", \"\\x2e\");\n"
     "solve satisfy;\n"));
+
+  assert(satisfiable(
+    "constraint str_reg(\"😀\", \"\\u{1F600}\");\n"
+    "constraint str_reg(\"本\", \"[日-本]\");\n"
+    "solve satisfy;\n"));
+
+  assert(solve(
+    "var string(1): text :: output_var;\n"
+    "constraint str_reg(text, \"[α-ω]\");\n"
+    "constraint str_char2code(text, 946);\n"
+    "solve satisfy;\n") == "text = β;\n");
+
+  assert(solve(
+    "string: alphabet_hint = \"β\";\n"
+    "var string(1): text :: output_var;\n"
+    "constraint str_reg(text, \".\");\n"
+    "constraint str_char2code(text, 946);\n"
+    "solve satisfy;\n") == "text = β;\n");
+
+  assert(solve(
+    "var int: index :: output_var;\n"
+    "constraint str_match(\"a😀b\", \"\\u{1F600}\", index);\n"
+    "solve satisfy;\n") == "index = 2;\n");
+
+  assert(satisfiable(
+    "var string(1) of {\"日\", \"😀\"}: text = \"\\u{1F600}\";\n"
+    "solve satisfy;\n"));
+
+  assert(satisfiable(
+    "var string(1) of \"日\"..\"本\": text = \"本\";\n"
+    "solve satisfy;\n"));
+
+  assert(solve(
+    "var string(1) of \"α\"..\"ω\": text :: output_var;\n"
+    "constraint str_char2code(text, 946);\n"
+    "solve satisfy;\n") == "text = β;\n");
+
+  assert(satisfiable(
+    "constraint str_alphabet(\"日本\", {\"日\", \"本\"});\n"
+    "solve satisfy;\n"));
+
+  assert(solve(
+    "array [1..2] of string: values = [\"日\", \"😀\"];\n"
+    "var string: text :: output_var;\n"
+    "constraint array_string_element(2, values, text);\n"
+    "solve satisfy;\n") == "text = 😀;\n");
+
+  assert(parse_rejected(
+    "constraint str_eq(\"\\uD800\", \"\");\n"
+    "solve satisfy;\n"));
+  assert(parse_rejected(
+    "constraint str_eq(\"\\u{110000}\", \"\");\n"
+    "solve satisfy;\n"));
+  assert(parse_rejected(
+    "constraint str_eq(\"\\u{}\", \"\");\n"
+    "solve satisfy;\n"));
+  std::string malformed_utf8 = "constraint str_eq(\"";
+  malformed_utf8.push_back(static_cast<char>(0xFF));
+  malformed_utf8 += "\", \"\");\nsolve satisfy;\n";
+  assert(parse_rejected(malformed_utf8));
 
   assert(satisfiable(
     "var string: text = \"ab\";\n"

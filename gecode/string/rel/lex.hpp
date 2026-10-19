@@ -32,7 +32,9 @@ namespace Gecode { namespace String {
     //lt ? std::cerr<<"\nLex::propagate "<<x0<<" < " <<x1<<std::endl
     //   : std::cerr<<"\nLex::propagate "<<x0<<" <= "<<x1<<std::endl;
     if (x0.assigned() && x1.assigned()) {
-      return (x0.val() < x1.val() || (!lt && x0.val() == x1.val()))
+      const StringVal left = x0.val_symbols();
+      const StringVal right = x1.val_symbols();
+      return (left < right || (!lt && left == right))
         ? home.ES_SUBSUMED(*this) : ES_FAILED;
     }
     if (lt)
@@ -45,7 +47,9 @@ namespace Gecode { namespace String {
       return home.ES_SUBSUMED(*this);
     GECODE_ME_CHECK(x0.lex(home, x1, lt));
     if (x0.assigned() && x1.assigned()) {
-      assert (x0.val() < x1.val() || (!lt && x0.val() == x1.val()));
+      const StringVal left = x0.val_symbols();
+      const StringVal right = x1.val_symbols();
+      assert (left < right || (!lt && left == right));
       return home.ES_SUBSUMED(*this);
     }
     //std::cerr<<"propagated: "<<x0<<" < (<=) "<<x1<<std::endl;

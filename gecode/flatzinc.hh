@@ -476,6 +476,8 @@ namespace Gecode { namespace FlatZinc {
 #ifdef GECODE_HAS_STRING_VARS
     /// Number of string variables
     int stringVarCount;
+    /// Active alphabet for unconstrained FlatZinc strings
+    String::NSIntSet _stringAlphabet;
 #endif
 
     /// Index of the variable to optimize
@@ -651,6 +653,10 @@ namespace Gecode { namespace FlatZinc {
     void newFloatVar(FloatVarSpec* vs);
     /// Create new string variable from specification
     void newStringVar(StringVarSpec* vs);
+    /// Set the active alphabet for unconstrained string variables
+    void stringAlphabet(const String::NSIntSet& alphabet);
+    /// Return the active alphabet for unconstrained string variables
+    const String::NSIntSet& stringAlphabet(void) const;
 
     /// Post a constraint specified by \a ce
     void postConstraints(std::vector<ConExpr*>& ces);
@@ -770,8 +776,8 @@ namespace Gecode { namespace FlatZinc {
     StringVar arg2StringVar(AST::Node* n);
     /// Convert \a arg to StringVarArgs
     StringVarArgs arg2stringvarargs(AST::Node* arg, int offset = 0);
-    /// Convert \a arg (array of strings) to a vector of strings
-    std::vector<std::string> arg2stringvec(AST::Node* arg);
+    /// Convert \a arg (array of strings) to encoding-neutral values
+    std::vector<String::StringVal> arg2stringvec(AST::Node* arg);
 #endif
     /// Convert \a ann to integer propagation level
     IntPropLevel ann2ipl(AST::Node* ann);

@@ -68,34 +68,69 @@ bool parseInt(const char* text, int& value) {
 }
 
 Gecode::FlatZinc::AST::String*
-parseString(const char* text) {
-  std::string value;
+parseString(const char* text, Gecode::FlatZinc::ParserState* state) {
+  typedef Gecode::String::StringSymbol Symbol;
+  typedef Gecode::String::StringVal Value;
+
+  auto hexValue = [](char c) -> int {
+    if (c >= '0' && c <= '9')
+      return c - '0';
+    if (c >= 'a' && c <= 'f')
+      return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+      return c - 'A' + 10;
+    return -1;
+  };
+  auto decodeHex = [&hexValue](const char* digits, size_t count,
+                               const char* kind) -> Symbol {
+    Symbol decoded = 0;
+    for (size_t j = 0; j < count; ++j) {
+      int digit = hexValue(digits[j]);
+      if (digit < 0)
+        throw std::runtime_error(
+          std::string("Malformed ") + kind + " escape sequence");
+      decoded = decoded * 16 + digit;
+    }
+    return decoded;
+  };
+
+  std::vector<Symbol> symbols;
   std::string regex;
   size_t len = strlen(text);
+  auto appendUtf8 = [text, &symbols](size_t begin, size_t end) {
+    if (begin == end)
+      return;
+    Value decoded = Value::decode_utf8(std::string(text + begin, end - begin));
+    symbols.insert(symbols.end(), decoded.begin(), decoded.end());
+  };
+
+  size_t plain = 1;
   for (size_t i = 1; i < len - 1; i++) {
     if (text[i] != '\\') {
-      value += text[i];
       regex += text[i];
       continue;
     }
+    appendUtf8(plain, i);
     if (i + 1 >= len - 1)
       throw std::runtime_error("Incomplete escape sequence");
+    const size_t escape = i;
     char c = text[++i];
+    Symbol decoded = 0;
     switch (c) {
-    case 'a': c = '\a'; break;
-    case 'b': c = '\b'; break;
-    case 'e': c = '\x1b'; break;
-    case 'f': c = '\f'; break;
-    case 'n': c = '\n'; break;
-    case 'r': c = '\r'; break;
-    case 't': c = '\t'; break;
-    case 'v': c = '\v'; break;
-    case '\'': c = '\''; break;
-    case '"': c = '"'; break;
+    case 'a': decoded = '\a'; regex += '\a'; break;
+    case 'b': decoded = '\b'; regex += '\b'; break;
+    case 'e': decoded = '\x1b'; regex += '\x1b'; break;
+    case 'f': decoded = '\f'; regex += '\f'; break;
+    case 'n': decoded = '\n'; regex += '\n'; break;
+    case 'r': decoded = '\r'; regex += '\r'; break;
+    case 't': decoded = '\t'; regex += '\t'; break;
+    case 'v': decoded = '\v'; regex += '\v'; break;
+    case '\'': decoded = '\''; regex += '\''; break;
+    case '"': decoded = '"'; regex += '"'; break;
     case '0':
-      value += '\0';
+      decoded = 0;
       regex += "\\0";
-      continue;
+      break;
     case '(':
     case ')':
     case '[':
@@ -105,33 +140,54 @@ parseString(const char* text) {
     case '*':
     case '.':
     case '\\':
-      value += c;
+      decoded = static_cast<unsigned char>(c);
       regex += '\\';
       regex += c;
-      continue;
+      break;
     case 'x': {
       if (i + 2 >= len - 1)
         throw std::runtime_error("Incomplete hexadecimal escape sequence");
-      char hex[3] = {text[i+1], text[i+2], '\0'};
-      char* end;
-      long decoded = strtol(hex, &end, 16);
-      if (*end != '\0')
-        throw std::runtime_error("Malformed hexadecimal escape sequence");
-      c = static_cast<unsigned char>(decoded);
+      decoded = decodeHex(text + i + 1, 2, "hexadecimal");
       i += 2;
-      value += c;
-      regex += "\\x";
-      regex += hex[0];
-      regex += hex[1];
-      continue;
+      regex.append(text + escape, i - escape + 1);
+      break;
+    }
+    case 'u': {
+      if (i + 1 < len - 1 && text[i + 1] == '{') {
+        const size_t digits = i + 2;
+        size_t close = digits;
+        while (close < len - 1 && text[close] != '}')
+          ++close;
+        if (close >= len - 1)
+          throw std::runtime_error("Incomplete Unicode escape sequence");
+        const size_t count = close - digits;
+        if (count == 0 || count > 6)
+          throw std::runtime_error("Malformed Unicode escape sequence");
+        decoded = decodeHex(text + digits, count, "Unicode");
+        i = close;
+      } else {
+        if (i + 4 >= len - 1)
+          throw std::runtime_error("Incomplete Unicode escape sequence");
+        decoded = decodeHex(text + i + 1, 4, "Unicode");
+        i += 4;
+      }
+      if (!Gecode::String::is_unicode_scalar_value(decoded))
+        throw std::runtime_error("Invalid Unicode scalar value escape");
+      regex.append(text + escape, i - escape + 1);
+      break;
     }
     default:
       throw std::runtime_error(
         "Unable to unescape: " + std::string(1, c));
     }
-    value += c;
-    regex += c;
+    symbols.push_back(decoded);
+    plain = i + 1;
   }
+  appendUtf8(plain, len - 1);
+  Value value = Value::from_symbols(std::move(symbols));
+  for (Value::const_iterator symbol = value.begin(); symbol != value.end();
+       ++symbol)
+    state->stringAlphabet.add(*symbol);
   return new Gecode::FlatZinc::AST::String(value, regex);
 }
 
@@ -223,7 +279,9 @@ int yy_input_proc(char* buf, int size, yyscan_t yyscanner);
 "where"           { return FZ_WHERE; }
 [A-Za-z][A-Za-z0-9_]* { yylval->sValue = strdup(yytext); return FZ_ID; }
 _[_]*[A-Za-z][A-Za-z0-9_]* { yylval->sValue = strdup(yytext); return FZ_U_ID; }
-\"([^"\\]|(\\.))*\" { yylval->stringValue = parseString(yytext);
+\"([^"\\]|(\\.))*\" { yylval->stringValue = parseString(
+                         yytext,
+                         static_cast<Gecode::FlatZinc::ParserState*>(yyextra));
                        return FZ_STRING_LIT; }
 .                 { yyerror("Unknown character"); }
 %%

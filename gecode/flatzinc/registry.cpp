@@ -2426,7 +2426,9 @@ fvar,
     }
 
     void p_str_chars(FlatZincSpace& s, const ConExpr& ce, AST::Node*) {
-      Gecode::String::NSBlock b = Gecode::String::NSBlock::top();
+      Gecode::String::NSBlock b(
+        s.stringAlphabet(),
+        0, Gecode::String::DashedString::_MAX_STR_LENGTH);
       if (ce[1]->isStringDom()) {
         AST::StringDom* sl = ce[1]->getStringDom();
         if (sl->c)
@@ -2451,14 +2453,18 @@ fvar,
         alphabet = ce[1]->getCharSet()->s;
       for (Gecode::String::NSIntSet::iterator c = alphabet.begin(); c(); ++c)
         contains(s, s.arg2StringVar(ce[0]),
-                 StringVar(s, std::string(1, Gecode::String::int2char(*c))));
+                 StringVar(s, Gecode::String::StringVal::from_symbols({*c})));
     }
 
     void p_str_range(FlatZincSpace& s, const ConExpr& ce, AST::Node*) {
       Gecode::String::NSBlock b;
       b.u = Gecode::String::DashedString::_MAX_STR_LENGTH;
-      int n = Gecode::String::char2int(ce[1]->getString()[0]);
-      int m = Gecode::String::char2int(ce[2]->getString()[0]);
+      Gecode::String::StringVal lower = ce[1]->getStringValue();
+      Gecode::String::StringVal upper = ce[2]->getStringValue();
+      if (lower.size() != 1 || upper.size() != 1)
+        throw AST::TypeError("character literal expected");
+      int n = lower[0];
+      int m = upper[0];
       b.S = Gecode::String::NSIntSet(n, m);
       Gecode::String::NSBlocks dom(1, b);
       rel(s, s.arg2StringVar(ce[0]), STRT_DOM, dom, b.l, b.u);
@@ -2574,10 +2580,13 @@ fvar,
     }
 
     void p_str_gcc(FlatZincSpace& s, const ConExpr& ce, AST::Node*) {
-      std::vector<std::string> v = s.arg2stringvec(ce[1]);
+      std::vector<Gecode::String::StringVal> v = s.arg2stringvec(ce[1]);
       IntArgs a;
-      for (auto c : v)
-        a << Gecode::String::char2int(c[0]);
+      for (const Gecode::String::StringVal& c : v) {
+        if (c.size() != 1)
+          throw AST::TypeError("character literal expected");
+        a << c[0];
+      }
       gcc(s, s.arg2StringVar(ce[0]), a, s.arg2intvarargs(ce[2]));
     }
 

@@ -323,6 +323,10 @@ void initfg(ParserState* pp) {
       AST::StringVar target(x.first);
       add_to_flatzinc(*x.second, &target, pp);
     }
+#ifdef GECODE_HAS_STRING_VARS
+    pp->fg->stringAlphabet(
+      pp->stringAlphabet);
+#endif
     pp->fg->init(pp->intvars.size(),
                  pp->boolvars.size(),
                  pp->setvars.size(),
@@ -1030,14 +1034,14 @@ vardecl_item:
           AST::Node* arg = $6.some();
           if (arg->isString()) {
             pp->stringvars.push_back(varspec($4,
-              new StringVarSpec(arg->getString(),!print,funcDep)));
+              new StringVarSpec(arg->getStringValue(),!print,funcDep)));
           } else if (arg->isStringVar()) {
             pp->stringvars.push_back(varspec($4,
               new StringVarSpec(
                 Alias(arg->getStringVar()),!print,funcDep)));
           } else if (arg->isStringDom()) {
             pp->stringvars.push_back(varspec($4,
-              new StringVarSpec(arg->getStringDom()->s,!print,funcDep)));
+              new StringVarSpec(arg->getStringDom()->v,!print,funcDep)));
           } else {
             yyassert(pp, false, "Invalid var string initializer");
           }
@@ -1603,7 +1607,7 @@ int_var_array_literal : '[' int_init_list ']'
 string_init :
       FZ_STRING_LIT
       {
-        $$ = new StringVarSpec($1->s,false,false);
+        $$ = new StringVarSpec($1->v,false,false);
         delete $1;
       }
     | var_par_id
@@ -1613,7 +1617,7 @@ string_init :
         if (pp->symbols.get($1, e) && e.t == ST_STRINGVAR)
           $$ = new StringVarSpec(Alias(e.i),false,false);
         else if (pp->symbols.get($1, e) && e.t == ST_STRING)
-          $$ = new StringVarSpec(pp->stringvals[e.i].s,false,false);
+          $$ = new StringVarSpec(pp->stringvals[e.i].v,false,false);
         else {
           pp->err << "Error: undefined identifier for type string " << $1
                   << " in line no. "
@@ -1639,7 +1643,7 @@ string_init :
                    "array access out of bounds");
           if (!pp->hadError)
             $$ = new StringVarSpec(
-                   pp->stringvals[pp->arrays[e.i+1]+$3-1].s,false,false);
+                   pp->stringvals[pp->arrays[e.i+1]+$3-1].v,false,false);
           else
             $$ = new StringVarSpec(std::string(""),false,false);
         } else {
@@ -2181,9 +2185,12 @@ string_list_head:
 
 charset_literal :
       '{' string_list '}'
-      { $$ = new AST::CharSetLit(*$2); delete $2; }
+      { $$ = new AST::CharSetLit(*$2);
+        static_cast<ParserState*>(parm)->stringAlphabet.include($$->s);
+        delete $2; }
     | FZ_STRING_LIT FZ_DOTDOT FZ_STRING_LIT
-      { $$ = new AST::CharSetLit($1->s, $3->s);
+      { $$ = new AST::CharSetLit($1->v, $3->v);
+        static_cast<ParserState*>(parm)->stringAlphabet.include($$->s);
         delete $1; delete $3; }
 
 set_literal_list :

@@ -236,6 +236,22 @@ namespace Gecode { namespace String {
     bool operator!=(const StringVal& that) const {
       return !(*this == that);
     }
+
+    bool operator<(const StringVal& that) const {
+      return _symbols < that._symbols;
+    }
+
+    bool operator<=(const StringVal& that) const {
+      return _symbols <= that._symbols;
+    }
+
+    bool operator>(const StringVal& that) const {
+      return _symbols > that._symbols;
+    }
+
+    bool operator>=(const StringVal& that) const {
+      return _symbols >= that._symbols;
+    }
   };
 
 }}

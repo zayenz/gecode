@@ -117,6 +117,8 @@ namespace Gecode { namespace FlatZinc { namespace AST {
 
     /// Cast this node to a string node
     std::string getString(void);
+    /// Return the encoding-neutral value of a string node
+    Gecode::String::StringVal getStringValue(void);
     /// Return the string after FlatZinc decoding but before regex decoding
     std::string getRegex(void);
     /// Cast this node to a string domain node
@@ -328,9 +330,14 @@ namespace Gecode { namespace FlatZinc { namespace AST {
   public:
     std::string s;
     std::string r;
-    String(void) : s(), r() {}
-    String(const std::string& s0) : s(s0), r(s0) {}
-    String(const std::string& s0, const std::string& r0) : s(s0), r(r0) {}
+    Gecode::String::StringVal v;
+    String(void) : s(), r(), v() {}
+    String(const std::string& s0)
+      : s(s0), r(s0), v(Gecode::String::StringVal::decode_utf8(s0)) {}
+    String(const std::string& s0, const std::string& r0)
+      : s(s0), r(r0), v(Gecode::String::StringVal::decode_utf8(s0)) {}
+    String(const Gecode::String::StringVal& v0, const std::string& r0)
+      : s(v0.to_utf8()), r(r0), v(v0) {}
     virtual void print(std::ostream& os) {
       os << "s(\"" << s << "\")";
     }
@@ -340,13 +347,19 @@ namespace Gecode { namespace FlatZinc { namespace AST {
   class GECODE_VTABLE_EXPORT CharSetLit : public Node {
   public:
     Gecode::String::NSIntSet s;
-    CharSetLit(const std::string& a, const std::string& b)
-      : s(Gecode::String::char2int(a[0]),
-          Gecode::String::char2int(b[0])) {}
+    CharSetLit(const Gecode::String::StringVal& a,
+               const Gecode::String::StringVal& b) {
+      if (a.size() != 1 || b.size() != 1)
+        throw TypeError("character literal expected");
+      s = Gecode::String::NSIntSet(a[0], b[0]);
+    }
     CharSetLit(const Gecode::String::NSIntSet& s0) : s(s0) {}
     CharSetLit(const std::vector<String>& v) {
-      for (auto c: v)
-        s.add(Gecode::String::char2int(c.s[0]));
+      for (const String& c : v) {
+        if (c.v.size() != 1)
+          throw TypeError("character literal expected");
+        s.add(c.v[0]);
+      }
     }
     virtual void print(std::ostream& os) {
       os << "t(charset)";
@@ -358,15 +371,21 @@ namespace Gecode { namespace FlatZinc { namespace AST {
   public:
     int u;
     std::string s;
+    Gecode::String::StringVal v;
     CharSetLit* c;
-    StringDom() : u(Gecode::String::DashedString::_MAX_STR_LENGTH), s(), c(NULL) {}
-    StringDom(int u0) : u(u0), s(), c(NULL) {}
-    StringDom(const std::string& s0) : u(-1), s(s0), c(NULL) {}
-    StringDom(CharSetLit* c0) : u(-1), s(), c(c0) {}
-    StringDom(const Gecode::String::NSIntSet& s0) : u(-1), s(),
+    StringDom()
+      : u(Gecode::String::DashedString::_MAX_STR_LENGTH), s(), v(), c(NULL) {}
+    StringDom(int u0) : u(u0), s(), v(), c(NULL) {}
+    StringDom(const std::string& s0)
+      : u(-1), s(s0), v(Gecode::String::StringVal::decode_utf8(s0)), c(NULL) {}
+    StringDom(const Gecode::String::StringVal& v0)
+      : u(-1), s(v0.to_utf8()), v(v0), c(NULL) {}
+    StringDom(CharSetLit* c0) : u(-1), s(), v(), c(c0) {}
+    StringDom(const Gecode::String::NSIntSet& s0) : u(-1), s(), v(),
       c(new CharSetLit(s0)) {}
-    StringDom(int u0, CharSetLit* c0) : u(u0), s(), c(c0) {}
-    explicit StringDom(StringDom* s0) : u(s0->u), s(s0->s), c(s0->c) {}
+    StringDom(int u0, CharSetLit* c0) : u(u0), s(), v(), c(c0) {}
+    explicit StringDom(StringDom* s0)
+      : u(s0->u), s(s0->s), v(s0->v), c(s0->c) {}
     virtual void print(std::ostream& os) {
       if (c) {
         if (u < 0)
@@ -561,6 +580,14 @@ namespace Gecode { namespace FlatZinc { namespace AST {
       return a->s;
     throw TypeError("string literal expected");
   }
+  inline Gecode::String::StringVal
+  Node::getStringValue(void) {
+    if (String* a = dynamic_cast<String*>(this))
+      return a->v;
+    else if (StringDom* a = dynamic_cast<StringDom*>(this))
+      return a->v;
+    throw TypeError("string literal expected");
+  }
   inline std::string
   Node::getRegex(void) {
     if (String* a = dynamic_cast<String*>(this))
@@ -572,7 +599,7 @@ namespace Gecode { namespace FlatZinc { namespace AST {
     if (StringDom* a = dynamic_cast<StringDom*>(this))
       return a;
     else if (String* a = dynamic_cast<String*>(this))
-      return new StringDom(a->s);
+      return new StringDom(a->v);
     throw TypeError("string literal expected");
   }
   inline CharSetLit*

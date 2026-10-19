@@ -133,5 +133,13 @@ main(void) {
   assert(interior->status() != SS_FAILED);
   assert(!String::StringView(interior->string).may_chars().contains('b'));
   delete interior;
+
+  Char2CodeModel* unicode = new Char2CodeModel(0x1F600, 0x1F64F);
+  unicode->assign_code(0x1F600);
+  assert(unicode->status() != SS_FAILED);
+  assert(unicode->string.assigned());
+  assert(unicode->string.val_symbols() ==
+         String::StringVal::from_symbols({0x1F600}));
+  delete unicode;
   return 0;
 }

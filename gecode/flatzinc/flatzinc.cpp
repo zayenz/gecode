@@ -924,6 +924,7 @@ namespace Gecode { namespace FlatZinc {
 #ifdef GECODE_HAS_STRING_VARS
       tv.update(*this, f.tv);
       stringVarCount = f.stringVarCount;
+      _stringAlphabet = f._stringAlphabet;
       tv_introduced = f.tv_introduced;
       if (needAuxVars) {
         StringVarArgs tva;
@@ -942,7 +943,8 @@ namespace Gecode { namespace FlatZinc {
   :  _initData(new FlatZincSpaceInitData),
     intVarCount(-1), boolVarCount(-1), floatVarCount(-1), setVarCount(-1)
 #ifdef GECODE_HAS_STRING_VARS
-    , stringVarCount(-1)
+    , stringVarCount(-1),
+      _stringAlphabet(Gecode::String::StringAlphabet::bytes().symbols())
 #endif
     ,
     _optVar(-1), _optVarIsInt(true), _lns(0), _lnsInitialSolution(0),
@@ -1105,6 +1107,16 @@ namespace Gecode { namespace FlatZinc {
 
 #ifdef GECODE_HAS_STRING_VARS
   void
+  FlatZincSpace::stringAlphabet(const Gecode::String::NSIntSet& alphabet) {
+    _stringAlphabet = alphabet;
+  }
+
+  const Gecode::String::NSIntSet&
+  FlatZincSpace::stringAlphabet(void) const {
+    return _stringAlphabet;
+  }
+
+  void
   FlatZincSpace::newStringVar(StringVarSpec* vs) {
     if (vs->alias) {
       tv[stringVarCount++] = tv[vs->i];
@@ -1122,14 +1134,17 @@ namespace Gecode { namespace FlatZinc {
         Gecode::String::NSBlocks v(1, b);
         tv[stringVarCount++] = StringVar(*this, v, b.l, b.u);
       } else if (u == -1) {
-        tv[stringVarCount++] = StringVar(*this, vs->domain.some()->s);
+        tv[stringVarCount++] = StringVar(*this, vs->domain.some()->v);
       } else {
         if (u > Gecode::String::DashedString::_MAX_STR_LENGTH)
           u = Gecode::String::DashedString::_MAX_STR_LENGTH;
-        tv[stringVarCount++] = StringVar(*this, 0, u);
+        tv[stringVarCount++] = StringVar(
+          *this, _stringAlphabet, 0, u);
       }
     } else {
-      tv[stringVarCount++] = StringVar(*this);
+      tv[stringVarCount++] = StringVar(
+        *this, _stringAlphabet, 0,
+        Gecode::String::DashedString::_MAX_STR_LENGTH);
     }
     tv_introduced[2*(stringVarCount-1)] = vs->introduced;
     tv_introduced[2*(stringVarCount-1)+1] = vs->funcDep;
@@ -2844,14 +2859,14 @@ namespace Gecode { namespace FlatZinc {
     StringVar x0;
     if (!n->isStringVar()) {
       if (n->isString()) {
-        x0 = StringVar(*this, n->getString());
+        x0 = StringVar(*this, n->getStringValue());
       }
       else if (n->isStringDom()) {
         AST::StringDom* sl = n->getStringDom();
         if (sl->u != -1)
-          x0 = StringVar(*this, Gecode::String::NSIntSet::top(), 0, sl->u);
+          x0 = StringVar(*this, _stringAlphabet, 0, sl->u);
         else if (sl->c == NULL)
-          x0 = StringVar(*this, sl->s);
+          x0 = StringVar(*this, sl->v);
         else
           x0 = StringVar(
             *this, sl->c->s, 0, Gecode::String::DashedString::_MAX_STR_LENGTH
@@ -2875,18 +2890,20 @@ namespace Gecode { namespace FlatZinc {
     }
     StringVarArgs ta(a->a.size()+offset);
     for (int i=offset; i--;)
-      ta[i] = StringVar(*this);
+      ta[i] = StringVar(
+        *this, _stringAlphabet, 0,
+        Gecode::String::DashedString::_MAX_STR_LENGTH);
     for (int i=a->a.size(); i--;) {
       ta[i+offset] = arg2StringVar(a->a[i]);
     }
     return ta;
   }
-  std::vector<std::string>
+  std::vector<Gecode::String::StringVal>
   FlatZincSpace::arg2stringvec(AST::Node* arg) {
     AST::Array* a = arg->getArray();
-    std::vector<std::string> v;
+    std::vector<Gecode::String::StringVal> v;
     for (auto x : a->a)
-      v.push_back(x->getString());
+      v.push_back(x->getStringValue());
     return v;
   }
 #endif
@@ -3048,7 +3065,7 @@ namespace Gecode { namespace FlatZinc {
 #ifdef GECODE_HAS_STRING_VARS
     } else if (ai->isStringVar()) {
       if (tv[ai->getStringVar()].assigned())
-        out << tv[ai->getStringVar()].val();
+        out << tv[ai->getStringVar()].val_symbols().to_utf8();
       else
         out << tv[ai->getStringVar()];
 #endif

@@ -1,6 +1,7 @@
 #include <gecode/string.hh>
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <random>
 #include <set>
@@ -100,6 +101,33 @@ namespace {
     }
   };
 
+  class UnicodeLexModel : public Space {
+  public:
+    StringVar left;
+    StringVar right;
+    BoolVar result;
+
+    UnicodeLexModel(const StringVal& left_value,
+                    const StringVal& right_value, bool strict)
+      : left(*this, left_value),
+        right(*this, right_value),
+        result(*this, 0, 1) {
+      rel(*this, left, strict ? STRT_LEXLT : STRT_LEXLQ, right,
+          Reify(result, RM_EQV));
+    }
+
+    UnicodeLexModel(UnicodeLexModel& model)
+      : Space(model) {
+      left.update(*this, model.left);
+      right.update(*this, model.right);
+      result.update(*this, model.result);
+    }
+
+    virtual Space* copy(void) {
+      return new UnicodeLexModel(*this);
+    }
+  };
+
   bool
   check_pair(const NSBlocks& left_domain, const NSBlocks& right_domain,
              bool strict) {
@@ -170,6 +198,21 @@ namespace {
 
 int
 main(void) {
+  const StringVal japanese =
+    StringVal::from_symbols({0x65E5, 0x672C});
+  const StringVal japanese_extended =
+    StringVal::from_symbols({0x65E5, 0x672C, 0x1F600});
+  UnicodeLexModel unicode_less(japanese, japanese_extended, true);
+  assert(unicode_less.status() != SS_FAILED);
+  assert(unicode_less.result.assigned() && unicode_less.result.val() == 1);
+
+  UnicodeLexModel unicode_greater(
+    StringVal::from_symbols({0x1F600}),
+    StringVal::from_symbols({0x65E5}), false);
+  assert(unicode_greater.status() != SS_FAILED);
+  assert(unicode_greater.result.assigned() &&
+         unicode_greater.result.val() == 0);
+
   std::vector<NSBlock> blocks;
   const std::string alphabet("ab");
   for (unsigned int mask = 1; mask < 4; ++mask) {

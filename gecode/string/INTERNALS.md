@@ -110,6 +110,16 @@ the same partition compiler. Its strategy selector counts the symbols carried
 by each transition label, rather than treating one symbolic transition as one
 word, and its fixed-prefix fast paths operate on scalar values.
 
+FlatZinc literals are decoded to `StringVal` at the lexer boundary. Raw source
+text must be valid UTF-8; `\uHHHH` and `\u{...}` denote Unicode scalar values,
+while `\xHH` intentionally remains the legacy one-byte/one-symbol path. The
+AST carries the scalar sequence separately from the preserved regex spelling,
+and FlatZinc output explicitly encodes assigned values as UTF-8. Models
+containing only byte-valued literals retain the legacy `0..255` active
+alphabet; scalar values and ranges observed in Unicode literals, charsets, and
+regular expressions extend that model-specific alphabet for unconstrained
+string variables.
+
 Replacement runs each operation-specific transformation as one complete pass.
 An explicit outer loop repeats that pass only for the assignment combinations
 that previously caused an immediate recursive restart, preserving the posting

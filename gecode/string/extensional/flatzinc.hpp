@@ -157,7 +157,8 @@ namespace Gecode { namespace String {
         } else {
           FlatZincAST::Array* constraint = new FlatZincAST::Array(2);
           constraint->a[0] = new FlatZincAST::StringVar(target->i);
-          constraint->a[1] = new FlatZincAST::StringDom(base.get_chars());
+          constraint->a[1] = new FlatZincAST::StringDom(
+            base.get_chars(state->stringAlphabet));
           state->constraints.push_back(
             new FlatZinc::ConExpr("str_chars", constraint, nullptr));
         }
@@ -198,7 +199,8 @@ namespace Gecode { namespace String {
       FlatZincAST::Array* chars_constraint = new FlatZincAST::Array(2);
       chars_constraint->a[0] = new FlatZincAST::StringVar(target->i);
       chars_constraint->a[1] =
-        new FlatZincAST::StringDom(expression.get_chars());
+        new FlatZincAST::StringDom(
+          expression.get_chars(state->stringAlphabet));
       state->constraints.push_back(
         new FlatZinc::ConExpr("str_chars", chars_constraint, nullptr));
     }
@@ -207,6 +209,8 @@ namespace Gecode { namespace String {
   forceinline void
   add_to_flatzinc(const RegEx& expression, FlatZincAST::StringVar* target,
                   FlatZinc::ParserState* state) {
+    state->stringAlphabet.include(
+      expression.get_chars(state->stringAlphabet));
     FlatZincRegExBuilder builder(state);
     builder.add(expression, target);
   }

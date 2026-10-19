@@ -226,6 +226,17 @@ namespace Gecode {
   }
 
   void
+  extensional(
+    Home home, StringVar x, const std::vector<String::StringVal>& y
+  ) {
+    IntVar i(home, 1, y.size());
+    StringVarArgs a;
+    for (const String::StringVal& value : y)
+      a << StringVar(home, value);
+    element(home, a, i, x);
+  }
+
+  void
   extensional(Home home, StringVar x, const std::vector<std::string>& y) {
     IntVar i(home, 1, y.size());
     StringVarArgs a;

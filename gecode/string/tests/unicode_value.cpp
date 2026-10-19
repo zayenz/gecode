@@ -607,6 +607,30 @@ namespace {
     }
   };
 
+  class UnicodeFiniteLanguageSpace : public Gecode::Space {
+  public:
+    Gecode::StringVar value;
+
+    explicit UnicodeFiniteLanguageSpace(bool accepted)
+      : value(*this, StringVal::from_symbols(
+          {accepted ? 0x1F600 : 0x672C})) {
+      const std::vector<StringVal> language = {
+        StringVal::from_symbols({0x65E5}),
+        StringVal::from_symbols({0x1F600})
+      };
+      Gecode::extensional(*this, value, language);
+    }
+
+    UnicodeFiniteLanguageSpace(UnicodeFiniteLanguageSpace& other)
+      : Gecode::Space(other) {
+      value.update(*this, other.value);
+    }
+
+    virtual Gecode::Space* copy(void) {
+      return new UnicodeFiniteLanguageSpace(*this);
+    }
+  };
+
   class UnicodeGCCSpace : public Gecode::Space {
   public:
     Gecode::StringVar value;
@@ -927,6 +951,39 @@ int main(void) {
   expect_bad_symbol(0xD800);
   expect_bad_symbol(0xDFFF);
   expect_bad_symbol(0x110000);
+
+  FixedStringValSpace* validation_space =
+    new FixedStringValSpace(StringVal());
+  bool rejected_surrogate_domain = false;
+  try {
+    Gecode::String::NSIntSet surrogate(0xD800);
+    (void) Gecode::StringVar(*validation_space, surrogate, 1, 1);
+  } catch (const Gecode::String::OutOfLimitsDS&) {
+    rejected_surrogate_domain = true;
+  }
+  assert(rejected_surrogate_domain);
+
+  bool rejected_out_of_range_domain = false;
+  try {
+    Gecode::String::NSIntSet beyond_unicode(0x110000);
+    (void) Gecode::StringVar(*validation_space, beyond_unicode, 1, 1);
+  } catch (const Gecode::String::OutOfLimitsDS&) {
+    rejected_out_of_range_domain = true;
+  }
+  assert(rejected_out_of_range_domain);
+
+  bool rejected_surrogate_blocks = false;
+  try {
+    Gecode::String::NSBlocks invalid_blocks(
+      1, Gecode::String::NSBlock(
+        Gecode::String::NSIntSet(0xD7FF, 0xE000), 1, 1));
+    (void) Gecode::StringVar(
+      *validation_space, invalid_blocks, 1, 1);
+  } catch (const Gecode::String::OutOfLimitsDS&) {
+    rejected_surrogate_blocks = true;
+  }
+  assert(rejected_surrogate_blocks);
+  delete validation_space;
 
   bool rejected_non_byte = false;
   try {
@@ -1281,6 +1338,16 @@ int main(void) {
   assert(reified_regular_propagated->result.assigned() &&
          reified_regular_propagated->result.val() == 1);
   delete reified_regular_propagated;
+
+  UnicodeFiniteLanguageSpace* accepted_language =
+    new UnicodeFiniteLanguageSpace(true);
+  assert(accepted_language->status() != Gecode::SS_FAILED);
+  delete accepted_language;
+
+  UnicodeFiniteLanguageSpace* rejected_language =
+    new UnicodeFiniteLanguageSpace(false);
+  assert(rejected_language->status() == Gecode::SS_FAILED);
+  delete rejected_language;
 
   UnicodeStrToNatSpace* unicode_str_to_nat =
     new UnicodeStrToNatSpace;

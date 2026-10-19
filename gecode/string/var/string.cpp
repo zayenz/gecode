@@ -4,6 +4,34 @@
 #include <stdexcept>
 
 
+namespace Gecode {
+
+  namespace {
+
+    void
+    validate_string_symbols(const String::NSIntSet& symbols,
+                            const char* location) {
+      for (String::NSRange* range = symbols.first();
+           range != NULL; range = range->next)
+        if (!String::is_unicode_scalar_value(range->l) ||
+            !String::is_unicode_scalar_value(range->u) ||
+            (range->l <= String::UNICODE_SURROGATE_MAX &&
+             range->u >= String::UNICODE_SURROGATE_MIN))
+          throw String::OutOfLimitsDS(location);
+    }
+
+    void
+    validate_string_symbols(const String::NSBlocks& blocks,
+                            const char* location) {
+      for (const String::NSBlock& block : blocks)
+        validate_string_symbols(block.S, location);
+    }
+
+  }
+
+}
+
+
 namespace Gecode { namespace String {
 
   StringAlphabet::StringAlphabet(const NSIntSet& symbols)
@@ -139,11 +167,15 @@ namespace Gecode {
         new (home) String::StringVarImp(home,alphabet.symbols(),a,b)) {}
 
   StringVar::StringVar(Space& home, String::NSBlocks& v, int mil, int mal)
-    : VarImpVar<String::StringVarImp>(
-        new (home) String::StringVarImp(home,v,mil,mal)) {}
+    : VarImpVar<String::StringVarImp>() {
+    validate_string_symbols(v, "StringVar::StringVar");
+    x = new (home) String::StringVarImp(home,v,mil,mal);
+  }
 
   StringVar::StringVar(Space& home, const String::NSIntSet& s, int a, int b)
-    : VarImpVar<String::StringVarImp>(
-        new (home) String::StringVarImp(home,s,a,b)) {}
+    : VarImpVar<String::StringVarImp>() {
+    validate_string_symbols(s, "StringVar::StringVar");
+    x = new (home) String::StringVarImp(home,s,a,b);
+  }
 
 }

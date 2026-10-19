@@ -139,9 +139,11 @@ namespace Gecode {
     /// Initialize from string view \a y
     StringVar(const String::StringView& y);
 
+    /// Initialize with the legacy byte alphabet and default length bounds
     GECODE_STRING_EXPORT
     StringVar(Space& home);
 
+    /// Initialize with length bounds and the legacy byte alphabet
     GECODE_STRING_EXPORT
     StringVar(Space& home, int a, int b);
 
@@ -158,9 +160,11 @@ namespace Gecode {
     GECODE_STRING_EXPORT
     StringVar(Space& home, const String::StringVal& value);
 
+    /// Initialize from a scalar-value domain and explicit length bounds
     GECODE_STRING_EXPORT
     StringVar(Space& home, String::NSBlocks& v, int mil, int mal);
 
+    /// Initialize from an active scalar-value set and length bounds
     GECODE_STRING_EXPORT
     StringVar(Space& home, const String::NSIntSet& s, int a, int b);
 
@@ -457,7 +461,7 @@ namespace Gecode {
    * \ingroup TaskModelString
    */
   //@{
-  /// Post propagator for \f$ x \in expr \f$
+  /// Post propagator for \f$ x \in expr \f$ from strict UTF-8 regex text
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, string expr);
   GECODE_STRING_EXPORT void
@@ -472,9 +476,15 @@ namespace Gecode {
   /// Post propagator for \f$ x \in a \f$
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, StringVarArgs a);
+  /// Post using encoding-neutral concrete values
+  GECODE_STRING_EXPORT void
+  extensional(Home home, StringVar x,
+              const std::vector<String::StringVal>& a);
+  /// Post using legacy one-byte-per-symbol concrete values
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, const std::vector<std::string>& a);
 
+  /// Post Unicode match from strict UTF-8 regex text
   GECODE_STRING_EXPORT void
   match(Home home, StringVar x, string expr, IntVar i);
   //@}

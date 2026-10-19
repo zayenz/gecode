@@ -171,6 +171,20 @@ then
   exit 1
 fi &&
 cat $X &&
+echo "Solving unicode_frontend.mzn"
+run_mzn_with_timeout "$TEST_DIR/unicode_frontend.mzn" || exit 1
+if
+  grep -aq "length = 3;" "$X" &&
+  grep -aq "emoji_code = 128512;" "$X" &&
+  grep -aq "text = 日本😀;" "$X" &&
+  grep -aq -- "----------" "$X"
+then
+  cat "$X"
+else
+  echo "Error! Unicode frontend output not expected!"
+  cat "$X"
+  exit 1
+fi &&
 echo "Solving lex_optional_suffix.mzn"
 run_mzn_with_timeout "$TEST_DIR/lex_optional_suffix.mzn" || exit 1
 if

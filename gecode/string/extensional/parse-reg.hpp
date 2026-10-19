@@ -10,15 +10,15 @@
  *
  * <factor> ::= <base> { '*' }
  *
- * <base>   ::= '.' | '\' <char> | <char> | '[' <char> '-' <char> ']'
- *            | '[' <char> '-' <char> ',' int ']' |
- *            | '[' <char> '-' <char> ',' int, ',' int ']' |
- *            | '(' <regex> ')'
+ * <base>   ::= '.' | <escape> | <unicode-scalar> | <class> | '(' <regex> ')'
  *
+ * <class>  ::= '[' ['^'] { <class-char> | <class-char> '-' <class-char> }
+ *              [',' int [',' int]] ']'
  *
- * (from http://matt.might.net/articles/parsing-regex-with-recursive-descent/).
+ * <escape> ::= '\' <meta> | '\0' | '\xHH' | '\uHHHH' | '\u{H...}'
  *
- * The \ symbol is used to escape characters '&' '|' '*' '[' ']' '(' ')' '\' '"'
+ * Input is decoded as strict UTF-8 before parsing. Wildcards and negated
+ * classes are interpreted over the active alphabet supplied while posting.
  *
 */
 
@@ -34,6 +34,7 @@ namespace Gecode { namespace String {
   class StarEx;
   class CharEx;
   class RangeEx;
+  class trimDFA;
 
   class RegExVisitor {
   public:
@@ -48,6 +49,17 @@ namespace Gecode { namespace String {
   };
 
   class RegEx {
+  protected:
+    static REG
+    symbolic_class(const NSIntSet& characters,
+                   const std::vector<NSIntSet>& partitions) {
+      IntArgs symbols;
+      for (unsigned int i = 0; i < partitions.size(); ++i)
+        if (!characters.disjoint(partitions[i]))
+          symbols << static_cast<int>(i);
+      return REG(symbols);
+    }
+
   public:
     virtual bool decomp()     const { return false; }
     virtual bool empty()      const { return false; }
@@ -61,6 +73,10 @@ namespace Gecode { namespace String {
     virtual void accept(RegExVisitor&) const = 0;
     virtual string str() const = 0;
     virtual REG reg()    const = 0;
+    virtual REG symbolic_reg(
+      const std::vector<NSIntSet>&, const NSIntSet&) const = 0;
+    virtual void collect_symbol_sets(
+      const NSIntSet&, std::vector<NSIntSet>&) const = 0;
     DFA dfa() const {
       try {
         return DFA(this->reg());
@@ -71,8 +87,13 @@ namespace Gecode { namespace String {
         return DFA(0, t, f);
       };
     }
+    GECODE_STRING_EXPORT trimDFA*
+    symbolic_dfa(const NSIntSet& active_alphabet) const;
     virtual string get_string()  const = 0;
     virtual NSIntSet get_chars() const = 0;
+    virtual NSIntSet get_chars(const NSIntSet&) const {
+      return get_chars();
+    }
     virtual ~RegEx() {};
   };
 
@@ -96,6 +117,12 @@ namespace Gecode { namespace String {
       visitor.visit(*this);
     }
     REG reg() const { return REG(); }
+    REG symbolic_reg(
+      const std::vector<NSIntSet>&, const NSIntSet&) const {
+      return REG();
+    }
+    void collect_symbol_sets(
+      const NSIntSet&, std::vector<NSIntSet>&) const {}
     ~EmptyEx() {}
   };
 
@@ -135,6 +162,12 @@ namespace Gecode { namespace String {
       s.include(rhs->get_chars());
       return s;
     }
+    NSIntSet
+    get_chars(const NSIntSet& active_alphabet) const {
+      NSIntSet s(lhs->get_chars(active_alphabet));
+      s.include(rhs->get_chars(active_alphabet));
+      return s;
+    }
     const RegEx& left(void) const { return *lhs; }
     const RegEx& right(void) const { return *rhs; }
     void accept(RegExVisitor& visitor) const {
@@ -158,7 +191,9 @@ namespace Gecode { namespace String {
         if (rhs->empty())
           lhs->post(home, x, va);
         else {
-          StringVar x1(home), x2(home);
+          const NSIntSet alphabet = x.may_chars();
+          StringVar x1(home, alphabet, 0, x.max_length());
+          StringVar x2(home, alphabet, 0, x.max_length());
           // std::cerr << "Posting " << x << " = " << x1 << " + " << x2 << "\n";
           lhs->post(home, x1, va);
           rhs->post(home, x2, va);
@@ -180,6 +215,24 @@ namespace Gecode { namespace String {
       else
         return lhs->reg() + rhs->reg();
       }
+    }
+    REG symbolic_reg(
+      const std::vector<NSIntSet>& partitions,
+      const NSIntSet& active_alphabet) const {
+      if (lhs->empty()) {
+        if (rhs->empty())
+          return REG();
+        return rhs->symbolic_reg(partitions, active_alphabet);
+      }
+      if (rhs->empty())
+        return lhs->symbolic_reg(partitions, active_alphabet);
+      return lhs->symbolic_reg(partitions, active_alphabet) +
+        rhs->symbolic_reg(partitions, active_alphabet);
+    }
+    void collect_symbol_sets(
+      const NSIntSet& active_alphabet, std::vector<NSIntSet>& sets) const {
+      lhs->collect_symbol_sets(active_alphabet, sets);
+      rhs->collect_symbol_sets(active_alphabet, sets);
     }
   };
 
@@ -216,6 +269,12 @@ namespace Gecode { namespace String {
         s.intersect(rhs->get_chars());
         return s;
       }
+      NSIntSet
+      get_chars(const NSIntSet& active_alphabet) const {
+        NSIntSet s(lhs->get_chars(active_alphabet));
+        s.intersect(rhs->get_chars(active_alphabet));
+        return s;
+      }
       const RegEx& left(void) const { return *lhs; }
       const RegEx& right(void) const { return *rhs; }
       void accept(RegExVisitor& visitor) const {
@@ -249,6 +308,28 @@ namespace Gecode { namespace String {
         }
         GECODE_NEVER;
         return REG();
+      }
+      REG symbolic_reg(
+        const std::vector<NSIntSet>& partitions,
+        const NSIntSet& active_alphabet) const {
+        try {
+          if (lhs->get_string() == rhs->get_string())
+            return lhs->symbolic_reg(partitions, active_alphabet);
+        }
+        catch (int) {
+          return REG(IntArgs::create(0, 1));
+        }
+        catch (...) {
+          throw std::runtime_error(
+            "Symbolic REG intersection is not implemented");
+        }
+        GECODE_NEVER;
+        return REG();
+      }
+      void collect_symbol_sets(
+        const NSIntSet& active_alphabet, std::vector<NSIntSet>& sets) const {
+        lhs->collect_symbol_sets(active_alphabet, sets);
+        rhs->collect_symbol_sets(active_alphabet, sets);
       }
   };
 
@@ -288,6 +369,12 @@ namespace Gecode { namespace String {
       s.include(rhs->get_chars());
       return s;
     }
+    NSIntSet
+    get_chars(const NSIntSet& active_alphabet) const {
+      NSIntSet s(lhs->get_chars(active_alphabet));
+      s.include(rhs->get_chars(active_alphabet));
+      return s;
+    }
     const RegEx& left(void) const { return *lhs; }
     const RegEx& right(void) const { return *rhs; }
     void accept(RegExVisitor& visitor) const {
@@ -316,6 +403,17 @@ namespace Gecode { namespace String {
       va.sva << x1 << x2;
     }
     REG reg() const { return lhs->reg() | rhs->reg(); }
+    REG symbolic_reg(
+      const std::vector<NSIntSet>& partitions,
+      const NSIntSet& active_alphabet) const {
+      return lhs->symbolic_reg(partitions, active_alphabet) |
+        rhs->symbolic_reg(partitions, active_alphabet);
+    }
+    void collect_symbol_sets(
+      const NSIntSet& active_alphabet, std::vector<NSIntSet>& sets) const {
+      lhs->collect_symbol_sets(active_alphabet, sets);
+      rhs->collect_symbol_sets(active_alphabet, sets);
+    }
   };
 
   class StarEx: public RegEx {
@@ -343,6 +441,9 @@ namespace Gecode { namespace String {
     NSIntSet get_chars() const {
       return base->get_chars();
     }
+    NSIntSet get_chars(const NSIntSet& active_alphabet) const {
+      return base->get_chars(active_alphabet);
+    }
     const RegEx& expression(void) const { return *base; }
     void accept(RegExVisitor& visitor) const {
       visitor.visit(*this);
@@ -355,14 +456,14 @@ namespace Gecode { namespace String {
         if (base->has_concat()) {
           string s = base->get_string();
           IntVar n(home, 0, l);
-          pow(home, StringVar(home, s), n, x);
+          pow(home, StringVar(home, StringVal::decode_utf8(s)), n, x);
           va.iva << n;
         }
         else {
           StringView view(x);
           const DashedString& domain = view.domain();
           NSBlocks refined(domain.blocks());
-          const NSIntSet s(base->get_chars());
+          const NSIntSet s(base->get_chars(x.may_chars()));
           bool changed = false;
           for (unsigned int i = 0; i < refined.size(); ++i) {
             NSBlock& block = refined[i];
@@ -405,17 +506,29 @@ namespace Gecode { namespace String {
       extensional(home, x, dfa());
     }
     REG reg() const { return *(base->reg()); }
+    REG symbolic_reg(
+      const std::vector<NSIntSet>& partitions,
+      const NSIntSet& active_alphabet) const {
+      return *(base->symbolic_reg(partitions, active_alphabet));
+    }
+    void collect_symbol_sets(
+      const NSIntSet& active_alphabet, std::vector<NSIntSet>& sets) const {
+      base->collect_symbol_sets(active_alphabet, sets);
+    }
   };
 
   class CharEx: public RegEx {
   private:
-    int i;
+    StringSymbol i;
   public:
-    CharEx(int x): i(x) {};
-    CharEx(char c): i(char2int(c)) {};
-    string str() const { return "'" + string(1, int2char(i)) + "'"; }
+    explicit CharEx(StringSymbol x): i(x) {};
+    string str() const {
+      return "'" + StringVal::from_symbols({i}).to_utf8() + "'";
+    }
     bool decomp() const { return true; }
-    string get_string() const { return string(1, int2char(i)); }
+    string get_string() const {
+      return StringVal::from_symbols({i}).to_utf8();
+    }
     NSIntSet get_chars() const { return NSIntSet(i); }
     void accept(RegExVisitor& visitor) const {
       visitor.visit(*this);
@@ -424,39 +537,106 @@ namespace Gecode { namespace String {
     post(Home home, StringVar x, VarArgs&) const {
       GECODE_POST;
       if (x.may_chars().contains(i))
-        rel(home, x, STRT_EQ, StringVar(home, string(1, int2char(i))));
+        rel(home, x, STRT_EQ,
+            StringVar(home, StringVal::from_symbols({i})));
       else
         home.fail();
     }
     REG reg() const { return REG(i); }
+    REG symbolic_reg(
+      const std::vector<NSIntSet>& partitions,
+      const NSIntSet&) const {
+      return symbolic_class(NSIntSet(i), partitions);
+    }
+    void collect_symbol_sets(
+      const NSIntSet&, std::vector<NSIntSet>& sets) const {
+      sets.push_back(NSIntSet(i));
+    }
   };
 
   class RangeEx: public RegEx {
   private:
-    int minS, maxS, l, u;
+    NSIntSet characters;
+    int l, u;
+    bool complement;
+    bool wildcard;
     const int _MAX_SIZE = 500;
+
+    NSIntSet effective(const NSIntSet& active_alphabet) const {
+      if (wildcard)
+        return active_alphabet;
+      if (!complement)
+        return characters;
+      NSIntSet result(active_alphabet);
+      result.exclude(characters);
+      return result;
+    }
+
+    REG legacy_reg(const NSIntSet& symbols) const {
+      IntArgs values;
+      for (NSIntSet::iterator symbol(symbols); symbol(); ++symbol)
+        values << *symbol;
+      REG result(values);
+      if (static_cast<long long>(u) * symbols.size() > _MAX_SIZE) {
+        std::cerr << "Warning: The resulting DFA size is too big! "
+                  << "Ignored max cardinality " << u << "\n";
+        return result(l);
+      }
+      return result(l, u);
+    }
+
   public:
-    RangeEx(char a, char b): minS(char2int(a)), maxS(char2int(b)), l(1), u(1) {};
-    RangeEx(char a, char b, int i): minS(char2int(a)), maxS(char2int(b)), l(i),
-      u(DashedString::_MAX_STR_LENGTH) {};
-    RangeEx(char a, char b, int i, int j): minS(char2int(a)), maxS(char2int(b)),
-      l(i), u(j) {};
+    RangeEx(StringSymbol a, StringSymbol b)
+      : characters(a, b), l(1), u(1), complement(false), wildcard(false) {}
+    RangeEx(StringSymbol a, StringSymbol b, int i)
+      : characters(a, b), l(i), u(DashedString::_MAX_STR_LENGTH),
+        complement(false), wildcard(false) {}
+    RangeEx(StringSymbol a, StringSymbol b, int i, int j)
+      : characters(a, b), l(i), u(j),
+        complement(false), wildcard(false) {}
+    RangeEx(const NSIntSet& symbols, int i, int j, bool negated)
+      : characters(symbols), l(i), u(j),
+        complement(negated), wildcard(false) {}
+    RangeEx()
+      : characters(), l(1), u(1), complement(false), wildcard(true) {}
+
     string
     str() const {
-      return "[" + string(1, int2char(minS)) + "-" + string(1, int2char(maxS)) +
+      if (wildcard)
+        return ".";
+      return "[" + string(complement ? "^" : "") + characters.toString() +
              ", " + std::to_string(l) + ", " + std::to_string(u) + "]";
     }
     bool decomp() const { return true; }
-    bool has_union() const { return maxS > minS; }
+    bool has_union() const {
+      return wildcard || complement || characters.size() > 1;
+    }
     string
     get_string() const {
-      if (minS == maxS && l == u)
-        return string(l, int2char(minS));
+      if (!wildcard && !complement && characters.size() == 1 && l == u) {
+        const string symbol =
+          StringVal::from_symbols({characters.min()}).to_utf8();
+        string result;
+        for (int i = 0; i < l; ++i)
+          result += symbol;
+        return result;
+      }
       throw std::runtime_error("Can't get a string from " + str() + "\n");
     }
-    NSIntSet get_chars() const { return NSIntSet(minS, maxS); }
-    int min_char(void) const { return minS; }
-    int max_char(void) const { return maxS; }
+    NSIntSet get_chars() const {
+      return effective(NSIntSet(0, 0xFF));
+    }
+    NSIntSet get_chars(const NSIntSet& active_alphabet) const {
+      return effective(active_alphabet);
+    }
+    int min_char(void) const {
+      const NSIntSet symbols = get_chars();
+      return symbols.empty() ? 1 : symbols.min();
+    }
+    int max_char(void) const {
+      const NSIntSet symbols = get_chars();
+      return symbols.empty() ? 0 : symbols.max();
+    }
     int min_length(void) const { return l; }
     int max_length(void) const { return u; }
     void accept(RegExVisitor& visitor) const {
@@ -465,20 +645,36 @@ namespace Gecode { namespace String {
     void
     post(Home home, StringVar x, VarArgs&) const {
       GECODE_POST;
-      if (minS > maxS || l > u)
+      const NSIntSet symbols = effective(x.may_chars());
+      if (symbols.empty() || l > u)
         home.fail();
       else {
-        NSBlocks d({NSBlock(NSIntSet(minS, maxS), l, u)});
+        NSBlocks d({NSBlock(symbols, l, u)});
         rel(home, x, STRT_DOM, d, l, u);
       }
     }
     REG reg() const {
-      if (u * (maxS - minS + 1) > _MAX_SIZE) {
+      return legacy_reg(get_chars());
+    }
+    REG symbolic_reg(
+      const std::vector<NSIntSet>& partitions,
+      const NSIntSet& active_alphabet) const {
+      const NSIntSet symbols = effective(active_alphabet);
+      REG result = symbolic_class(symbols, partitions);
+      int selected = 0;
+      for (const NSIntSet& partition : partitions)
+        if (!symbols.disjoint(partition))
+          ++selected;
+      if (static_cast<long long>(u) * selected > _MAX_SIZE) {
         std::cerr << "Warning: The resulting DFA size is too big! "
                   << "Ignored max cardinality " << u << "\n";
-        return REG(IntArgs::create(maxS - minS + 1, minS))(l);
+        return result(l);
       }
-      return REG(IntArgs::create(maxS - minS + 1, minS))(l, u);
+      return result(l, u);
+    }
+    void collect_symbol_sets(
+      const NSIntSet& active_alphabet, std::vector<NSIntSet>& sets) const {
+      sets.push_back(effective(active_alphabet));
     }
   };
 
@@ -487,24 +683,40 @@ namespace Gecode { namespace String {
   private:
 
     int _open;
-    int _currI;
-    int _lastI;
-    const string& _input;
+    StringVal::size_type _currI;
+    StringVal _input;
 
+    forceinline StringSymbol top() const {
+      if (!more())
+        throw std::runtime_error("Unexpected end of regular expression");
+      return _input[_currI];
+    }
 
-    forceinline char top() const { return _input[_currI]; }
+    forceinline bool more() const { return _currI < _input.size(); }
 
-    forceinline bool more() const { return _currI < _lastI; }
+    static int hex_value(StringSymbol symbol) {
+      if (symbol >= '0' && symbol <= '9')
+        return symbol - '0';
+      if (symbol >= 'a' && symbol <= 'f')
+        return symbol - 'a' + 10;
+      if (symbol >= 'A' && symbol <= 'F')
+        return symbol - 'A' + 10;
+      return -1;
+    }
 
-    forceinline char
+    static string symbol_string(StringSymbol symbol) {
+      return StringVal::from_symbols({symbol}).to_utf8();
+    }
+
+    forceinline StringSymbol
     next(bool escaped = false) {
-      char c = top();
+      StringSymbol c = top();
       consume(c, escaped);
       return c;
     }
 
     forceinline void
-    consume(char c, bool escaped = false) {
+    consume(StringSymbol c, bool escaped = false) {
       // std::cerr << "consume <" << c << "> (top = <" << top() << ">)\n";
       if (top() == c) {
         _currI++;
@@ -517,17 +729,182 @@ namespace Gecode { namespace String {
         throw std::runtime_error("Ill-formed expression\n");
     }
 
+    StringSymbol hex_escape(int digits) {
+      StringSymbol value = 0;
+      for (int i = 0; i < digits; ++i) {
+        if (!more())
+          throw std::runtime_error("Incomplete hexadecimal escape sequence");
+        const int digit = hex_value(next(true));
+        if (digit < 0)
+          throw std::runtime_error("Malformed hexadecimal escape sequence");
+        value = (value << 4) | digit;
+      }
+      return value;
+    }
+
+    StringSymbol escaped_symbol() {
+      consume('\\');
+      if (!more())
+        throw std::runtime_error("Incomplete escape sequence");
+
+      const StringSymbol escaped = top();
+      switch (escaped) {
+        case '0':
+          consume('0', true);
+          return 0;
+        case 'a':
+          consume('a', true);
+          return '\a';
+        case 'b':
+          consume('b', true);
+          return '\b';
+        case 'e':
+          consume('e', true);
+          return 0x1B;
+        case 'f':
+          consume('f', true);
+          return '\f';
+        case 'n':
+          consume('n', true);
+          return '\n';
+        case 'r':
+          consume('r', true);
+          return '\r';
+        case 't':
+          consume('t', true);
+          return '\t';
+        case 'v':
+          consume('v', true);
+          return '\v';
+        case 'x': {
+          consume('x', true);
+          return hex_escape(2);
+        }
+        case 'u': {
+          consume('u', true);
+          StringSymbol value = 0;
+          if (more() && top() == '{') {
+            consume('{', true);
+            int digits = 0;
+            while (more() && top() != '}') {
+              if (digits == 6)
+                throw std::runtime_error("Unicode escape is too long");
+              const int digit = hex_value(next(true));
+              if (digit < 0)
+                throw std::runtime_error("Malformed Unicode escape sequence");
+              value = (value << 4) | digit;
+              ++digits;
+            }
+            if (digits == 0 || !more())
+              throw std::runtime_error("Incomplete Unicode escape sequence");
+            consume('}', true);
+          } else {
+            value = hex_escape(4);
+          }
+          if (!is_unicode_scalar_value(value))
+            throw std::out_of_range(
+              "Unicode escape is not a Unicode scalar value");
+          return value;
+        }
+        case '(':
+        case ')':
+        case '[':
+        case ']':
+        case '|':
+        case '&':
+        case '*':
+        case '.':
+        case '\\':
+        case '\'':
+        case '"':
+        case '-':
+        case '^':
+        case ',':
+        case '{':
+        case '}':
+          return next(true);
+        default:
+          throw std::runtime_error(
+            "Unable to unescape: " + symbol_string(escaped));
+      }
+    }
+
+    StringSymbol class_symbol() {
+      if (!more() || top() == ']')
+        throw std::runtime_error("Missing character in character class");
+      return top() == '\\' ? escaped_symbol() : next();
+    }
+
+    int cardinality() {
+      string digits;
+      while (more() && top() >= '0' && top() <= '9')
+        digits += static_cast<char>(next());
+      if (digits.empty())
+        throw std::runtime_error("Missing character-class cardinality");
+      return stoi(digits);
+    }
+
+    std::unique_ptr<RegEx>
+    character_class() {
+      consume('[');
+      bool negated = false;
+      if (more() && top() == '^') {
+        consume('^');
+        negated = true;
+      }
+
+      NSIntSet characters;
+      bool any = false;
+      while (more() && top() != ']' && top() != ',') {
+        const StringSymbol first = class_symbol();
+        if (more() && top() == '-') {
+          consume('-');
+          if (!more() || top() == ']' || top() == ',')
+            throw std::runtime_error("Incomplete character-class range");
+          const StringSymbol last = class_symbol();
+          if (first <= last)
+            characters.include(NSIntSet(first, last));
+        } else {
+          characters.add(first);
+        }
+        any = true;
+      }
+      if (!any)
+        throw std::runtime_error("Empty character class");
+
+      int lower = 1;
+      int upper = 1;
+      if (more() && top() == ',') {
+        consume(',');
+        lower = cardinality();
+        if (more() && top() == ',') {
+          consume(',');
+          upper = cardinality();
+        } else {
+          upper = DashedString::_MAX_STR_LENGTH;
+        }
+      }
+      consume(']');
+      if (lower < 0 || upper < lower)
+        throw std::runtime_error("Invalid character-class cardinality");
+      return std::unique_ptr<RegEx>(
+        new RangeEx(characters, lower, upper, negated));
+    }
+
     std::unique_ptr<RegEx>
     term() {
       // std::cerr << "*** term ***\n";
       std::unique_ptr<RegEx> curr(new EmptyEx());
-      char c = top();
+      if (!more())
+        return curr;
+      StringSymbol c = top();
       if (c == '|' || c == '&')
         throw std::runtime_error("Ill-formed expression\n");
       while (more() && c != ')' && c != '|' && c != '&') {
         std::unique_ptr<RegEx> next = factor();
         curr.reset(new ConcatEx(std::move(curr), std::move(next)));
-        c = top();
+        if (more())
+          c = top();
       }
       return curr;
     }
@@ -536,8 +913,8 @@ namespace Gecode { namespace String {
     regex() {
       // std::cerr << "*** regex ***\n";
       std::unique_ptr<RegEx> curr = term();
-      char c = top();
-      if (more() && (c == '|' || c == '&')) {
+      if (more() && (top() == '|' || top() == '&')) {
+        const StringSymbol c = top();
         consume(c);
         std::unique_ptr<RegEx> next = regex();
         if (c == '|')
@@ -565,6 +942,8 @@ namespace Gecode { namespace String {
     std::unique_ptr<RegEx>
     base() {
       // std::cerr << "*** base ***" << top() << "\n";
+      if (!more())
+        throw std::runtime_error("Missing regular-expression term");
       switch (top()) {
         case '(': {
           consume('(');
@@ -572,83 +951,14 @@ namespace Gecode { namespace String {
           consume(')');
           return r;
         }
-        case '[': {
-          consume('[');
-          char l = next();
-          if (l == '\\') {
-	  l = next();
-	  if (l == '0') {
-	    --_lastI;
-	    l = '\0';
-	  }
-	}
-          consume('-');
-          char u = next();
-          if (u == '\\') {
-	  u = next();
-	  if (u == '0') {
-	    --_lastI;
-	    u = '\0';
-	  }
-	}
-          char c = next();
-          // std::cerr << c << ' ' << l << ' ' << u << '\n';
-          if (c == ']')
-            return std::unique_ptr<RegEx>(new RangeEx(l, u));
-          else if (c == ',') {
-	string s = "";
-	int x = -1;
-            while (true) {
-              char i = next();
-              if (i == ',') {
-                x = stoi(s);
-                s = "";
-              }
-              else if (i == ']') {
-                if (x == -1)
-                  return std::unique_ptr<RegEx>(new RangeEx(l, u, stoi(s)));
-                else
-                  return std::unique_ptr<RegEx>(
-                    new RangeEx(l, u, x, stoi(s)));
-              }
-              else
-                s += i;
-            }
-          }
-          else
-            throw std::runtime_error("Ill-formed expression\n");
-        }
+        case '[':
+          return character_class();
         case '.': {
           consume('.');
-          // FIXME: CharExacters of extended ASCII alphabet.
-          return std::unique_ptr<RegEx>(new RangeEx(0, 255));
+          return std::unique_ptr<RegEx>(new RangeEx());
         }
-        case '\\': {
-          consume(top());
-          switch (top()) {
-            case '(':
-            case ')':
-            case '[':
-            case ']':
-            case '|':
-            case '&':
-            case '*':
-            case '.':
-            case '\\':
-            case '\'':
-            case '"':
-            case '\n':
-              return std::unique_ptr<RegEx>(new CharEx(next(true)));
-            case '0':
-              consume('0');
-              return std::unique_ptr<RegEx>(new CharEx('\0'));
-            default:
-              throw std::runtime_error(
-                "Unescaped char " + string(1, top())
-              );
-          }
-          break;
-        }
+        case '\\':
+          return std::unique_ptr<RegEx>(new CharEx(escaped_symbol()));
         case ')':
         case ']':
           throw std::runtime_error("Ill-formed expression");
@@ -659,7 +969,10 @@ namespace Gecode { namespace String {
   public:
 
     RegExParser(const string& in)
-    : _open(0), _currI(0), _lastI(in.size()), _input(in) {}
+      : _open(0), _currI(0), _input(StringVal::decode_utf8(in)) {}
+
+    explicit RegExParser(const StringVal& in)
+      : _open(0), _currI(0), _input(in) {}
 
     std::unique_ptr<RegEx> parse() {
       std::unique_ptr<RegEx> r = regex();

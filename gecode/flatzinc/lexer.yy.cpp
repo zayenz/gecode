@@ -719,12 +719,11 @@ parseString(const char* text) {
         throw std::runtime_error("Malformed hexadecimal escape sequence");
       c = static_cast<unsigned char>(decoded);
       i += 2;
-      if (c == '\0') {
-        value += '\0';
-        regex += "\\0";
-        continue;
-      }
-      break;
+      value += c;
+      regex += "\\x";
+      regex += hex[0];
+      regex += hex[1];
+      continue;
     }
     default:
       throw std::runtime_error(
@@ -2597,4 +2596,3 @@ int yy_input_proc(char* buf, int size, yyscan_t yyscanner) {
   // work around warning that yyunput is unused
   yyunput (0,buf,yyscanner);
 }
-

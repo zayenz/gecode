@@ -99,6 +99,13 @@ individual symbols. The tables remain pass-local: this avoids duplicating
 immutable automaton storage and removes character checks from their inner
 traversal loops.
 
+The regular-expression parser decodes source text as strict UTF-8. Before
+determinization, its literal, class, negated-class, and wildcard sets are split
+into disjoint symbolic partitions. Gecode's `REG` machinery operates only on
+the compact partition identifiers; `trimDFA` then replaces each identifier
+with its `NSIntSet` label. Wildcard and complement therefore range over the
+posting variable's active alphabet without enumerating Unicode scalar values.
+
 Replacement runs each operation-specific transformation as one complete pass.
 An explicit outer loop repeats that pass only for the assignment combinations
 that previously caused an immediate recursive restart, preserving the posting

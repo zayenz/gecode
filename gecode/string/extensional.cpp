@@ -2,6 +2,47 @@
 #include <gecode/string/extensional.hh>
 #include <gecode/string/extensional/parse-reg.hpp>
 
+namespace Gecode { namespace String {
+
+  trimDFA*
+  RegEx::symbolic_dfa(const NSIntSet& active_alphabet) const {
+    std::vector<NSIntSet> sets;
+    collect_symbol_sets(active_alphabet, sets);
+
+    std::vector<NSIntSet> partitions;
+    for (const NSIntSet& set : sets) {
+      NSIntSet remaining(set);
+      const unsigned int count = partitions.size();
+      for (unsigned int i = 0; i < count; ++i) {
+        NSIntSet overlap(partitions[i]);
+        overlap.intersect(set);
+        if (overlap.empty())
+          continue;
+        remaining.exclude(overlap);
+        if (!(overlap == partitions[i])) {
+          NSIntSet outside(partitions[i]);
+          outside.exclude(set);
+          partitions[i] = std::move(overlap);
+          partitions.push_back(std::move(outside));
+        }
+      }
+      if (!remaining.empty())
+        partitions.push_back(std::move(remaining));
+    }
+
+    try {
+      return new trimDFA(
+        DFA(symbolic_reg(partitions, active_alphabet)), partitions);
+    }
+    catch (const MiniModel::TooFewArguments&) {
+      DFA::Transition t[1] = { DFA::Transition(-1, -1, -1) };
+      int f[1] = {-1};
+      return new trimDFA(DFA(0, t, f), partitions);
+    }
+  }
+
+}}
+
 namespace Gecode {
 
   namespace {
@@ -19,7 +60,10 @@ namespace Gecode {
         post_native_regex(home, x, intersection->right());
         return;
       }
-      extensional(home, x, expression.dfa());
+      String::TrimDFAHandle automaton(
+        expression.symbolic_dfa(x.may_chars()));
+      GECODE_ES_FAIL(String::Reg::post(
+        home, String::StringView(x), automaton.get()));
     }
 
     void
@@ -32,7 +76,23 @@ namespace Gecode {
       const String::InterEx* intersection =
         dynamic_cast<const String::InterEx*>(&expression);
       if (intersection == nullptr) {
-        extensional(home, x, expression.dfa(), b, rm);
+        String::TrimDFAHandle automaton(
+          expression.symbolic_dfa(x.may_chars()));
+        String::CompDFAHandle complete(
+          new String::compDFA(*automaton, x.may_chars()));
+        switch (rm) {
+          case RM_IMP:
+            GECODE_ES_FAIL((String::ReReg<Int::BoolView, RM_IMP>::post(
+              home, String::StringView(x), complete.get(), b)));
+            break;
+          case RM_PMI:
+            GECODE_ES_FAIL((String::ReReg<Int::BoolView, RM_PMI>::post(
+              home, String::StringView(x), complete.get(), b)));
+            break;
+          default:
+            GECODE_ES_FAIL((String::ReReg<Int::BoolView, RM_EQV>::post(
+              home, String::StringView(x), complete.get(), b)));
+        }
         return;
       }
 
@@ -58,7 +118,7 @@ namespace Gecode {
 
   void
   extensional(Home home, StringVar x, String::RegEx* r) {
-    if (Gecode::String::DashedString::_DECOMP_REGEX) {
+    if (Gecode::String::DashedString::_DECOMP_REGEX && r->decomp()) {
       VarArgs v;
       r->post(home, x, v);
     }
@@ -69,7 +129,7 @@ namespace Gecode {
   void
   extensional(Home home, StringVar x, std::string regex, VarArgs& v) {
     std::unique_ptr<String::RegEx> r = String::RegExParser(regex).parse();
-    if (Gecode::String::DashedString::_DECOMP_REGEX)
+    if (Gecode::String::DashedString::_DECOMP_REGEX && r->decomp())
       r->post(home, x, v);
     else
       post_native_regex(home, x, *r);

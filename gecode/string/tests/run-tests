@@ -107,6 +107,7 @@ then
   fi
   declare -a TESTS=( \
       'unicode_value.cpp'\
+      'unicode_regex.cpp'\
       'str_test1.cpp' 'str_test2.cpp' 'str_test3.cpp'\
       'match_differential.cpp'\
       'lex_differential.cpp'\

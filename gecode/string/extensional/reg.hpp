@@ -27,6 +27,29 @@ namespace Gecode { namespace String {
     }
   }
 
+  forceinline
+  trimDFA::trimDFA(const DFA& d, const std::vector<NSIntSet>& labels)
+    : stringDFA(d), delta(d.n_states()) {
+    for (DFA::Transitions t(d); t(); ++t) {
+      const int symbol = t.symbol();
+      if (symbol < 0 || static_cast<std::size_t>(symbol) >= labels.size())
+        throw std::out_of_range("Symbolic DFA transition label is out of range");
+      if (labels[symbol].empty())
+        continue;
+      const int source = t.i_state();
+      const int target = t.o_state();
+      std::vector<std::pair<NSIntSet, int>>& outgoing = delta[source];
+      std::vector<std::pair<NSIntSet, int>>::iterator edge = outgoing.begin();
+      while (edge != outgoing.end() && edge->second != target)
+        ++edge;
+      if (edge == outgoing.end()) {
+        outgoing.emplace_back(labels[symbol], target);
+      } else {
+        edge->first.include(labels[symbol]);
+      }
+    }
+  }
+
   forceinline int
   trimDFA::search(int q, int c) const {
     for (const auto& transition : delta[q])

@@ -130,6 +130,15 @@ main(void) {
     "solve satisfy;\n"));
 
   assert(satisfiable(
+    "constraint str_reg(\".\", \"\\x2e\");\n"
+    "constraint str_reg(\"\\xff\", \"\\xff\");\n"
+    "solve satisfy;\n"));
+
+  assert(!satisfiable(
+    "constraint str_reg(\"x\", \"\\x2e\");\n"
+    "solve satisfy;\n"));
+
+  assert(satisfiable(
     "var string: text = \"ab\";\n"
     "constraint str_alphabet(text, {\"a\", \"b\"});\n"
     "solve satisfy;\n"));

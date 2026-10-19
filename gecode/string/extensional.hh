@@ -26,7 +26,7 @@ namespace Gecode { namespace String {
       assert(begin <= s.size());
       int q = 0;
       for (string::size_type i = begin; i < s.size(); ++i) {
-        q = search(q, s[i]);
+        q = search(q, static_cast<unsigned char>(s[i]));
         if (q == -1)
           return false;
       }
@@ -53,6 +53,7 @@ namespace Gecode { namespace String {
     typedef std::vector<std::vector<std::pair<NSIntSet, int>>> delta_t;
     delta_t delta;
     trimDFA(const DFA&);
+    trimDFA(const DFA&, const std::vector<NSIntSet>&);
     NSIntSet alphabet() const;
     int min_word_length() const;
     int search(int, int) const;

@@ -36,3 +36,5 @@ namespace Gecode { namespace String {
     StringVarImpBase(home, y), ds(home, y.ds) {}
 
 }}
+
+// STATISTICS: string-var

@@ -31,3 +31,5 @@ namespace Gecode { namespace String { namespace Branch {
     }
 
 }}}
+
+// STATISTICS: string-branch

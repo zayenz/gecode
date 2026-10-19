@@ -12,3 +12,5 @@ forceinline
   }
 
 }}
+
+// STATISTICS: string-var

@@ -139,3 +139,5 @@ namespace Gecode { namespace String {
   }
 
 }}
+
+// STATISTICS: string-var

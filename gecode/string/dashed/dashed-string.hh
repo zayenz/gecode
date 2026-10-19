@@ -498,3 +498,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/dashed/dashed-string.hpp>
 
 #endif
+
+// STATISTICS: string-var

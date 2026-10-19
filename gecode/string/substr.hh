@@ -241,3 +241,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/substr/substring.hpp>
 
 #endif
+
+// STATISTICS: string-prop

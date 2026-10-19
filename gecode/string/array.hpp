@@ -42,3 +42,5 @@ namespace Gecode {
     : VarArray<StringVar>(home, a) {}
 
 }
+
+// STATISTICS: string-var

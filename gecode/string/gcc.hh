@@ -56,3 +56,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/gcc/gcc.hpp>
 
 #endif
+
+// STATISTICS: string-prop

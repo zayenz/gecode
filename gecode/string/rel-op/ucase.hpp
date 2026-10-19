@@ -74,3 +74,5 @@ namespace Gecode { namespace String {
   }
 
 }}
+
+// STATISTICS: string-prop

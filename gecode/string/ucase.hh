@@ -37,3 +37,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/rel-op/ucase.hpp>
 
 #endif
+
+// STATISTICS: string-prop

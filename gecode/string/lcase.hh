@@ -35,3 +35,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/rel-op/lcase.hpp>
 
 #endif
+
+// STATISTICS: string-prop

@@ -1,7 +1,7 @@
 namespace Gecode { namespace String {
 
   /**
-   * \defgroup FuncThrowSet String exceptions
+   * \defgroup FuncThrowString String exceptions
    * \ingroup FuncThrow
    */
 
@@ -34,3 +34,5 @@ namespace Gecode { namespace String {
   };
 
 }}
+
+// STATISTICS: string-core

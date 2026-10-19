@@ -10,17 +10,24 @@
 
 namespace Gecode { namespace String {
 
-  /// Symbol stored by the string solver.
+  /**
+   * \brief Symbol stored by the string solver
+   *
+   * Public concrete values and alphabets restrict symbols to Unicode scalar
+   * values.
+   *
+   * \ingroup TaskModelStringVars
+   */
   typedef int StringSymbol;
 
-  /// Largest Unicode code point.
+  /// Largest Unicode code point
   const StringSymbol UNICODE_MAX = 0x10FFFF;
-  /// First UTF-16 surrogate code point (not a Unicode scalar value).
+  /// First UTF-16 surrogate code point (not a Unicode scalar value)
   const StringSymbol UNICODE_SURROGATE_MIN = 0xD800;
-  /// Last UTF-16 surrogate code point (not a Unicode scalar value).
+  /// Last UTF-16 surrogate code point (not a Unicode scalar value)
   const StringSymbol UNICODE_SURROGATE_MAX = 0xDFFF;
 
-  /// Test whether \a value is a Unicode scalar value.
+  /// Test whether \a value is a Unicode scalar value
   inline bool
   is_unicode_scalar_value(StringSymbol value) {
     return value >= 0 && value <= UNICODE_MAX &&
@@ -33,10 +40,17 @@ namespace Gecode { namespace String {
    * A StringVal stores Unicode scalar values, not encoded bytes.  Encoding and
    * decoding are explicit boundary operations.  from_bytes() is the explicit
    * compatibility path for the legacy one-byte/one-symbol representation.
+   *
+   * Its size and indices count scalar values. No normalization, grapheme
+   * segmentation, locale-sensitive collation, or case folding is performed.
+   *
+   * \ingroup TaskModelStringVars
    */
   class StringVal {
   public:
+    /// Size and index type
     typedef std::vector<StringSymbol>::size_type size_type;
+    /// Constant scalar-value iterator
     typedef std::vector<StringSymbol>::const_iterator const_iterator;
 
   private:
@@ -79,16 +93,20 @@ namespace Gecode { namespace String {
     }
 
   public:
+    /// Construct the empty string
     StringVal(void) : _symbols() {}
 
+    /// Construct from Unicode scalar values
     static StringVal from_symbols(const std::vector<StringSymbol>& symbols) {
       return StringVal(symbols);
     }
 
+    /// Construct from Unicode scalar values, moving the input storage
     static StringVal from_symbols(std::vector<StringSymbol>&& symbols) {
       return StringVal(std::move(symbols));
     }
 
+    /// Construct from Unicode scalar values
     static StringVal from_symbols(
       std::initializer_list<StringSymbol> symbols
     ) {
@@ -109,7 +127,13 @@ namespace Gecode { namespace String {
       return StringVal(std::move(symbols));
     }
 
-    /// Decode a strictly valid UTF-8 byte string into Unicode scalar values.
+    /**
+     * \brief Decode strict UTF-8 into Unicode scalar values
+     *
+     * Throws \c std::invalid_argument for malformed, overlong, surrogate, or
+     * out-of-range input. The diagnostic offset counts input bytes. A leading
+     * UTF-8 encoding of U+FEFF is retained as a scalar value.
+     */
     static StringVal decode_utf8(const std::string& input) {
       std::vector<StringSymbol> symbols;
       symbols.reserve(input.size());
@@ -180,7 +204,14 @@ namespace Gecode { namespace String {
       return StringVal(std::move(symbols));
     }
 
-    /// Decode strictly valid UTF-16 code units into Unicode scalar values.
+    /**
+     * \brief Decode strict UTF-16 code units into Unicode scalar values
+     *
+     * Throws \c std::invalid_argument for unpaired or malformed surrogates.
+     * The diagnostic offset counts UTF-16 code units. The input has no byte
+     * order, and U+FEFF is retained rather than interpreted as a byte-order
+     * mark.
+     */
     static StringVal decode_utf16(const std::u16string& input) {
       std::vector<StringSymbol> symbols;
       symbols.reserve(input.size());
@@ -212,7 +243,7 @@ namespace Gecode { namespace String {
       return StringVal(std::move(symbols));
     }
 
-    /// Encode the stored Unicode scalar values as UTF-8.
+    /// Encode the stored Unicode scalar values as UTF-8
     std::string to_utf8(void) const {
       std::string output;
       output.reserve(_symbols.size());
@@ -242,7 +273,7 @@ namespace Gecode { namespace String {
       return output;
     }
 
-    /// Encode the stored Unicode scalar values as UTF-16 code units.
+    /// Encode the stored Unicode scalar values as UTF-16 code units
     std::u16string to_utf16(void) const {
       std::u16string output;
       output.reserve(_symbols.size());
@@ -286,11 +317,17 @@ namespace Gecode { namespace String {
       return output;
     }
 
+    /// Return the number of Unicode scalar values
     size_type size(void) const { return _symbols.size(); }
+    /// Test whether the value contains no scalar values
     bool empty(void) const { return _symbols.empty(); }
+    /// Return the scalar value at position \a i
     StringSymbol operator[](size_type i) const { return _symbols[i]; }
+    /// Return an iterator to the first scalar value
     const_iterator begin(void) const { return _symbols.begin(); }
+    /// Return an iterator past the last scalar value
     const_iterator end(void) const { return _symbols.end(); }
+    /// Return the underlying scalar-value sequence
     const std::vector<StringSymbol>& symbols(void) const { return _symbols; }
 
     bool operator==(const StringVal& that) const {
@@ -321,3 +358,5 @@ namespace Gecode { namespace String {
 }}
 
 #endif
+
+// STATISTICS: string-var

@@ -33,3 +33,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/rel/eq.hpp>
 
 #endif
+
+// STATISTICS: string-prop

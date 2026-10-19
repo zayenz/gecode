@@ -108,3 +108,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/match/match-nfa.hpp>
 #include <gecode/string/match/post.hpp>
 #endif
+
+// STATISTICS: string-prop

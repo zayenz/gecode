@@ -12,3 +12,5 @@ namespace Gecode { namespace String {
     Exception(l, "Unknown relation.") {}
 
 }}
+
+// STATISTICS: string-core

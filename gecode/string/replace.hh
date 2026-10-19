@@ -43,3 +43,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/rel-op/replace.hpp>
 
 #endif
+
+// STATISTICS: string-prop

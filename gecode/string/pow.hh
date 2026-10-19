@@ -34,3 +34,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/pow/pow.hpp>
 
 #endif
+
+// STATISTICS: string-prop

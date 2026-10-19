@@ -559,7 +559,7 @@ STRINGSRC0 = \
 	gcc.cpp gconcat.cpp extensional.cpp element.cpp channel.cpp match.cpp
 
 STRINGHDR0 = \
-	var-imp.hpp view.hpp var-imp/string.hpp var-imp/delta.hpp var/string.hpp \
+	value.hpp var-imp.hpp view.hpp var-imp/string.hpp var-imp/delta.hpp var/string.hpp \
 	dashed/dashed-string.hh dashed/dashed-string.hpp exception.hpp view/string.hpp \
 	rel/dom.hpp rel/eq.hpp rel/nq.hpp rel/lex.hpp rel/re-lex.hpp rel/inc.hpp rel/re-eq.hpp array-traits.hpp array.hpp \
 	branch/var.hpp branch/val.hpp branch.hh branch/blockmin_llll.hpp \

@@ -97,3 +97,5 @@ namespace Gecode { namespace String {
 }}
 
 #include <gecode/string/view/string.hpp>
+
+// STATISTICS: string-var

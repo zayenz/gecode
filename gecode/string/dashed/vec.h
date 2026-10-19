@@ -160,3 +160,5 @@ protected:
 };
 
 #endif
+
+// STATISTICS: string-var

@@ -40,3 +40,5 @@ namespace Gecode { namespace String { namespace Branch {
       return commit_choice(home, p, Block::FIRST, a);
     }
 }}}
+
+// STATISTICS: string-branch

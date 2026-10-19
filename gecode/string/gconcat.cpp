@@ -22,3 +22,5 @@ namespace Gecode {
   }
 
 }
+
+// STATISTICS: string-post

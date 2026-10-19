@@ -28,3 +28,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/gconcat/gconcat.hpp>
 
 #endif
+
+// STATISTICS: string-prop

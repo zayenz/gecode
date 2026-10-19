@@ -172,3 +172,5 @@ namespace Gecode { namespace String {
       _min_length(d._min_length), _max_length(d._max_length) {}
 
 }}
+
+// STATISTICS: string-var

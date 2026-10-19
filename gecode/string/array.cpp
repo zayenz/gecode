@@ -15,3 +15,5 @@ namespace Gecode {
   }*/
 
 }
+
+// STATISTICS: string-var

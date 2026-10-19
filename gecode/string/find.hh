@@ -29,7 +29,7 @@ namespace Gecode { namespace String {
     virtual Actor* copy(Space& home);
     /// Perform propagation
     virtual ExecStatus propagate(Space& home, const ModEventDelta& med);
-    /// Post propagator for \f n = find(x, y) \f$
+    /// Post propagator for \f$ n = find(x, y) \f$
     static ExecStatus post(Home, StringView, StringView, Gecode::Int::IntView);
   };
 
@@ -38,3 +38,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/find/find.hpp>
 
 #endif
+
+// STATISTICS: string-prop

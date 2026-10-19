@@ -222,3 +222,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/extensional/re-reg.hpp>
 
 #endif
+
+// STATISTICS: string-prop

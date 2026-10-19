@@ -65,3 +65,5 @@ namespace Gecode {
     return os;
   }
 }
+
+// STATISTICS: string-var

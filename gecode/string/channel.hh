@@ -71,3 +71,5 @@ namespace Gecode { namespace String {
 #include <gecode/string/channel/nat2str.hpp>
 
 #endif
+
+// STATISTICS: string-prop

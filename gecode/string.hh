@@ -35,12 +35,15 @@
 
 /**
  * \namespace Gecode::String
- * \brief Bounded length string.
+ * \brief Bounded-length string support.
  *
  * The Gecode::String namespace contains all functionality required
  * to program propagators and branchers for bounded length strings.
  * In addition, all propagators and branchers for bounded length strings
  * provided by %Gecode are contained as nested namespaces.
+ *
+ * A solver symbol is a Unicode scalar value. String lengths and positions
+ * count scalar values, independently of their UTF-8 or UTF-16 encoding.
  *
  */
 
@@ -56,6 +59,8 @@ namespace Gecode { namespace String {
    * An alphabet contains Unicode scalar values.  In particular, surrogate
    * code points are rejected.  The predefined byte profile preserves the
    * legacy string-variable alphabet.
+   *
+   * \ingroup TaskModelStringVars
    */
   class GECODE_STRING_EXPORT StringAlphabet {
   public:
@@ -113,7 +118,12 @@ namespace Gecode {
   }
 
   /**
-   * \brief String variables
+   * \brief Bounded-length string variable
+   *
+   * A string variable ranges over finite sequences of Unicode scalar values.
+   * Lengths and positions count scalar values, not encoded bytes or grapheme
+   * clusters. No normalization or locale-sensitive text processing is
+   * performed.
    *
    * \ingroup TaskModelStringVars
    */
@@ -181,7 +191,7 @@ namespace Gecode {
     */
     string val(void) const;
 
-    /// Return the assigned encoding-neutral symbol sequence
+    /// Return the assigned encoding-neutral scalar-value sequence
     String::StringVal val_symbols(void) const;
 
     bool assigned(void) const;
@@ -197,9 +207,9 @@ namespace Gecode {
     /// Return the maximum length of a string in the domain
     int max_length() const;
 
-    /// Return characters occurring in every string in the domain
+    /// Return scalar values occurring in every string in the domain
     String::NSIntSet must_chars() const;
-    /// Return characters occurring in at least one string in the domain
+    /// Return scalar values occurring in at least one string in the domain
     String::NSIntSet may_chars() const;
 
     template<class Char, class Traits>
@@ -267,7 +277,7 @@ namespace Gecode {
     /**
      * \brief Create an array of size \a n.
      *
-     * Each variable is initialized with domain \d
+     * Each variable is initialized with domain \a v
      */
     GECODE_STRING_EXPORT
     StringVarArgs(Space& home, int n, const String::NSBlocks& v);
@@ -329,15 +339,15 @@ namespace Gecode {
    * \ingroup TaskModelString
    */
   //@{
-  /// Post a channel between the natural number \a n and its decimal string \a x
+  /// Channel \a n to its non-negative ASCII decimal representation \a x
   GECODE_STRING_EXPORT void
   nat2str(Home home, IntVar n, StringVar x);
 
-  /// Post a channel between the decimal string \a x and its natural number \a n
+  /// Channel a non-negative ASCII decimal representation \a x to \a n
   GECODE_STRING_EXPORT void
   str2nat(Home home, StringVar x, IntVar n);
 
-  /// Post a channel between the one-character string \a x and its character code \a n
+  /// Channel the single scalar value in \a x to its numeric value \a n
   GECODE_STRING_EXPORT void
   char2code(Home home, StringVar x, IntVar n);
   //@}
@@ -385,7 +395,7 @@ namespace Gecode {
    * \ingroup TaskModelString
    */
   //@{
-  /// Post propagator for \f$ y = x[i..j] \f$
+  /// Post \f$ y = x[i..j] \f$, with positions measured in scalar values
   GECODE_STRING_EXPORT void
   substr(Home home, StringVar x, IntVar i, IntVar j, StringVar y);
 
@@ -441,7 +451,7 @@ namespace Gecode {
   GECODE_STRING_EXPORT void
   gcc(Home home, StringVar x, const IntArgs& a, IntVarArgs n);
 
-  /// Post propagator requiring every character in \a s to occur in \a x
+  /// Post propagator requiring every scalar value in \a s to occur in \a x
   GECODE_STRING_EXPORT void
   must_chars(Home home, StringVar x, const String::NSIntSet& s);
   //@}
@@ -461,9 +471,16 @@ namespace Gecode {
    * \ingroup TaskModelString
    */
   //@{
-  /// Post propagator for \f$ x \in expr \f$ from strict UTF-8 regex text
+  /**
+   * \brief Post \f$ x \in expr \f$ from strict UTF-8 regular-expression text
+   *
+   * Regular-expression atoms and character classes denote Unicode scalar
+   * values. The wildcard and negated classes range over the active alphabet
+   * of \a x.
+   */
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, string expr);
+  /// Reified variant of extensional(Home,StringVar,string)
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, string expr, BoolVar b, ReifyMode rm);
   GECODE_STRING_EXPORT void
@@ -476,7 +493,7 @@ namespace Gecode {
   /// Post propagator for \f$ x \in a \f$
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, StringVarArgs a);
-  /// Post using encoding-neutral concrete values
+  /// Post using encoding-neutral concrete scalar-value sequences
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x,
               const std::vector<String::StringVal>& a);
@@ -484,7 +501,7 @@ namespace Gecode {
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, const std::vector<std::string>& a);
 
-  /// Post Unicode match from strict UTF-8 regex text
+  /// Match strict UTF-8 regex text; \a i counts matched scalar values
   GECODE_STRING_EXPORT void
   match(Home home, StringVar x, string expr, IntVar i);
   //@}
@@ -666,3 +683,5 @@ namespace Gecode {
 }
 
 #endif
+
+// STATISTICS: string-post

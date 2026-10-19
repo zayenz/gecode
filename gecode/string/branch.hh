@@ -362,3 +362,5 @@ namespace Gecode { namespace String { namespace Branch {
 #include <gecode/string/branch/lenblockmin_lllm.hpp>
 
 #endif
+
+// STATISTICS: string-branch

@@ -173,3 +173,5 @@ namespace Gecode {
   };
 
 }
+
+// STATISTICS: string-branch

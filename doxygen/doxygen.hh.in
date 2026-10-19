@@ -105,6 +105,29 @@
  */
 
 /**
+ * \defgroup TaskModelString Using bounded string variables and constraints
+ *
+ * String variables model finite sequences of Unicode scalar values. Their
+ * positions and lengths count scalar values rather than encoded bytes or
+ * user-perceived characters. The solver does not perform Unicode
+ * normalization, grapheme segmentation, locale-sensitive collation, or case
+ * folding.
+ *
+ * Concrete encoding-neutral values use Gecode::String::StringVal. Legacy
+ * interfaces taking \c std::string retain their documented
+ * one-byte-per-symbol semantics, except regular-expression text, which is
+ * decoded as strict UTF-8.
+ *
+ * Requires \code #include <gecode/string.hh> \endcode
+ * \ingroup TaskModel
+ */
+
+/**
+ * \defgroup TaskModelStringVars String values and variables
+ * \ingroup TaskModelString
+ */
+
+/**
  * \defgroup TaskModelMiniModel Direct modeling support
  * \ingroup TaskModel
  */

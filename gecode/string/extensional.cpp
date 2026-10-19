@@ -6,8 +6,27 @@ namespace Gecode { namespace String {
 
   trimDFA*
   RegEx::symbolic_dfa(const NSIntSet& active_alphabet) const {
+    return symbolic_dfa(active_alphabet, false, false);
+  }
+
+  trimDFA*
+  RegEx::symbolic_dfa(const NSIntSet& active_alphabet,
+                      bool leading_wildcard, bool trailing_wildcard) const {
     std::vector<NSIntSet> sets;
     collect_symbol_sets(active_alphabet, sets);
+    if (leading_wildcard || trailing_wildcard) {
+      std::vector<NSIntSet> active_sets;
+      active_sets.reserve(sets.size() + 1);
+      for (const NSIntSet& set : sets) {
+        NSIntSet overlap(set);
+        overlap.intersect(active_alphabet);
+        if (!overlap.empty())
+          active_sets.push_back(std::move(overlap));
+      }
+      sets.swap(active_sets);
+    }
+    if ((leading_wildcard || trailing_wildcard) && !active_alphabet.empty())
+      sets.push_back(active_alphabet);
 
     std::vector<NSIntSet> partitions;
     for (const NSIntSet& set : sets) {
@@ -31,8 +50,17 @@ namespace Gecode { namespace String {
     }
 
     try {
-      return new trimDFA(
-        DFA(symbolic_reg(partitions, active_alphabet)), partitions);
+      REG pattern = symbolic_reg(partitions, active_alphabet);
+      if (leading_wildcard || trailing_wildcard) {
+        REG sigma_star = *symbolic_class(active_alphabet, partitions);
+        if (leading_wildcard && trailing_wildcard)
+          return new trimDFA(
+            DFA(sigma_star + pattern + sigma_star), partitions);
+        if (leading_wildcard)
+          return new trimDFA(DFA(sigma_star + pattern), partitions);
+        return new trimDFA(DFA(pattern + sigma_star), partitions);
+      }
+      return new trimDFA(DFA(pattern), partitions);
     }
     catch (const MiniModel::TooFewArguments&) {
       DFA::Transition t[1] = { DFA::Transition(-1, -1, -1) };

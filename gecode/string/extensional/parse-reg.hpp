@@ -89,6 +89,9 @@ namespace Gecode { namespace String {
     }
     GECODE_STRING_EXPORT trimDFA*
     symbolic_dfa(const NSIntSet& active_alphabet) const;
+    GECODE_STRING_EXPORT trimDFA*
+    symbolic_dfa(const NSIntSet& active_alphabet,
+                 bool leading_wildcard, bool trailing_wildcard) const;
     virtual string get_string()  const = 0;
     virtual NSIntSet get_chars() const = 0;
     virtual NSIntSet get_chars(const NSIntSet&) const {

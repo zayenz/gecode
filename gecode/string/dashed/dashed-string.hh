@@ -376,8 +376,10 @@ namespace Gecode { namespace String {
   bool known() const;
 
   string known_pref() const;
+  std::vector<StringSymbol> known_pref_symbols() const;
 
   string known_suff() const;
+  std::vector<StringSymbol> known_suff_symbols() const;
 
   bool null() const;
 

@@ -151,9 +151,8 @@ namespace Gecode { namespace String {
       }
       const DashedString& px = x0.domain();
 
-      std::string w = px.known_pref();
-//      std::cerr << "w: " << w << '\n';
-      int z = w.size();
+      StringVal w = StringVal::from_symbols(px.known_pref_symbols());
+      int z = static_cast<int>(w.size());
       if (z > 0) {
         if (Rs->accepted(w, 0)) {
           GECODE_ME_CHECK(x1.eq(home, 1));

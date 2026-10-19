@@ -1941,6 +1941,29 @@ namespace Gecode { namespace String {
     return pref;
   }
 
+  forceinline std::vector<StringSymbol>
+  DashedString::known_pref_symbols() const {
+    int end = 0;
+    std::vector<StringSymbol>::size_type length = 0;
+    for (; end < _blocks.length(); ++end) {
+      const DSBlock& b = at(end);
+      if (b.S.size() > 1)
+        break;
+      length += static_cast<std::vector<StringSymbol>::size_type>(b.l);
+      if (b.l < b.u) {
+        ++end;
+        break;
+      }
+    }
+    std::vector<StringSymbol> prefix;
+    prefix.reserve(length);
+    for (int i = 0; i < end; ++i) {
+      const DSBlock& b = at(i);
+      prefix.insert(prefix.end(), b.l, b.S.min());
+    }
+    return prefix;
+  }
+
   forceinline string
   DashedString::known_suff() const {
     int begin = _blocks.length();
@@ -1961,6 +1984,28 @@ namespace Gecode { namespace String {
       suff.append(b.l, int2char(b.S.min()));
     }
     return suff;
+  }
+
+  forceinline std::vector<StringSymbol>
+  DashedString::known_suff_symbols() const {
+    int begin = _blocks.length();
+    std::vector<StringSymbol>::size_type length = 0;
+    for (int i = begin - 1; i >= 0; --i) {
+      const DSBlock& b = at(i);
+      if (b.S.size() > 1)
+        break;
+      begin = i;
+      length += static_cast<std::vector<StringSymbol>::size_type>(b.l);
+      if (b.l < b.u)
+        break;
+    }
+    std::vector<StringSymbol> suffix;
+    suffix.reserve(length);
+    for (int i = begin; i < _blocks.length(); ++i) {
+      const DSBlock& b = at(i);
+      suffix.insert(suffix.end(), b.l, b.S.min());
+    }
+    return suffix;
   }
 
   forceinline bool

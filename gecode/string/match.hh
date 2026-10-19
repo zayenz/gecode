@@ -15,9 +15,12 @@ namespace Gecode { namespace String {
 
   /// Test whether the language of a DFA contains exactly one word.
   forceinline bool match_language_is_singleton(const DFA& dfa);
+  forceinline bool match_language_is_singleton(const trimDFA& dfa);
 
   /// Return the propagator selected by the public match posting function.
   forceinline MatchImplementation match_default_implementation(const DFA& dfa);
+  forceinline MatchImplementation
+  match_default_implementation(const trimDFA& dfa);
 
   /// Post match with automatic or explicitly selected internal propagation.
   forceinline ExecStatus post_match(Home home, StringView x, const string& re,

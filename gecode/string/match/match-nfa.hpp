@@ -353,8 +353,8 @@ namespace Gecode { namespace String {
         }
       }
       const DashedString& X = x0.domain();
-      std::string w = X.known_pref();
-      int k = w.size();
+      StringVal w = StringVal::from_symbols(X.known_pref_symbols());
+      int k = static_cast<int>(w.size());
       if (k > 0) {
         if (Rpref->accepted(w, 0)) {
           GECODE_ME_CHECK(x1.eq(home, 1));

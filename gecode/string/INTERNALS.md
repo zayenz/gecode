@@ -105,6 +105,10 @@ into disjoint symbolic partitions. Gecode's `REG` machinery operates only on
 the compact partition identifiers; `trimDFA` then replaces each identifier
 with its `NSIntSet` label. Wildcard and complement therefore range over the
 posting variable's active alphabet without enumerating Unicode scalar values.
+MATCH builds its exact-pattern, pattern-prefix, and full-search automata through
+the same partition compiler. Its strategy selector counts the symbols carried
+by each transition label, rather than treating one symbolic transition as one
+word, and its fixed-prefix fast paths operate on scalar values.
 
 Replacement runs each operation-specific transformation as one complete pass.
 An explicit outer loop repeats that pass only for the assignment combinations

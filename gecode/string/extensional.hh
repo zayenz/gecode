@@ -50,7 +50,7 @@ namespace Gecode { namespace String {
   // trimmed-DFA data structure for non-reified regular.
   class trimDFA : public stringDFA {
   public:
-    typedef std::vector<std::vector<std::pair<int, int>>> delta_t;
+    typedef std::vector<std::vector<std::pair<NSIntSet, int>>> delta_t;
     delta_t delta;
     trimDFA(const DFA&);
     NSIntSet alphabet() const;

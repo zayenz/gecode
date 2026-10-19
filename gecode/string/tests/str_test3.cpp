@@ -398,6 +398,39 @@ public:
     next_states.add(branching.search(0, 'b'));
     DSIntSet complete(*this, NSIntSet('a', 'b'));
     assert(branching.neighbot(0, complete) == next_states);
+
+    DFA symbolic_base(0, {
+      DFA::Transition(0, 0x65E5, 1),
+      DFA::Transition(0, 0x65E6, 1),
+      DFA::Transition(0, 0x1F600, 1)
+    }, {1}, false);
+    trimDFA symbolic(symbolic_base);
+    assert(symbolic.delta[0].size() == 1);
+    NSIntSet symbolic_label(0x65E5, 0x65E6);
+    symbolic_label.add(0x1F600);
+    assert(symbolic.delta[0][0].first == symbolic_label);
+    assert(symbolic.search(0, 0x65E5) == 1);
+    assert(symbolic.search(0, 0x1F600) == 1);
+
+    DSIntSet symbolic_complete(*this, symbolic_label);
+    assert(symbolic.neighbot(0, symbolic_complete) == NSIntSet(1));
+    NSIntSet with_missing(symbolic_label);
+    with_missing.add(0x672C);
+    DSIntSet symbolic_incomplete(*this, with_missing);
+    assert(symbolic.neighbot(0, symbolic_incomplete).empty());
+
+    trimDFA::delta_t reverse =
+      symbolic.reverse_transitions(symbolic_complete);
+    assert(reverse[1].size() == 1);
+    assert(reverse[1][0].first == symbolic_label);
+    assert(reverse[1][0].second == 0);
+
+    NSIntSet completed_alphabet(0x65E5);
+    completed_alphabet.add(0x672C);
+    compDFA completed(symbolic, completed_alphabet);
+    assert(completed.search(0, 0x65E5) == 1);
+    assert(completed.search(0, 0x672C) == completed.q_bot);
+    assert(completed.alphabet() == completed_alphabet);
   }
 
   void test13() {

@@ -91,11 +91,13 @@ traversals visit matching destinations directly and use their distance arrays
 for deduplication, so filtered transition APIs never allocate an intermediate
 frontier.
 
-`trimDFA` and `compDFA` own construction of their block-filtered reverse tables.
-Forward-reverse and backward propagation consume those tables without knowing
-their label representation. The tables remain pass-local: this avoids
-duplicating immutable automaton storage and removes character checks from their
-inner traversal loops.
+`trimDFA` and `compDFA` store transitions as `NSIntSet` labels, with all symbols
+from one source to one destination coalesced into a single range set. They own
+construction of their block-filtered reverse tables. Forward-reverse and
+backward propagation consume those tables without expanding labels into
+individual symbols. The tables remain pass-local: this avoids duplicating
+immutable automaton storage and removes character checks from their inner
+traversal loops.
 
 Replacement runs each operation-specific transformation as one complete pass.
 An explicit outer loop repeats that pass only for the assignment combinations

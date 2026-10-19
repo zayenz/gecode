@@ -4,40 +4,34 @@ namespace Gecode { namespace String {
   forceinline std::basic_ostream<Char,Traits>&
   operator <<(std::basic_ostream<Char,Traits>& os, const trimDFA& d) {
     os << '[';
-    for (int i = 0; i < d.n_states; i++) {
-      std::vector<NSIntSet> qi(d.n_states);
+    for (int i = 0; i < d.n_states; i++)
       for (auto& x : d.delta[i])
-        qi[x.second].add(x.first);
-      for (unsigned j = 0; j < qi.size(); ++j)
-        if (!qi[j].empty())
-          os << "(q" << i << ", " << qi[j] << ", q" << j << "), ";
-    }
+        os << "(q" << i << ", " << x.first << ", q" << x.second << "), ";
     return os << "], F: " << d.accepting_states().toString();
   }
 
   forceinline
   trimDFA::trimDFA(const DFA& d) : stringDFA(d), delta(d.n_states()) {
     for (DFA::Transitions t(d); t(); ++t) {
-      delta[t.i_state()].push_back(std::pair<int,int>(t.symbol(), t.o_state()));
+      const int source = t.i_state();
+      const int target = t.o_state();
+      std::vector<std::pair<NSIntSet, int>>& outgoing = delta[source];
+      std::vector<std::pair<NSIntSet, int>>::iterator edge = outgoing.begin();
+      while (edge != outgoing.end() && edge->second != target)
+        ++edge;
+      if (edge == outgoing.end()) {
+        outgoing.emplace_back(NSIntSet(t.symbol()), target);
+      } else {
+        edge->first.add(t.symbol());
+      }
     }
-    for (int i = 0; i < n_states; ++i)
-      std::sort(delta[i].begin(), delta[i].end());
   }
 
   forceinline int
   trimDFA::search(int q, int c) const {
-    const std::vector<std::pair<int, int>>& d = delta[q];
-    int l = 0, u = d.size() - 1;
-    // Binary search, assuming delta[q] is lexicographically sorted.
-    while (l <= u) {
-      int m = l + (u - l) / 2, dm = d[m].first;
-      if (dm == c)
-        return d[m].second;
-      if (dm < c)
-        l = m + 1;
-      else
-        u = m - 1;
-    }
+    for (const auto& transition : delta[q])
+      if (transition.first.in(c))
+        return transition.second;
     return -1;
   }
 
@@ -46,9 +40,12 @@ namespace Gecode { namespace String {
     delta_t reverse(n_states);
     for (int source = 0; source < n_states; ++source)
       for (auto& transition : delta[source])
-        if (characters.in(transition.first))
-          reverse[transition.second].push_back(
-            std::pair<int, int>(transition.first, source));
+        if (!characters.disjoint(transition.first)) {
+          NSIntSet label(characters);
+          label.intersect(transition.first);
+          reverse[transition.second].emplace_back(
+            std::move(label), source);
+        }
     return reverse;
   }
 
@@ -57,7 +54,7 @@ namespace Gecode { namespace String {
     NSIntSet s;
     for (int i = 0; i < n_states; i++)
       for (auto& x : delta[i])
-        s.add(x.first);
+        s.include(x.first);
     return s;
   }
 
@@ -97,7 +94,7 @@ namespace Gecode { namespace String {
   trimDFA::visit_neighbours(int q, const DSIntSet& characters,
                             Visitor visitor) const {
     for (auto& transition : delta[q])
-      if (characters.in(transition.first))
+      if (!characters.disjoint(transition.first))
         visitor(transition.second);
   }
 
@@ -111,14 +108,17 @@ namespace Gecode { namespace String {
   forceinline bool
   trimDFA::include_all_neighbours(NSIntSet& states, int q,
                                   const DSIntSet& characters) const {
-    unsigned int covered = 0;
+    NSIntSet required(characters);
+    NSIntSet covered;
     for (auto& transition : delta[q]) {
-      if (characters.in(transition.first)) {
+      if (!characters.disjoint(transition.first)) {
         states.add(transition.second);
-        ++covered;
+        NSIntSet label(transition.first);
+        label.intersect(characters);
+        covered.include(label);
       }
     }
-    return !characters.empty() && covered == characters.size();
+    return !required.empty() && covered == required;
   }
 
   forceinline NSIntSet
@@ -418,14 +418,17 @@ namespace Gecode { namespace String {
       if (d < DashedString::_MAX_STR_LENGTH)
         ++d;
       if (d <= b.u - b.l) {
-        const std::vector<std::pair<int, int>>& dx =
+        const std::vector<std::pair<NSIntSet, int>>& dx =
           rev ? dfa->delta[q] : delta_bwd[q];
         for (const auto& x : dx) {
-          int c = x.first, q1 = x.second;
-          if (rev && !b.S.in(c))
+          NSIntSet characters(x.first);
+          int q1 = x.second;
+          if (rev)
+            characters.intersect(b.S);
+          if (characters.empty())
             continue;
           if (Q[l + 1].contains(q1)) {
-            S_opt.add(c);
+            S_opt.include(characters);
             if (dist[q1] > d) {
               Q_bfs.push_back(q1);
               if (Q[l].in(q1))
@@ -451,15 +454,18 @@ namespace Gecode { namespace String {
       NSIntSet S_man, B1;
       for (NSIntSet::iterator it(E); it(); ++it) {
         int q = *it;
-        const std::vector<std::pair<int, int>>& dx =
+        const std::vector<std::pair<NSIntSet, int>>& dx =
           rev ? dfa->delta[q] : delta_bwd[q];
         for (const auto& x : dx) {
-          int c = x.first, q1 = x.second;
-          if (rev && !b.S.in(c))
+          NSIntSet characters(x.first);
+          int q1 = x.second;
+          if (rev)
+            characters.intersect(b.S);
+          if (characters.empty())
             continue;
-          S_opt.add(c);
+          S_opt.include(characters);
           if (Q[i - 1].contains(q1)) {
-            S_man.add(c);
+            S_man.include(characters);
             B1.add(q1);
           }
         }

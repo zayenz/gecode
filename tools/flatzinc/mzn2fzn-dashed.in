@@ -7,9 +7,7 @@ set -eu
 # `var string(N)` and `var string of {...}` syntax. This binary predates the
 # 6.4 porting and is kept precompiled (rather than rebuilt from a patched
 # libminizinc 2.10.0) because maintaining/patching a modern libminizinc for
-# these features is a much larger, ongoing burden; see
-# tools/minizinc-string/PATCH_STATUS.md for the abandoned in-progress
-# alternative and rationale.
+# these features is a much larger, ongoing burden.
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ASSET_DIR="$SCRIPT_DIR"
 SOURCE_ASSET_DIR="@DASHED_SOURCE_ASSET_DIR@"

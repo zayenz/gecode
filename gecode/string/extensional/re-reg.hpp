@@ -23,10 +23,13 @@ namespace Gecode { namespace String {
     bool add_bot = false;
     std::vector<NSIntSet> labels(n_states);
     for (int q = 0; q < d.n_states; ++q) {
-      const std::vector<std::pair<int, int>>& delta_q = d.delta[q];
-      for (auto& x : delta_q)
-        if (alphabet.in(x.first))
-          labels[x.second].add(x.first);
+      const std::vector<std::pair<NSIntSet, int>>& delta_q = d.delta[q];
+      for (auto& x : delta_q) {
+        NSIntSet label(x.first);
+        label.intersect(alphabet);
+        if (!label.empty())
+          labels[x.second].include(label);
+      }
       NSIntSet missing(alphabet);
       for (int i = 0; i < n_states; ++i)
         missing.exclude(labels[i]);

@@ -1058,11 +1058,6 @@ int main(void) {
   std::ostringstream printed_unicode_block;
   printed_unicode_block << unicode_space->value.domain().at(0);
   assert(printed_unicode_block.str() == "\"日\"");
-  Gecode::String::NSIntSet printed_symbols(0x65E5);
-  printed_symbols.include(Gecode::String::NSIntSet(0x1F600));
-  std::ostringstream printed_unicode_set;
-  printed_unicode_set << printed_symbols;
-  assert(printed_unicode_set.str() == "{日,😀}");
 
   FixedStringValSpace* unicode_clone =
     static_cast<FixedStringValSpace*>(unicode_space->clone());

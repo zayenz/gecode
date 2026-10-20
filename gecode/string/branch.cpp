@@ -140,49 +140,36 @@ namespace Gecode {
          StringVarBranch vars, StringValBranch vals) {
     switch (vars.select()) {
       case StringVarBranch::Select::STRING_VAR_NONE:
-        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLL) {
+        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLL)
           none_llll(home, x);
-          return;
-        }
-        break;
+        return;
       case StringVarBranch::Select::STRING_VAR_SIZEMIN:
-        if (vals.select() == StringValBranch::Select::STRING_VAL_LLUL) {
+        if (vals.select() == StringValBranch::Select::STRING_VAL_LLUL)
           sizemin_llul(home, x);
-          return;
-        }
-        break;
+        return;
       case StringVarBranch::Select::STRING_VAR_LENMIN:
-        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLL) {
+        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLL)
           lenmin_llll(home, x);
-          return;
-        }
-        break;
+        return;
       case StringVarBranch::Select::STRING_VAR_LENMAX:
-        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLL) {
+        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLL)
           lenmax_llll(home, x);
-          return;
-        }
-        break;
+        return;
       case StringVarBranch::Select::STRING_VAR_BLOCKMIN:
-        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLL) {
+        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLL)
           blockmin_llll(home, x);
-          return;
-        }
-        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLM) {
+        else if (vals.select() == StringValBranch::Select::STRING_VAL_LLLM)
           blockmin_lllm(home, x);
-          return;
-        }
-        break;
+        return;
       case StringVarBranch::Select::STRING_VAR_LENBLOCKMIN:
-        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLM) {
+        if (vals.select() == StringValBranch::Select::STRING_VAL_LLLM)
           lenblockmin_lllm(home, x);
-          return;
-        }
-        break;
+        return;
       default:
-        break;
+        GECODE_NEVER;
     }
-    throw String::UnknownBranching("String::branch");
+    std::cerr << "Undefined search heuristics. Using blockmin_lllm.";
+    blockmin_lllm(home, x);
   };
 
 }

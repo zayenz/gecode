@@ -33,13 +33,6 @@ namespace Gecode { namespace String {
   UnknownRelation(const char* l);
   };
 
-  /// %Exception: Unknown value or variable selection passed as argument
-  class GECODE_STRING_EXPORT UnknownBranching : public Exception {
-  public:
-    /// Initialize with location \a l
-    UnknownBranching(const char* l);
-  };
-
 }}
 
 // STATISTICS: string-core

@@ -188,10 +188,8 @@ namespace Gecode { namespace String {
       NSRange* p = s._fst;
       os << '{';
       while (p != NULL) {
-        const string mi =
-          StringVal::from_symbols({p->l}).to_utf8();
-        const string ma =
-          StringVal::from_symbols({p->u}).to_utf8();
+        char mi = p->l;
+        char ma = p->u;
         if (mi == ma)
           os << mi;
         else

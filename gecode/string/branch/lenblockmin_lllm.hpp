@@ -19,27 +19,30 @@ namespace Gecode { namespace String { namespace Branch {
     }
 
     forceinline Choice*
-    LenBlockMin_LLLM::choice(Space&) {
+    LenBlockMin_LLLM::choice(Space& home) {
       // std::cerr << "\nVar. choice\n";
       const DashedString* p = &x[start].domain();
       const DSBlock& b = p->at(p->first_na_block());
       double s = b.logdim();
-      int d = p->max_length() - p->min_length();
-      if (d == 0)
-        d = DashedString::_MAX_STR_LENGTH;
+      int d = DashedString::_MAX_STR_LENGTH;
       int l = b.u - b.l;
       int m = p->min_length();
       int pos = start;
-      NSIntSet preferred;
-      for (int i = 0; i < x.size(); ++i)
-        preferred.include(x[i].must_chars());
       // std::cerr<<x[start]<<" (pos. "<<start<<", dim. "<<s<<")\n";
+      if (_FIRST)
+        DashedString::_MUST_CHARS.include(x[start].must_chars());
       for (int i = start + 1; i < x.size(); ++i) {
+        if (_FIRST)
+          DashedString::_MUST_CHARS.include(x[i].must_chars());
         if (!x[i].assigned()) {
+          if (x[i].degree() == 0) {
+            complete(home, i);
+            continue;
+          }
           p = &x[i].domain();
           const DSBlock& bi = p->at(p->first_na_block());
           double si = bi.logdim();
-          int li = bi.u - bi.l;
+          int li = b.u - bi.l;
           int mi = p->min_length();
           int di = p->max_length() - p->min_length();
           if (di > 0) {
@@ -61,16 +64,18 @@ namespace Gecode { namespace String { namespace Branch {
           }
         }
       }
+      // if (_FIRST) std::cerr<<"Must chars: "<<DashedString::_MUST_CHARS<<"\n";
 //       std::cerr << "Chosen var. " << x[pos] << " (pos. " << pos << ")\n";
 //       abort();
-      return val_lllm(pos, &x[pos].domain(), preferred);
+      _FIRST = false;
+      return val_lllm(pos, &x[pos].domain());
     }
 
     forceinline ExecStatus
     LenBlockMin_LLLM::commit(Space& home, const Choice& c, unsigned a) {
       const PosLevVal& p = static_cast<const PosLevVal&>(c);
       // this->print(home, c, a, std::cerr); std::cerr << '\n';
-      return commit_choice(home, p, a);
+      return commit_choice(home, p, Block::FIRST, a);
     }
 
 }}}

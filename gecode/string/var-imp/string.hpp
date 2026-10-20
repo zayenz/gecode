@@ -153,6 +153,16 @@ namespace Gecode { namespace String {
   }
 
   forceinline ModEvent
+  StringVarImp::commit(
+    Space& home, Branch::Level l, Branch::Value v, Branch::Block b, unsigned a
+  ) {
+    int old_min_length = min_length(), old_max_length = max_length();
+    ds.commit(home, l, v, b, a);
+    Delta d = StringDelta(ds._changed);
+    return notify(home, old_min_length, old_max_length, d);
+  }
+
+  forceinline ModEvent
   StringVarImp::lb(Space& home, int l) {
     DomainState state(*this);
     if (!ds.refine_lb(l))

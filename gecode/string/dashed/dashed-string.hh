@@ -282,6 +282,7 @@ namespace Gecode { namespace String { namespace Branch {
 
   enum Level {
     LENGTH,
+    CARD,
     BASE
   };
 
@@ -290,6 +291,11 @@ namespace Gecode { namespace String { namespace Branch {
     MAX,
     MUSTMIN,
     MUSTMAX
+  };
+
+  enum Block {
+    FIRST,
+    SMALLEST
   };
 
 }}}
@@ -315,6 +321,7 @@ namespace Gecode { namespace String {
   static bool _QUAD_SWEEP;
   static int  _MAX_STR_LENGTH;
   static int  _MAX_STR_ALPHA;
+  static NSIntSet _MUST_CHARS;
 
   static bool deep_check_dp(
     const NSBlocks& x, int i, const NSBlock& x_i,
@@ -361,9 +368,6 @@ namespace Gecode { namespace String {
   NSIntSet must_chars() const;
 
   NSIntSet may_chars() const;
-
-  /// Return the symbols supported at zero-based \a position for fixed length
-  NSIntSet chars_at(int position) const;
 
   int length() const;
 
@@ -424,6 +428,8 @@ namespace Gecode { namespace String {
 
   int first_na_block() const;
 
+  int smallest_na_block() const;
+
   bool check_lex(const DashedString& that, bool lt) const;
 
   NSBlocks lex_least(const std::vector<float>& succ) const;
@@ -436,6 +442,8 @@ namespace Gecode { namespace String {
   string min_str() const;
   /// Return a shortest concrete encoding-neutral value represented by this domain.
   StringVal min_value() const;
+
+  void commit(Space&, Branch::Level, Branch::Value, Branch::Block, unsigned);
 
   bool refine_lb(int l);
 
@@ -475,6 +483,10 @@ namespace Gecode { namespace String {
     int _min_length;
     // Length of the longest concrete string this dashed dtring can represent.
     int _max_length;
+
+    void _commit0(Space&, Branch::Level, Branch::Value, int);
+
+    void _commit1(Space&, Branch::Level, Branch::Value, int);
 
     DashedString(const DashedString& that);
     DashedString& operator=(const DashedString& that);

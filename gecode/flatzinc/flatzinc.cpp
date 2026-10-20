@@ -2874,7 +2874,6 @@ namespace Gecode { namespace FlatZinc {
       }
       else
         GECODE_NEVER;
-      Gecode::String::DashedString::_MUST_CHARS.include(x0.must_chars());
     }
     else
       x0 = tv[n->getStringVar()];

@@ -236,7 +236,7 @@ namespace Gecode { namespace String {
              fst(NULL);
              lst(NULL);
            }
-           delete p;
+           p->dispose(h, p);
          }
          else
            p->min(p->min() + 1);
@@ -982,234 +982,6 @@ namespace Gecode { namespace String {
     return -1;
   }
 
-  forceinline int
-  DashedString::smallest_na_block() const {
-    int j = -1;
-    double d = std::numeric_limits<double>::infinity();
-    for (int i = 0; i < _blocks.length(); ++i) {
-      const DSBlock& bi = at(i);
-      if (!bi.known() && bi.logdim() < d) {
-        j = i;
-        d = bi.logdim();
-      }
-    }
-    return j;
-  }
-
-  forceinline void
-  DashedString::_commit0(
-    Space& h, Branch::Level lev, Branch::Value val, int idx
-  ) {
-    DSBlock& block = at(idx);
-    switch (lev) {
-      case Branch::LENGTH: {
-        // std::cerr << "Branch::LENGTH\n";
-        switch (val) {
-          case Branch::MIN:
-            refine_ub(h, _min_length);
-            return;
-          case Branch::MAX:
-            refine_lb(_max_length);
-            return;
-          default:
-            GECODE_NEVER;
-        }
-      }
-      case Branch::CARD: {
-        // std::cerr << "Branch::CARD\n";
-        switch (val) {
-          case Branch::MIN:
-            block.u = block.l;
-            refine_card(h, _min_length, _max_length);
-            if (block.u == 0 && known())
-              normalize(h);
-            return;
-          case Branch::MAX:
-            block.l = block.u;
-            refine_card(h, _min_length, _max_length);
-            if (block.u == 0 && known())
-              normalize(h);
-            return;
-          default:
-            GECODE_NEVER;
-        }
-      }
-      case Branch::BASE: {
-        // std::cerr << "Branch::BASE\n";
-        int l = block.l;
-        const DSIntSet& S = block.S;
-        DSIntSet s;
-        switch (val) {
-          case Branch::MIN:
-            s.init(h, S.min());
-            break;
-          case Branch::MAX:
-            s.init(h, S.max());
-            break;
-          case Branch::MUSTMIN:
-            if (_MUST_CHARS.disjoint(S))
-              s.init(h, S.min());
-            else {
-              NSIntSet t(_MUST_CHARS);
-              t.intersect(S);
-              s.init(h, t.min());
-            }
-            break;
-          case Branch::MUSTMAX:
-            if (_MUST_CHARS.disjoint(S))
-              s.init(h, S.max());
-            else {
-              NSIntSet t(_MUST_CHARS);
-              t.intersect(S);
-              s.init(h, t.max());
-            }
-            break;
-          default:
-            GECODE_NEVER;
-        }
-        bool norm = (idx > 0 && at(idx - 1).S == s) ||
-          (l == 1 && idx < length() - 1 && at(idx + 1).S == s);
-        if (l == 1 && !norm) {
-          at(idx).S.update(h, s);
-          return;
-        }
-        _blocks.insert(h, idx, DSBlock(h, s, 1, 1));
-        _blocks.at(idx + 1).l--;
-        _blocks.at(idx + 1).u--;
-        if (norm)
-          normalize(h);
-        return;
-      }
-      default:
-        GECODE_NEVER;
-    }
-  }
-
-  forceinline void
-  DashedString::_commit1(
-    Space& h, Branch::Level lev, Branch::Value val, int idx
-  ) {
-    DSBlock& block = at(idx);
-    switch (lev) {
-      case Branch::LENGTH: {
-        if (_min_length == _max_length)
-          h.fail();
-        // std::cerr << "Branch::LENGTH\n";
-        switch (val) {
-          case Branch::MIN:
-            refine_lb(_min_length + 1);
-            return;
-          case Branch::MAX:
-            refine_ub(h, _max_length - 1);
-            return;
-          default:
-            GECODE_NEVER;
-        }
-      }
-      case Branch::CARD: {
-        // std::cerr << "Branch::CARD\n";
-        if (block.l == block.u)
-          h.fail();
-        switch (val) {
-          case Branch::MIN:
-             block.l++;
-             refine_card(h, _min_length, _max_length);
-             return;
-          case Branch::MAX:
-             block.u--;
-             refine_card(h, _min_length, _max_length);
-             return;
-          default:
-            GECODE_NEVER;
-        }
-      }
-      case Branch::BASE: {
-        // std::cerr << "Branch::BASE\n";
-        DSIntSet S1(h, block.S);
-        if (S1.size() == 1)
-          h.fail();
-        int l = block.l;
-        Gecode::Set::SetDelta d;
-        switch (val) {
-          case Branch::MIN: {
-            int m = S1.min();
-            S1.exclude(h, m, m, d);
-            break;
-          }
-          case Branch::MAX: {
-            int m = S1.max();
-            S1.exclude(h, m, m, d);
-            break;
-          }
-          case Branch::MUSTMIN: {
-            int m;
-            if (_MUST_CHARS.disjoint(S1))
-              m = S1.min();
-            else {
-              NSIntSet t(_MUST_CHARS);
-              t.intersect(S1);
-              m = t.min();
-            }
-            S1.exclude(h, m, m, d);
-            break;
-          }
-          case Branch::MUSTMAX: {
-            int m;
-            if (_MUST_CHARS.disjoint(S1))
-              m = S1.max();
-            else {
-              NSIntSet t(_MUST_CHARS);
-              t.intersect(S1);
-              m = t.max();
-            }
-            S1.exclude(h, m, m, d);
-            break;
-          }
-          default:
-            GECODE_NEVER;
-        }
-        bool norm = (idx > 0 && S1 == at(idx-1).S) ||
-          (l == 1 && idx < length() - 1 && S1 == at(idx+1).S);
-        if (l == 1 && !norm) {
-          at(idx).S.update(h, S1);
-          return;
-        }
-        _blocks.insert(h, idx, DSBlock(h, S1, 1, 1));
-        _blocks.at(idx + 1).l--;
-        _blocks.at(idx + 1).u--;
-        if (norm)
-          normalize(h);
-        return;
-      }
-      default:
-        GECODE_NEVER;
-    }
-  }
-
-  forceinline void
-  DashedString::commit(
-    Space& h, Branch::Level l, Branch::Value v, Branch::Block b, unsigned a
-  ) {
-    // std::cerr<<"\nDashedString::commit "<< *this <<" ["<<_min_length<< ", "
-    // << _max_length << "] -- " << l <<' '<< v << ' ' << b << ' '<< a <<'\n';
-    int i;
-    switch (b) {
-      case Branch::FIRST:
-        i = first_na_block();
-        break;
-      case Branch::SMALLEST:
-        i = smallest_na_block();
-        break;
-      default:
-        GECODE_NEVER;
-    }
-    a == 0 ? _commit0(h, l, v, i) : _commit1(h, l, v, i);
-    _changed = true;
-    // std::cerr<<"Set: "<<*this<<" ["<<_min_length<<", "<< _max_length <<"]\n";
-    if (!is_normalized())
-      normalize(h);
-  }
-
   forceinline bool
   DashedString::is_normalized() const {
     // std::cerr << *this << ' ' << _min_length << ' ' << _max_length << "\n";
@@ -1913,6 +1685,39 @@ namespace Gecode { namespace String {
     return set;
   }
 
+  forceinline NSIntSet
+  DashedString::chars_at(int position) const {
+    assert(_min_length == _max_length);
+    assert(position >= 0 && position < _min_length);
+    const long total = _min_length;
+    long suffix_min = 0;
+    long suffix_max = 0;
+    for (int i = 0; i < _blocks.length(); ++i) {
+      suffix_min += at(i).l;
+      suffix_max += at(i).u;
+    }
+    long prefix_min = 0;
+    long prefix_max = 0;
+    NSIntSet supported;
+    for (int i = 0; i < _blocks.length(); ++i) {
+      const DSBlock& block = at(i);
+      suffix_min -= block.l;
+      suffix_max -= block.u;
+      const long lower = std::max(
+        std::max(prefix_min, long(position + 1) - block.u),
+        total - suffix_max - block.u);
+      const long upper = std::min(
+        std::min(prefix_max, long(position)),
+        total - suffix_min - block.l);
+      if (block.u > 0 && position + 1 <= total - suffix_min &&
+          lower <= upper)
+        supported.include(block.S);
+      prefix_min += block.l;
+      prefix_max += block.u;
+    }
+    return supported;
+  }
+
   forceinline double
   DashedString::logdim() const {
     return _blocks.logdim();
@@ -2199,12 +2004,24 @@ namespace Gecode { namespace String {
     if (_min_length > that._max_length
     ||  _max_length < that._min_length)
       return false;
+    if (_blocks.length() == 1 && that._blocks.length() == 1)
+      return std::max(_min_length, that._min_length) == 0 ||
+        !_blocks.at(0).S.disjoint(that._blocks.at(0).S);
     return check_sweep<DSBlock, DSBlocks, DSBlock, DSBlocks>(
       _blocks, that. _blocks
     );
   }
   forceinline bool
   DashedString::check_equate(const NSBlocks& that) const {
+    if (that.size() == 1) {
+      const NSBlock& block = that[0];
+      const int lower = std::max(_min_length, block.l);
+      const int upper = std::min(_max_length, block.u);
+      if (lower > upper)
+        return false;
+      if (_blocks.length() == 1)
+        return lower == 0 || !_blocks.at(0).S.disjoint(block.S);
+    }
     return check_sweep<DSBlock, DSBlocks, NSBlock, NSBlocks>(
       _blocks, that
     );

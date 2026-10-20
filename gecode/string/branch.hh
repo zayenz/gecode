@@ -24,57 +24,101 @@ namespace Gecode { namespace String { namespace Branch {
       Level lev;
       Value val;
       int split;
-      int offset;
+      int index;
+      int length;
+      NSIntSet alphabet;
+      NSIntSet chars;
+      StringVal fixed;
 
       PosLevVal(
-        const StringBrancher& b, unsigned p, Level l, Value v, int s, int o
+        const StringBrancher& b, unsigned p, Level l, Value v, int s
       ):
-        Choice(b, 2), pos(p), lev(l), val(v), split(s), offset(o) {}
+        Choice(b, 2), pos(p), lev(l), val(v), split(s), index(-1), length(-1),
+        alphabet(), chars(), fixed() {}
+
+      PosLevVal(
+        const StringBrancher& b, unsigned p, Value v, int s, int i, int n,
+        NSIntSet&& a, NSIntSet&& c
+      ):
+        Choice(b, 2), pos(p), lev(Level::BASE), val(v), split(s), index(i),
+        length(n), alphabet(std::move(a)), chars(std::move(c)), fixed() {}
+
+      PosLevVal(
+        const StringBrancher& b, unsigned p, StringVal&& value
+      ):
+        Choice(b, 2), pos(p), lev(Level::BASE), val(Value::MIN), split(0),
+        index(-1), length(value.size()), alphabet(), chars(),
+        fixed(std::move(value)) {}
 
       virtual size_t
       size(void) const {
-        return sizeof(*this);
+        return sizeof(*this) +
+          (alphabet.length() + chars.length()) * sizeof(NSRange) +
+          fixed.size() * sizeof(StringSymbol);
       }
 
       virtual void
       archive(Archive& e) const {
         Choice::archive(e);
-        e << pos << lev << val << split << offset;
+        e << pos << lev << val << split << index << length;
+        e << alphabet.length();
+        for (NSRange* range = alphabet.first(); range; range = range->next)
+          e << range->l << range->u;
+        e << chars.length();
+        for (NSRange* range = chars.first(); range; range = range->next)
+          e << range->l << range->u;
+        e << static_cast<int>(fixed.size());
+        for (StringVal::size_type i = 0; i < fixed.size(); ++i)
+          e << fixed[i];
       }
 
     };
 
     PosLevVal*
     decision(
-      int pos, const Gecode::String::DashedString* p, Level lev, Value val
+      int pos, const Gecode::String::DashedString* p, Level lev, Value val,
+      const NSIntSet* preferred = nullptr
     ) {
       if (lev == Level::LENGTH) {
         int split = val == Value::MIN ? p->min_length() : p->max_length();
-        return new PosLevVal(*this, pos, lev, val, split, -1);
+        return new PosLevVal(*this, pos, lev, val, split);
       }
-      int index = p->first_na_block();
-      const DSBlock& block = p->at(index);
-      if (lev == Level::CARD) {
-        int split = val == Value::MIN ? block.l : block.u;
-        return new PosLevVal(*this, pos, lev, val, split, -1);
+      assert(lev == Level::BASE);
+      assert(p->min_length() == p->max_length());
+      int index = -1;
+      NSIntSet chars;
+      std::vector<StringSymbol> concrete;
+      concrete.reserve(p->min_length());
+      for (int i = 0; i < p->min_length(); ++i) {
+        NSIntSet position_chars(p->chars_at(i));
+        assert(!position_chars.empty());
+        if (index < 0 && position_chars.size() > 1) {
+          index = i;
+          chars = position_chars;
+        }
+        concrete.push_back(position_chars.min());
       }
-      int offset = 0;
-      for (int i = 0; i < index; ++i)
-        offset += p->at(i).l;
+      if (index < 0)
+        return new PosLevVal(
+          *this, pos, StringVal::from_symbols(std::move(concrete)));
       int split;
       switch (val) {
         case Value::MIN:
-          split = block.S.min();
+          split = chars.min();
           break;
         case Value::MAX:
-          split = block.S.max();
+          split = chars.max();
           break;
         case Value::MUSTMIN:
         case Value::MUSTMAX: {
-          NSIntSet must(DashedString::_MUST_CHARS);
-          must.intersect(block.S);
+          NSIntSet must;
+          if (preferred != nullptr) {
+            must = *preferred;
+            must.intersect(chars);
+          }
           if (must.empty())
-            split = val == Value::MUSTMIN ? block.S.min() : block.S.max();
+            split = val == Value::MUSTMIN ?
+              chars.min() : chars.max();
           else
             split = val == Value::MUSTMIN ? must.min() : must.max();
           break;
@@ -82,89 +126,81 @@ namespace Gecode { namespace String { namespace Branch {
         default:
           GECODE_NEVER;
       }
-      return new PosLevVal(*this, pos, lev, val, split, offset);
+      return new PosLevVal(
+        *this, pos, val, split, index, p->min_length(),
+        p->may_chars(), std::move(chars));
     }
 
     ExecStatus
-    commit_choice(Space& home, const PosLevVal& p, Block block, unsigned a) {
-      if (!x[p.pos].assigned()) {
-        x[p.pos].commit(home, p.lev, p.val, block, a);
-        return ES_OK;
-      }
-      if (p.lev == Level::CARD)
-        return ES_OK;
-      string bytes;
-      bool selected;
-      if (x[p.pos].domain().try_val_bytes(bytes)) {
-        if (p.lev == Level::LENGTH)
-          selected = static_cast<int>(bytes.size()) == p.split;
-        else
-          selected = p.offset < static_cast<int>(bytes.size()) &&
-            static_cast<int>(char2int(bytes[p.offset])) == p.split;
+    commit_choice(Space& home, const PosLevVal& p, unsigned a) {
+      ModEvent me;
+      if (p.lev == Level::LENGTH) {
+        if (p.val == Value::MIN) {
+          me = a == 0 ?
+            x[p.pos].ub(home, p.split) :
+            x[p.pos].lb(home, p.split + 1);
+        } else {
+          me = a == 0 ?
+            x[p.pos].lb(home, p.split) :
+            x[p.pos].ub(home, p.split - 1);
+        }
       } else {
-        const StringVal value = x[p.pos].domain().val_symbols();
-        if (p.lev == Level::LENGTH)
-          selected = static_cast<int>(value.size()) == p.split;
+        assert(p.lev == Level::BASE);
+        if (p.index < 0) {
+          if (a != 0)
+            return ES_FAILED;
+          me = x[p.pos].eq(home, p.fixed);
+          return me_failed(me) ? ES_FAILED : ES_OK;
+        }
+        NSIntSet selected(p.chars);
+        if (a == 0)
+          selected = NSIntSet(p.split);
         else
-          selected = p.offset < static_cast<int>(value.size()) &&
-            value[static_cast<StringVal::size_type>(p.offset)] == p.split;
+          selected.remove(p.split);
+        if (selected.empty())
+          return ES_FAILED;
+        NSBlocks restriction;
+        if (p.index > 0)
+          restriction.emplace_back(p.alphabet, p.index, p.index);
+        restriction.emplace_back(std::move(selected), 1, 1);
+        if (p.index + 1 < p.length)
+          restriction.emplace_back(
+            p.alphabet, p.length - p.index - 1, p.length - p.index - 1);
+        me = x[p.pos].dom(home, restriction);
+        return me_failed(me) ? ES_FAILED : ES_OK;
       }
-      return selected == (a == 0) ? ES_OK : ES_FAILED;
+      return me_failed(me) ? ES_FAILED : ES_OK;
     }
 
     Choice*
     val_llll(int pos, const Gecode::String::DashedString* p) {
       if (p->min_length() < p->max_length())
         return decision(pos, p, Level::LENGTH, Value::MIN);
-      int i = p->first_na_block();
-      const DSBlock& b = p->at(i);
-      if (b.l < b.u)
-        return decision(pos, p, Level::CARD, Value::MIN);
-      else
-        return decision(pos, p, Level::BASE, Value::MIN);
+      return decision(pos, p, Level::BASE, Value::MIN);
     }
 
     Choice*
     val_llul(int pos, const Gecode::String::DashedString* p) {
       if (p->min_length() < p->max_length())
         return decision(pos, p, Level::LENGTH, Value::MIN);
-      int i = p->first_na_block();
-      const DSBlock& b = p->at(i);
-      if (b.l < b.u)
-        return decision(pos, p, Level::CARD, Value::MAX);
-      else
-        return decision(pos, p, Level::BASE, Value::MIN);
+      return decision(pos, p, Level::BASE, Value::MIN);
     }
 
     Choice*
     val_ulul(int pos, const Gecode::String::DashedString* p) {
       if (p->min_length() < p->max_length())
         return decision(pos, p, Level::LENGTH, Value::MAX);
-      int i = p->first_na_block();
-      const DSBlock& b = p->at(i);
-      if (b.l < b.u)
-        return decision(pos, p, Level::CARD, Value::MAX);
-      else
-        return decision(pos, p, Level::BASE, Value::MIN);
+      return decision(pos, p, Level::BASE, Value::MAX);
     }
 
     Choice*
-    val_lllm(int pos, const Gecode::String::DashedString* p) {
+    val_lllm(
+      int pos, const Gecode::String::DashedString* p,
+      const NSIntSet& preferred
+    ) {
       if (p->min_length() < p->max_length())
         return decision(pos, p, Level::LENGTH, Value::MIN);
-      int i = p->first_na_block();
-      const DSBlock& b = p->at(i);
-      if (b.l < b.u)
-        return decision(pos, p, Level::CARD, Value::MIN);
-      else
-        return decision(pos, p, Level::BASE, Value::MUSTMIN);
-    }
-
-    forceinline void
-    complete(Space& home, int pos) {
-      ModEvent me = x[pos].eq(home, x[pos].domain().min_value());
-      assert(!me_failed(me));
-      (void) me;
+      return decision(pos, p, Level::BASE, Value::MUSTMIN, &preferred);
     }
 
   public:
@@ -189,10 +225,39 @@ namespace Gecode { namespace String { namespace Branch {
 
     Choice*
     choice(const Space&, Archive& e) {
-      int pos, lev, val, split, offset;
-      e >> pos >> lev >> val >> split >> offset;
+      int pos, lev, val, split, index, length, range_count;
+      e >> pos >> lev >> val >> split >> index >> length >> range_count;
+      NSIntSet alphabet;
+      for (int i = 0; i < range_count; ++i) {
+        int lower, upper;
+        e >> lower >> upper;
+        alphabet.include(NSIntSet(lower, upper));
+      }
+      e >> range_count;
+      NSIntSet chars;
+      for (int i = 0; i < range_count; ++i) {
+        int lower, upper;
+        e >> lower >> upper;
+        chars.include(NSIntSet(lower, upper));
+      }
+      int value_size;
+      e >> value_size;
+      std::vector<StringSymbol> symbols;
+      symbols.reserve(value_size);
+      for (int i = 0; i < value_size; ++i) {
+        int symbol;
+        e >> symbol;
+        symbols.push_back(symbol);
+      }
+      if (Level(lev) == Level::LENGTH)
+        return new PosLevVal(
+          *this, pos, Level(lev), Value(val), split);
+      if (index < 0)
+        return new PosLevVal(
+          *this, pos, StringVal::from_symbols(std::move(symbols)));
       return new PosLevVal(
-        *this, pos, Level(lev), Value(val), split, offset);
+        *this, pos, Value(val), split, index, length,
+        std::move(alphabet), std::move(chars));
     }
 
     virtual void
@@ -327,11 +392,7 @@ namespace Gecode { namespace String { namespace Branch {
 
     ExecStatus commit(Space& home, const Choice& c, unsigned a);
 
-    static bool _FIRST;
-
   };
-
-  bool BlockMin_LLLM::_FIRST = true;
 
 }}}
 #include <gecode/string/branch/blockmin_lllm.hpp>
@@ -352,11 +413,7 @@ namespace Gecode { namespace String { namespace Branch {
 
     ExecStatus commit(Space& home, const Choice& c, unsigned a);
 
-    static bool _FIRST;
-
   };
-
-  bool LenBlockMin_LLLM::_FIRST = true;
 
 }}}
 #include <gecode/string/branch/lenblockmin_lllm.hpp>

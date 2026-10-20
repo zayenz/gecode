@@ -150,13 +150,17 @@ fi
 "$MZN_CMD" $TEST_DIR/test.mzn > $X
 Y=$TEST_DIR/output_mzn
 t=$(sed -n 's/^t = \([^;]*\);$/\1/p' "$X")
+x2=$(sed -n 's/^x2 = \([^;]*\);$/\1/p' "$X")
+z=$(sed -n 's/^z = \([^;]*\);$/\1/p' "$X")
 z1=$(sed -n 's/^z1 = \([^;]*\);$/\1/p' "$X")
 if
-  [[ $t =~ ^[deg]{5}$ ]] && [[ $z1 == "ABBABB1211${t^^}" ]]
+  [[ $t =~ ^[deg]{5}$ ]] &&
+  [[ $x2 =~ ^[1-5]2[1-5]{2,}$ ]] &&
+  [[ $z1 == "${z^^}${x2^^}${t^^}" ]]
 then
   diff \
-    <(sed -E 's/^t = [deg]{5};$/t = <optimal>;/; s/^z1 = ABBABB1211[DEG]{5};$/z1 = <derived>;/' "$X") \
-    <(sed -E 's/^t = [deg]{5};$/t = <optimal>;/; s/^z1 = ABBABB1211[DEG]{5};$/z1 = <derived>;/' "$Y") \
+    <(sed -E 's/^t = [deg]{5};$/t = <optimal>;/; s/^x2 = [1-5]+;$/x2 = <valid>;/; s/^z1 = [A-Z0-9]+;$/z1 = <derived>;/' "$X") \
+    <(sed -E 's/^t = [deg]{5};$/t = <optimal>;/; s/^x2 = [1-5]+;$/x2 = <valid>;/; s/^z1 = [A-Z0-9]+;$/z1 = <derived>;/' "$Y") \
     > "$Z"
 else
   echo "Error! MZN output has an invalid optimum!"

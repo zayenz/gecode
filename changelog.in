@@ -52,7 +52,7 @@
 # An entry is described as follows:
 #   [ENTRY]
 #   Module:
-#     kernel|search|int|set|float|cpltset|scheduling|graph|minimodel|
+#     kernel|search|int|set|string|float|cpltset|scheduling|graph|minimodel|
 #     driver|iter|support|example|test|gist|flatzinc|other
 #   What:   bug|documentation|performance|new|removed|change
 #   Rank:   minor|major
@@ -74,6 +74,17 @@ Date: 2026-07-15
 This release modernizes the Gecode build infrastructure, adds a
 first-class CMake package for downstream consumers, refreshes the
 autoconf build path, and updates CI coverage for current platforms.
+
+[ENTRY]
+Module: string
+What:   new
+Rank:   major
+[DESCRIPTION]
+Add bounded string variables based on dashed domains, with native
+propagators, branchers, examples, randomized tests, and C++ and
+FlatZinc/MiniZinc integration. Concrete string values use Unicode scalar
+values with strict UTF-8 and UTF-16 boundaries, while legacy byte-oriented
+interfaces retain their one-byte-per-symbol semantics.
 
 [ENTRY]
 Module: int

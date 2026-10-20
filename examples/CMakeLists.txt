@@ -55,6 +55,7 @@ set(GECODE_EXAMPLE_SOURCES
   sports-league.cpp
   steel-mill.cpp
   steiner.cpp
+  string-palindrome.cpp
   sudoku-advanced.cpp
   sudoku.cpp
   tsp.cpp
@@ -71,6 +72,9 @@ set(GECODE_SET_EXAMPLES
 set(GECODE_FLOAT_EXAMPLES
   cartesian-heart
   descartes-folium)
+
+set(GECODE_STRING_EXAMPLES
+  string-palindrome)
 
 set(GECODE_MPFR_FLOAT_EXAMPLES
   archimedean-spiral
@@ -89,6 +93,11 @@ function(gecode_add_example source_file)
     return()
   endif()
 
+  if(example_name IN_LIST GECODE_STRING_EXAMPLES AND NOT GECODE_ENABLE_STRING_VARS)
+    message(STATUS "Skipping example: ${example_name} (requires string variables)")
+    return()
+  endif()
+
   if(example_name IN_LIST GECODE_MPFR_FLOAT_EXAMPLES AND
      (NOT GECODE_ENABLE_FLOAT_VARS OR NOT GECODE_ENABLE_MPFR OR NOT MPFR_FOUND))
     message(STATUS "Skipping example: ${example_name} (requires MPFR float support)")
@@ -101,6 +110,11 @@ function(gecode_add_example source_file)
     PRIVATE
       gecodeminimodel
       gecodedriver)
+  if(example_name IN_LIST GECODE_STRING_EXAMPLES)
+    target_link_libraries(${example_name}${EXECUTABLE_EXTENSION}
+      PRIVATE
+        gecodestring)
+  endif()
   if(MSVC)
     # Needed for some examples to prevent C1128:
     # number of sections exceeded object file format limit.

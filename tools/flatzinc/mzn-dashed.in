@@ -7,10 +7,9 @@ set -eu
 # of {...}` support) compiles the model to FlatZinc, then fzn-dashed
 # (fzn-gecode) solves it.
 #
-# Unlike the old `mzn-gstrings` script (which just forwarded "$@" to the
-# compile stage and never passed solve-time options such as -a/-f/-s/-n to
-# the solve stage), every option given to this script is classified and
-# routed to whichever stage(s) understand it:
+# Unlike the legacy compiler-only driver, which never passed solve-time
+# options such as -a/-f/-s/-n to the solve stage, every option given to this
+# script is classified and routed to whichever stage(s) understand it:
 #  - options recognized by mzn2fzn-dashed (the compile stage) are sent there;
 #  - every other option (including all fzn-gecode/fzn-dashed solve-time
 #    flags like -a, -f, -s, -n, -p, -restart, ...) is forwarded to the solve

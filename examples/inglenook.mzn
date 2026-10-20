@@ -55,7 +55,7 @@ array[MOVES] of var {0} union TRACKS: Moves;
 constraint A[0] = A_ini /\ str_len(A_ini) <= A_cap;
 constraint B[0] = B_ini /\ str_len(B_ini) <= B_cap;
 constraint C[0] = C_ini /\ str_len(C_ini) <= C_cap;
-constraint X[0] = X_ini /\ str_len(C_ini) <= X_cap;
+constraint X[0] = X_ini /\ str_len(X_ini) <= X_cap;
 
 % Intermediate moves.
 constraint forall (i in MOVES) (
@@ -66,9 +66,9 @@ constraint forall (i in MOVES) (
   str_len(C[i]) <= C_cap /\ str_len(X[i]) <= X_cap /\
   [% No-move: once no-move, always no-move.
     forall (j in i..N_MOVES) (
-      A[i-1] = A[j] /\ B[i-1] = B[j] /\ C[i-1] = C[j] /\ Moves[j] = 0 /\
-      DiffA[j] = 0  /\ DiffB[j] = 0  /\ DiffC[j] = 0  /\ DiffX[j] = 0 /\
-      Moves[j] = 0
+      A[i-1] = A[j] /\ B[i-1] = B[j] /\ C[i-1] = C[j] /\
+      X[i-1] = X[j] /\ Moves[j] = 0 /\ DiffA[j] = 0 /\ DiffB[j] = 0 /\
+      DiffC[j] = 0 /\ DiffX[j] = 0
     ),
     % A-move.
     A[i] ++ X[i] = A[i-1] ++ X[i-1] /\ B[i] = B[i-1] /\ C[i] = C[i-1] /\

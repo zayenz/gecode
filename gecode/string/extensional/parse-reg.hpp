@@ -470,20 +470,17 @@ namespace Gecode { namespace String {
           bool changed = false;
           for (unsigned int i = 0; i < refined.size(); ++i) {
             NSBlock& block = refined[i];
-            NSIntSet si(block.S);
-            if (s.disjoint(si)) {
+            if (s.disjoint(block.S)) {
               if (x.min_length() > 0)
                 home.fail();
               else
                 rel(home, x, STRT_EQ, StringVar(home, ""));
               return;
             }
-            int n = si.size();
-            si.intersect(s);
-            if (si.size() < n) {
-              block.S = std::move(si);
+            int n = block.S.size();
+            block.S.intersect(s);
+            if (block.S.size() < n)
               changed = true;
-            }
             if (block.u != x.max_length()) {
               block.u = x.max_length();
               changed = true;

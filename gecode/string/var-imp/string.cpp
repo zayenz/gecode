@@ -7,7 +7,7 @@ namespace Gecode { namespace String {
 
   StringVarImp::StringVarImp(Space& h, int a, int b) :
     StringVarImpBase(h), ds(h) {
-    ds._blocks.at(0).S.init(h, DSIntSet(h, 0, DashedString::_MAX_STR_ALPHA));
+    ds._blocks.at(0).S.init(h, 0, DashedString::_MAX_STR_ALPHA);
     ds._blocks.at(0).l = a;
     ds._blocks.at(0).u = b;
     ds._min_length = min(DashedString::_MAX_STR_LENGTH, a);

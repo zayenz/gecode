@@ -19,6 +19,30 @@ namespace Gecode { namespace String {
 
 namespace Gecode { namespace String {
 
+  forceinline void
+  DSIntSet::init(Space& h, int c) {
+    RangeList* range = new (h) RangeList(c, c);
+    range->next(NULL);
+    fst(range);
+    lst(range);
+    _size = 1;
+  }
+
+  forceinline void
+  DSIntSet::init(Space& h, int l, int u) {
+    if (l > u) {
+      fst(NULL);
+      lst(NULL);
+      _size = 0;
+      return;
+    }
+    RangeList* range = new (h) RangeList(l, u);
+    range->next(NULL);
+    fst(range);
+    lst(range);
+    _size = u - l + 1;
+  }
+
   forceinline IntSet
   DSIntSet::toIntSet() const {
     Gecode::Set::BndSetRanges ranges(*this);
@@ -120,7 +144,11 @@ namespace Gecode { namespace String {
 
   forceinline void
   DSIntSet::update(Space& h, char c) {
-    int i = char2int(c);
+    update(h, static_cast<int>(char2int(c)));
+  }
+
+  forceinline void
+  DSIntSet::update(Space& h, int i) {
     if (ranges() && ranges()->next() == NULL) {
       ranges()->min(i);
       ranges()->max(i);
@@ -346,7 +374,7 @@ namespace Gecode { namespace String {
 
   forceinline DSBlock
   DSBlock::top(Space& h) {
-    return DSBlock(h, DSIntSet(h, 0, DashedString::_MAX_STR_ALPHA), 0,
+    return DSBlock(h, 0, DashedString::_MAX_STR_ALPHA, 0,
       DashedString::_MAX_STR_LENGTH);
   }
 
@@ -668,7 +696,7 @@ namespace Gecode { namespace String {
         }
         else {
           prev_c = s_i;
-          x[j].S.update(h, prev_c);
+          x[j].S.update(h, static_cast<int>(prev_c));
           x[j].l = 1;
           x[j].u = 1;
           ++j;
@@ -725,7 +753,7 @@ namespace Gecode { namespace String {
           ++x[j - 1].u;
         } else {
           previous = symbol;
-          x[j].S.update(h, NSIntSet(symbol));
+          x[j].S.update(h, symbol);
           x[j].l = 1;
           x[j].u = 1;
           ++j;
@@ -744,7 +772,7 @@ namespace Gecode { namespace String {
         ++x[j - 1].u;
       } else {
         previous = symbol;
-        x[j].S.init(h, NSIntSet(symbol));
+        x[j].S.init(h, symbol);
         x[j].l = 1;
         x[j].u = 1;
         ++j;
@@ -752,8 +780,9 @@ namespace Gecode { namespace String {
     }
   }
 
+  template <typename Block>
   forceinline void
-  DSBlocks::insert(Space& h, int k, const DSBlock& b) {
+  DSBlocks::insert(Space& h, int k, const Block& b) {
     // std::cerr << "Inserting " << b << " at position " << k << " of " << *this << '\n';
     DSBlock* y = h.alloc<DSBlock>(n + 1);
     for (int i = 0; i < k; i++)
@@ -1041,15 +1070,14 @@ namespace Gecode { namespace String {
           return;
         }
         int l = block.l;
-        DSIntSet s;
-        s.init(h, split);
+        NSIntSet s(split);
         bool norm = (idx > 0 && at(idx - 1).S == s) ||
           (l == 1 && idx < length() - 1 && at(idx + 1).S == s);
         if (l == 1 && !norm) {
           at(idx).S.update(h, s);
           return;
         }
-        _blocks.insert(h, idx, DSBlock(h, s, 1, 1));
+        _blocks.insert(h, idx, NSBlock(std::move(s), 1, 1));
         _blocks.at(idx + 1).l--;
         _blocks.at(idx + 1).u--;
         if (norm)
@@ -1103,19 +1131,18 @@ namespace Gecode { namespace String {
         // std::cerr << "Branch::BASE\n";
         if (!block.S.in(split))
           return;
-        DSIntSet S1(h, block.S);
+        NSIntSet S1(block.S);
         if (S1.size() == 1)
           h.fail();
         int l = block.l;
-        Gecode::Set::SetDelta d;
-        S1.exclude(h, split, split, d);
+        S1.remove(split);
         bool norm = (idx > 0 && S1 == at(idx-1).S) ||
           (l == 1 && idx < length() - 1 && S1 == at(idx+1).S);
         if (l == 1 && !norm) {
           at(idx).S.update(h, S1);
           return;
         }
-        _blocks.insert(h, idx, DSBlock(h, S1, 1, 1));
+        _blocks.insert(h, idx, NSBlock(std::move(S1), 1, 1));
         _blocks.at(idx + 1).l--;
         _blocks.at(idx + 1).u--;
         if (norm)
@@ -1606,7 +1633,7 @@ namespace Gecode { namespace String {
               }
               else
                 blocks().insert(
-                  h, j, DSBlock(h, DSIntSet(h, s), 1, 1));
+                  h, j, NSBlock(std::move(s), 1, 1));
             }
           }
           break;
@@ -1653,7 +1680,7 @@ namespace Gecode { namespace String {
             }
             else
               that.blocks().insert(
-                h, j, DSBlock(h, DSIntSet(h, s), 1, 1));
+                h, j, NSBlock(std::move(s), 1, 1));
             if (that._changed)
               that.normalize(h);
             return !h.failed();

@@ -30,9 +30,6 @@ namespace Gecode { namespace String { namespace Branch {
       int l = b.u - b.l;
       int m = p->min_length();
       int pos = start;
-      NSIntSet preferred;
-      for (int i = 0; i < x.size(); ++i)
-        preferred.include(x[i].must_chars());
       // std::cerr<<x[start]<<" (pos. "<<start<<", dim. "<<s<<")\n";
       for (int i = start + 1; i < x.size(); ++i) {
         if (!x[i].assigned()) {
@@ -63,7 +60,7 @@ namespace Gecode { namespace String { namespace Branch {
       }
 //       std::cerr << "Chosen var. " << x[pos] << " (pos. " << pos << ")\n";
 //       abort();
-      return val_lllm(pos, &x[pos].domain(), preferred);
+      return val_lllm(pos, &x[pos].domain());
     }
 
     forceinline ExecStatus

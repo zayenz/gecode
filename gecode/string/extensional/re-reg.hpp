@@ -114,8 +114,9 @@ namespace Gecode { namespace String {
     return -1;
   };
 
+  template<class CharacterSet>
   forceinline compDFA::Delta_t
-  compDFA::reverse_transitions(const DSIntSet& characters) const {
+  compDFA::reverse_transitions(const CharacterSet& characters) const {
     Delta_t reverse(n_states);
     for (int source = 0; source < n_states; ++source)
       for (auto& transition : delta[source])
@@ -136,18 +137,19 @@ namespace Gecode { namespace String {
     return s;
   };
 
-  template<class Visitor>
+  template<class CharacterSet, class Visitor>
   forceinline void
-  compDFA::visit_neighbours(int q, const DSIntSet& characters,
+  compDFA::visit_neighbours(int q, const CharacterSet& characters,
                             Visitor visitor) const {
     for (auto& transition : delta[q])
       if (!characters.disjoint(transition.first))
         visitor(transition.second);
   }
 
+  template<class CharacterSet>
   forceinline void
   compDFA::include_neighbours(NSIntSet& states, int q,
-                              const DSIntSet& characters) const {
+                              const CharacterSet& characters) const {
     visit_neighbours(q, characters,
       [&states](int state) { states.add(state); });
   }

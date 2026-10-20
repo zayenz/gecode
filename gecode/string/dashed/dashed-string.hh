@@ -98,12 +98,15 @@ namespace Gecode { namespace String {
 
     IntSet toIntSet() const;
 
+    void init(Space& h, int c);
+    void init(Space& h, int l, int u);
     void init(Space& h, const DSIntSet& s);
     void init(Space& h, const NSIntSet& s);
 
     void update(Space& h, const NSIntSet& s);
     void update(Space& h, const DSIntSet& s);
     void update(Space& h, char c);
+    void update(Space& h, int c);
 
     bool contains(const DSIntSet& that) const;
     bool contains(const NSIntSet& that) const;
@@ -145,6 +148,8 @@ namespace Gecode { namespace String {
     DSBlock(Space& h, const NSBlock& b);
 
     DSBlock(Space& h, const DSIntSet& s, int a, int b);
+
+    DSBlock(Space& h, int min, int max, int a, int b);
 
     void init(Space& h, const DSBlock& d);
 
@@ -263,7 +268,8 @@ namespace Gecode { namespace String {
     void update(Space& h, const string& s);
     void update(Space& h, const StringVal& value);
 
-    void insert(Space& h, int k, const DSBlock& d);
+    template <typename Block>
+    void insert(Space& h, int k, const Block& d);
 
     //void normalize(Space& h);
     void normalize(Space& h, int&, int&);

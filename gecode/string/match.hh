@@ -40,7 +40,8 @@ namespace Gecode { namespace String {
     int minR;
     int must_idx(void) const;
     NSIntSet checkBlock(const DSBlock&, const NSIntSet&) const;
-    template <typename DFA_t> int checkReg(Space& home, const NSBlocks& x, DFA_t* d) const;
+    template <typename DFA_t>
+    int checkReg(const NSBlocks& x, DFA_t* d) const;
   protected:
     using MixBinaryPropagator<StringView, PC_STRING_DOM, Gecode::Int::IntView,
       Gecode::Int::PC_INT_DOM>::x0;

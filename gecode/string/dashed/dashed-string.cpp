@@ -78,6 +78,19 @@ namespace Gecode { namespace String {
     S.init(h, s);
   }
 
+  DSBlock::DSBlock(Space& h, int min, int max, int a, int b)
+    : l(0), u(0), S() {
+    if (b == 0 || a > b || min > max)
+      return;
+    if (a < 0)
+      a = 0;
+    if (b > DashedString::_MAX_STR_LENGTH)
+      b = DashedString::_MAX_STR_LENGTH;
+    l = a;
+    u = b;
+    S.init(h, min, max);
+  }
+
 }}
 
 using Gecode::Support::DynamicArray;
@@ -114,7 +127,7 @@ namespace Gecode { namespace String {
   DSBlocks::DSBlocks(Space& h, const NSBlocks& v)
     : DynamicArray(h,(int) v.size()), _size(v.size()) {
     for (int i = 0; i < (int) v.size(); ++i)
-      x[i].init(h, DSBlock(h, v[i]));
+      x[i].init(h, v[i]);
   }
 
 }}

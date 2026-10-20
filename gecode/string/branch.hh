@@ -16,6 +16,7 @@ namespace Gecode { namespace String { namespace Branch {
 
     ViewArray<StringView> x;
     mutable int start;
+    mutable int preferred_start;
 
     enum class ChoiceKind {
       DIRECT,
@@ -141,10 +142,42 @@ namespace Gecode { namespace String { namespace Branch {
       return true;
     }
 
+    template <typename CharacterSet>
+    int
+    preferred_symbol(const CharacterSet& candidates, Value val) const {
+      const bool select_min = val == Value::MUSTMIN;
+      const int extreme = select_min ? candidates.min() : candidates.max();
+      int selected = extreme;
+      bool found = false;
+      for (int offset = 0; offset < x.size(); ++offset) {
+        int i = preferred_start + offset;
+        if (i >= x.size())
+          i -= x.size();
+        const DashedString& domain = x[i].domain();
+        for (int j = 0; j < domain.length(); ++j) {
+          const DSBlock& block = domain.at(j);
+          if (block.l == 0 || block.S.size() != 1)
+            continue;
+          const int symbol = block.S.min();
+          if (!candidates.in(symbol))
+            continue;
+          if (symbol == extreme) {
+            preferred_start = i;
+            return symbol;
+          }
+          if (!found ||
+              (select_min ? symbol < selected : symbol > selected)) {
+            selected = symbol;
+            found = true;
+          }
+        }
+      }
+      return selected;
+    }
+
     PosLevVal*
     direct_decision(
-      int pos, const Gecode::String::DashedString* p, Level lev, Value val,
-      const NSIntSet* preferred = nullptr
+      int pos, const Gecode::String::DashedString* p, Level lev, Value val
     ) {
       if (lev == Level::LENGTH) {
         int split = val == Value::MIN ? p->min_length() : p->max_length();
@@ -168,18 +201,9 @@ namespace Gecode { namespace String { namespace Branch {
           split = block.S.max();
           break;
         case Value::MUSTMIN:
-        case Value::MUSTMAX: {
-          NSIntSet must;
-          if (preferred != nullptr) {
-            must = *preferred;
-            must.intersect(block.S);
-          }
-          if (must.empty())
-            split = val == Value::MUSTMIN ? block.S.min() : block.S.max();
-          else
-            split = val == Value::MUSTMIN ? must.min() : must.max();
+        case Value::MUSTMAX:
+          split = preferred_symbol(block.S, val);
           break;
-        }
         default:
           GECODE_NEVER;
       }
@@ -188,8 +212,7 @@ namespace Gecode { namespace String { namespace Branch {
 
     StringChoice*
     position_decision(
-      int pos, const DashedString* p, Value val,
-      const NSIntSet* preferred = nullptr
+      int pos, const DashedString* p, Value val
     ) {
       assert(p->min_length() == p->max_length());
       std::vector<StringSymbol> concrete;
@@ -210,19 +233,9 @@ namespace Gecode { namespace String { namespace Branch {
             split = chars.max();
             break;
           case Value::MUSTMIN:
-          case Value::MUSTMAX: {
-            NSIntSet must;
-            if (preferred != nullptr) {
-              must = *preferred;
-              must.intersect(chars);
-            }
-            if (must.empty())
-              split = val == Value::MUSTMIN ?
-                chars.min() : chars.max();
-            else
-              split = val == Value::MUSTMIN ? must.min() : must.max();
+          case Value::MUSTMAX:
+            split = preferred_symbol(chars, val);
             break;
-          }
           default:
             GECODE_NEVER;
         }
@@ -346,30 +359,26 @@ namespace Gecode { namespace String { namespace Branch {
     }
 
     Choice*
-    val_lllm(
-      int pos, const Gecode::String::DashedString* p,
-      const NSIntSet& preferred
-    ) {
+    val_lllm(int pos, const Gecode::String::DashedString* p) {
       if (p->min_length() < p->max_length())
         return direct_decision(pos, p, Level::LENGTH, Value::MIN);
       if (!direct_partition_safe(p))
-        return position_decision(pos, p, Value::MUSTMIN, &preferred);
+        return position_decision(pos, p, Value::MUSTMIN);
       int i = p->first_na_block();
       const DSBlock& b = p->at(i);
       if (b.l < b.u)
         return direct_decision(pos, p, Level::CARD, Value::MIN);
       else
-        return direct_decision(
-          pos, p, Level::BASE, Value::MUSTMIN, &preferred);
+        return direct_decision(pos, p, Level::BASE, Value::MUSTMIN);
     }
 
   public:
 
     StringBrancher(Home home, ViewArray<String::StringView>& x0):
-      Brancher(home), x(x0), start(0) {};
+      Brancher(home), x(x0), start(0), preferred_start(0) {};
 
     StringBrancher(Space& home, StringBrancher& b):
-      Brancher(home, b), start(b.start) {
+      Brancher(home, b), start(b.start), preferred_start(b.preferred_start) {
       x.update(home, b.x);
     };
 

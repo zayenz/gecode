@@ -88,11 +88,11 @@ namespace Gecode { namespace String {
 
   template <typename DFA_t>
   forceinline int
-  MatchDFA::checkReg(Space& home, const NSBlocks& x, DFA_t* d) const {
+  MatchDFA::checkReg(const NSBlocks& x, DFA_t* d) const {
 //    std::cerr << "\ncheckReg: "<<x<<" in "<<*d<<std::endl;
     NSIntSet Fj(0);
     for (int j = 0; j < x.length(); ++j) {
-      std::vector<NSIntSet> F = Reg::reach_fwd(d, Fj, DSBlock(home,x[j]));
+      std::vector<NSIntSet> F = Reg::reach_fwd(d, Fj, x[j]);
       if (F.empty())
         return -1;
 //      for (auto x : F) std::cerr<<x.toString()<<'\n';
@@ -212,7 +212,7 @@ namespace Gecode { namespace String {
         if (x_suff[0].l > 1)
           x_suff[0].l = 1;
 //        std::cerr << i << ": " << x_suff << "\n";
-        int u = checkReg(home, x_suff, Rs.get());
+        int u = checkReg(x_suff, Rs.get());
         if (u >= 0) {
           h = i;
           k = 0;

@@ -18,6 +18,12 @@ constructors allocate and copy into the destination space. `NSIntSet`,
 domains and refinements. Code must not retain an `NS*` object in space-owned
 state.
 
+Algorithms that only inspect blocks or character sets are generic across the
+two representations. They must not create a temporary `DS*` value merely to
+adapt an `NS*` value: space allocations cannot be reclaimed at the temporary's
+lifetime boundary. Conversion into `DS*` storage belongs at the final
+space-owned commit, where blocks and ranges are initialized directly.
+
 Dashed-domain operations report failure with their Boolean return value and
 record successful mutation in `DashedString::_changed`. They do not schedule
 propagators directly. The variable implementation owns that responsibility.
@@ -156,3 +162,9 @@ and does not copy the domain again. `StringBrancher` similarly owns cloning its
 complete `ViewArray`; concrete branchers copy only their additional scalar
 state. Branch choices archive only the selected variable position and scalar
 split data, never pointers into a space or dashed domain.
+
+LLLM value selection derives preferred mandatory symbols from the brancher's
+current views. It scans singleton mandatory blocks directly, without building
+temporary sets or using process-global state. The brancher retains only a
+cloned scalar scan hint and can stop as soon as it finds the candidate
+minimum or maximum; changing that hint must not change the selected symbol.

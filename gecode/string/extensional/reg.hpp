@@ -58,8 +58,9 @@ namespace Gecode { namespace String {
     return -1;
   }
 
+  template<class CharacterSet>
   forceinline trimDFA::delta_t
-  trimDFA::reverse_transitions(const DSIntSet& characters) const {
+  trimDFA::reverse_transitions(const CharacterSet& characters) const {
     delta_t reverse(n_states);
     for (int source = 0; source < n_states; ++source)
       for (auto& transition : delta[source])
@@ -112,25 +113,27 @@ namespace Gecode { namespace String {
     return s;
   }
 
-  template<class Visitor>
+  template<class CharacterSet, class Visitor>
   forceinline void
-  trimDFA::visit_neighbours(int q, const DSIntSet& characters,
+  trimDFA::visit_neighbours(int q, const CharacterSet& characters,
                             Visitor visitor) const {
     for (auto& transition : delta[q])
       if (!characters.disjoint(transition.first))
         visitor(transition.second);
   }
 
+  template<class CharacterSet>
   forceinline void
   trimDFA::include_neighbours(NSIntSet& states, int q,
-                              const DSIntSet& characters) const {
+                              const CharacterSet& characters) const {
     visit_neighbours(q, characters,
       [&states](int state) { states.add(state); });
   }
 
+  template<class CharacterSet>
   forceinline bool
   trimDFA::include_all_neighbours(NSIntSet& states, int q,
-                                  const DSIntSet& characters) const {
+                                  const CharacterSet& characters) const {
     NSIntSet required(characters);
     NSIntSet covered;
     for (auto& transition : delta[q]) {
@@ -339,9 +342,10 @@ namespace Gecode { namespace String {
     return sizeof(*this);
   }
 
+  template <typename Block>
   forceinline std::vector<NSIntSet>
   Reg::reach_fwd(
-    trimDFA* dfa, const NSIntSet& Qf, const DSBlock& b, bool rev
+    trimDFA* dfa, const NSIntSet& Qf, const Block& b, bool rev
   ) {
     int l = b.l;
     std::vector<NSIntSet> Q(l + 2);
@@ -412,10 +416,11 @@ namespace Gecode { namespace String {
     return Q;
   }
 
+  template <typename Block>
   forceinline NSBlocks
   Reg::reach_bwd(
     trimDFA* dfa, const std::vector<NSIntSet>& Q, NSIntSet& Qe,
-    const DSBlock& b, bool& changed, bool rev
+    const Block& b, bool& changed, bool rev
   ) {
     trimDFA::delta_t delta_bwd;
     if (!rev)
@@ -503,10 +508,11 @@ namespace Gecode { namespace String {
     return y;
   }
 
+  template <typename Block>
   forceinline NSBlocks
   Reg::reach_bwd(
     compDFA* dfa, const std::vector<NSIntSet>& Q, NSIntSet& Qe,
-    const DSBlock& b, bool& changed
+    const Block& b, bool& changed
   ) {
     compDFA::Delta_t delta_bwd = dfa->reverse_transitions(b.S);
     int l = b.l, l1 = DashedString::_MAX_STR_LENGTH;
@@ -582,8 +588,9 @@ namespace Gecode { namespace String {
     return y;
   }
 
+  template <typename Block>
   forceinline std::vector<NSIntSet>
-  Reg::reach_fwd(compDFA* dfa, const NSIntSet& Qf, const DSBlock& b) {
+  Reg::reach_fwd(compDFA* dfa, const NSIntSet& Qf, const Block& b) {
     int l = b.l;
     std::vector<NSIntSet> Q(l + 2);
     Q[0] = Qf;
@@ -673,7 +680,7 @@ namespace Gecode { namespace String {
       NSIntSet initial(0);
       const NSIntSet* states = &initial;
       for (int i = 0; i < n; ++i) {
-        forward[i] = reach_fwd(dfa, *states, DSBlock(home, x[i]));
+        forward[i] = reach_fwd(dfa, *states, x[i]);
         if (forward[i].empty())
           return ES_FAILED;
         states = &forward[i].back();
@@ -685,8 +692,7 @@ namespace Gecode { namespace String {
       std::vector<NSBlocks> refined(n);
       changed = false;
       for (int i = n - 1; i >= 0; --i)
-        refined[i] = reach_bwd(
-          dfa, forward[i], endings, DSBlock(home, x[i]), changed);
+        refined[i] = reach_bwd(dfa, forward[i], endings, x[i], changed);
       if (changed) {
         nofix = true;
         x = merge_refined_blocks(std::move(refined));

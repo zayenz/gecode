@@ -57,12 +57,15 @@ namespace Gecode { namespace String {
     NSIntSet alphabet() const;
     int min_word_length() const;
     int search(int, int) const;
-    delta_t reverse_transitions(const DSIntSet&) const;
+    template<class CharacterSet>
+    delta_t reverse_transitions(const CharacterSet&) const;
     NSIntSet neighbours(int) const;
-    template<class Visitor>
-    void visit_neighbours(int, const DSIntSet&, Visitor) const;
-    void include_neighbours(NSIntSet&, int, const DSIntSet&) const;
-    bool include_all_neighbours(NSIntSet&, int, const DSIntSet&) const;
+    template<class CharacterSet, class Visitor>
+    void visit_neighbours(int, const CharacterSet&, Visitor) const;
+    template<class CharacterSet>
+    void include_neighbours(NSIntSet&, int, const CharacterSet&) const;
+    template<class CharacterSet>
+    bool include_all_neighbours(NSIntSet&, int, const CharacterSet&) const;
     NSIntSet neighbot(int, const DSIntSet&) const;
     /// Return reachable states, or no states if any represented word is rejected
     NSIntSet reach_all(const DSBlock&, const NSIntSet&) const;
@@ -80,11 +83,13 @@ namespace Gecode { namespace String {
     void negate();
     NSIntSet alphabet() const;
     int search(int, int) const;
-    Delta_t reverse_transitions(const DSIntSet&) const;
+    template<class CharacterSet>
+    Delta_t reverse_transitions(const CharacterSet&) const;
     NSIntSet neighbours(int) const;
-    template<class Visitor>
-    void visit_neighbours(int, const DSIntSet&, Visitor) const;
-    void include_neighbours(NSIntSet&, int, const DSIntSet&) const;
+    template<class CharacterSet, class Visitor>
+    void visit_neighbours(int, const CharacterSet&, Visitor) const;
+    template<class CharacterSet>
+    void include_neighbours(NSIntSet&, int, const CharacterSet&) const;
   };
 
   struct matchNFA : public compDFA {
@@ -171,16 +176,20 @@ namespace Gecode { namespace String {
     static ExecStatus post(Home home, StringView x, const DFA& dfa);
     static ExecStatus post(Home home, StringView x, trimDFA* pdfa);
     static NSBlocks dom(trimDFA*);
+    template <typename Block>
     static std::vector<NSIntSet> reach_fwd(trimDFA*, const NSIntSet&,
-      const DSBlock&, bool rev = false
+      const Block&, bool rev = false
     );
+    template <typename Block>
     static NSBlocks reach_bwd(trimDFA*, const std::vector<NSIntSet>&,
-      NSIntSet&, const DSBlock&, bool&, bool rev = false
+      NSIntSet&, const Block&, bool&, bool rev = false
     );
+    template <typename Block>
     static std::vector<NSIntSet> reach_fwd(compDFA*, const NSIntSet&,
-                                                     const DSBlock&);
+                                                     const Block&);
+    template <typename Block>
     static NSBlocks reach_bwd(compDFA*, const std::vector<NSIntSet>&, NSIntSet&,
-                                                      const DSBlock&, bool&);
+                                                      const Block&, bool&);
     template <typename DFA_t>
     static ExecStatus propagate_blocks(Space&, NSBlocks&, DFA_t*);
   };

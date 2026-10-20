@@ -104,7 +104,8 @@ namespace Gecode { namespace String {
     /// Test whether variable is assigned
     bool assigned(void) const;
 
-    ModEvent commit(Space&, Branch::Level, Branch::Value, Branch::Block, unsigned);
+    ModEvent commit(
+      Space&, Branch::Level, Branch::Value, Branch::Block, int, unsigned);
 
     ModEvent dom(Space& home, const NSBlocks& d);
 

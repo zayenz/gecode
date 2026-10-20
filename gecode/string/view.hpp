@@ -70,7 +70,8 @@ namespace Gecode { namespace String {
 
     ModEvent inc(Space& home, bool lt);
 
-    ModEvent commit(Space&, Branch::Level, Branch::Value, Branch::Block, unsigned);
+    ModEvent commit(
+      Space&, Branch::Level, Branch::Value, Branch::Block, int, unsigned);
 
     ModEvent lb(Space& home, int l);
 

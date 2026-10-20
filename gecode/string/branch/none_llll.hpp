@@ -25,9 +25,8 @@ namespace Gecode { namespace String { namespace Branch {
 
     ExecStatus
     None_LLLL::commit(Space& home, const Choice& c, unsigned a) {
-      const PosLevVal& p = static_cast<const PosLevVal&>(c);
       // this->print(home, c, a, std::cerr); std::cerr << '\n';
-      return commit_choice(home, p, Block::FIRST, a);
+      return commit_choice(home, c, Block::FIRST, a);
     }
 
 }}}

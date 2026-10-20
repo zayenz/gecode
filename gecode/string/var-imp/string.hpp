@@ -154,10 +154,11 @@ namespace Gecode { namespace String {
 
   forceinline ModEvent
   StringVarImp::commit(
-    Space& home, Branch::Level l, Branch::Value v, Branch::Block b, unsigned a
+    Space& home, Branch::Level l, Branch::Value v, Branch::Block b, int split,
+    unsigned a
   ) {
     int old_min_length = min_length(), old_max_length = max_length();
-    ds.commit(home, l, v, b, a);
+    ds.commit(home, l, v, b, split, a);
     Delta d = StringDelta(ds._changed);
     return notify(home, old_min_length, old_max_length, d);
   }

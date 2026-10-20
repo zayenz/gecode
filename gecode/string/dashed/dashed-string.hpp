@@ -236,7 +236,7 @@ namespace Gecode { namespace String {
              fst(NULL);
              lst(NULL);
            }
-           delete p;
+           p->dispose(h, p);
          }
          else
            p->min(p->min() + 1);
@@ -998,7 +998,7 @@ namespace Gecode { namespace String {
 
   forceinline void
   DashedString::_commit0(
-    Space& h, Branch::Level lev, Branch::Value val, int idx
+    Space& h, Branch::Level lev, Branch::Value val, int idx, int split
   ) {
     DSBlock& block = at(idx);
     switch (lev) {
@@ -1036,37 +1036,13 @@ namespace Gecode { namespace String {
       }
       case Branch::BASE: {
         // std::cerr << "Branch::BASE\n";
-        int l = block.l;
-        const DSIntSet& S = block.S;
-        DSIntSet s;
-        switch (val) {
-          case Branch::MIN:
-            s.init(h, S.min());
-            break;
-          case Branch::MAX:
-            s.init(h, S.max());
-            break;
-          case Branch::MUSTMIN:
-            if (_MUST_CHARS.disjoint(S))
-              s.init(h, S.min());
-            else {
-              NSIntSet t(_MUST_CHARS);
-              t.intersect(S);
-              s.init(h, t.min());
-            }
-            break;
-          case Branch::MUSTMAX:
-            if (_MUST_CHARS.disjoint(S))
-              s.init(h, S.max());
-            else {
-              NSIntSet t(_MUST_CHARS);
-              t.intersect(S);
-              s.init(h, t.max());
-            }
-            break;
-          default:
-            GECODE_NEVER;
+        if (!block.S.in(split)) {
+          h.fail();
+          return;
         }
+        int l = block.l;
+        DSIntSet s;
+        s.init(h, split);
         bool norm = (idx > 0 && at(idx - 1).S == s) ||
           (l == 1 && idx < length() - 1 && at(idx + 1).S == s);
         if (l == 1 && !norm) {
@@ -1087,7 +1063,7 @@ namespace Gecode { namespace String {
 
   forceinline void
   DashedString::_commit1(
-    Space& h, Branch::Level lev, Branch::Value val, int idx
+    Space& h, Branch::Level lev, Branch::Value val, int idx, int split
   ) {
     DSBlock& block = at(idx);
     switch (lev) {
@@ -1125,49 +1101,14 @@ namespace Gecode { namespace String {
       }
       case Branch::BASE: {
         // std::cerr << "Branch::BASE\n";
+        if (!block.S.in(split))
+          return;
         DSIntSet S1(h, block.S);
         if (S1.size() == 1)
           h.fail();
         int l = block.l;
         Gecode::Set::SetDelta d;
-        switch (val) {
-          case Branch::MIN: {
-            int m = S1.min();
-            S1.exclude(h, m, m, d);
-            break;
-          }
-          case Branch::MAX: {
-            int m = S1.max();
-            S1.exclude(h, m, m, d);
-            break;
-          }
-          case Branch::MUSTMIN: {
-            int m;
-            if (_MUST_CHARS.disjoint(S1))
-              m = S1.min();
-            else {
-              NSIntSet t(_MUST_CHARS);
-              t.intersect(S1);
-              m = t.min();
-            }
-            S1.exclude(h, m, m, d);
-            break;
-          }
-          case Branch::MUSTMAX: {
-            int m;
-            if (_MUST_CHARS.disjoint(S1))
-              m = S1.max();
-            else {
-              NSIntSet t(_MUST_CHARS);
-              t.intersect(S1);
-              m = t.max();
-            }
-            S1.exclude(h, m, m, d);
-            break;
-          }
-          default:
-            GECODE_NEVER;
-        }
+        S1.exclude(h, split, split, d);
         bool norm = (idx > 0 && S1 == at(idx-1).S) ||
           (l == 1 && idx < length() - 1 && S1 == at(idx+1).S);
         if (l == 1 && !norm) {
@@ -1188,11 +1129,12 @@ namespace Gecode { namespace String {
 
   forceinline void
   DashedString::commit(
-    Space& h, Branch::Level l, Branch::Value v, Branch::Block b, unsigned a
+    Space& h, Branch::Level l, Branch::Value v, Branch::Block b, int split,
+    unsigned a
   ) {
     // std::cerr<<"\nDashedString::commit "<< *this <<" ["<<_min_length<< ", "
     // << _max_length << "] -- " << l <<' '<< v << ' ' << b << ' '<< a <<'\n';
-    int i;
+    int i = -1;
     switch (b) {
       case Branch::FIRST:
         i = first_na_block();
@@ -1203,7 +1145,12 @@ namespace Gecode { namespace String {
       default:
         GECODE_NEVER;
     }
-    a == 0 ? _commit0(h, l, v, i) : _commit1(h, l, v, i);
+    if (i < 0) {
+      h.fail();
+      return;
+    }
+    a == 0 ? _commit0(h, l, v, i, split) :
+      _commit1(h, l, v, i, split);
     _changed = true;
     // std::cerr<<"Set: "<<*this<<" ["<<_min_length<<", "<< _max_length <<"]\n";
     if (!is_normalized())
@@ -1911,6 +1858,39 @@ namespace Gecode { namespace String {
     for (int i = 0; i < _blocks.length(); ++i)
       set.include(at(i).S);
     return set;
+  }
+
+  forceinline NSIntSet
+  DashedString::chars_at(int position) const {
+    assert(_min_length == _max_length);
+    assert(position >= 0 && position < _min_length);
+    const long total = _min_length;
+    long suffix_min = 0;
+    long suffix_max = 0;
+    for (int i = 0; i < _blocks.length(); ++i) {
+      suffix_min += at(i).l;
+      suffix_max += at(i).u;
+    }
+    long prefix_min = 0;
+    long prefix_max = 0;
+    NSIntSet supported;
+    for (int i = 0; i < _blocks.length(); ++i) {
+      const DSBlock& block = at(i);
+      suffix_min -= block.l;
+      suffix_max -= block.u;
+      const long lower = std::max(
+        std::max(prefix_min, long(position + 1) - block.u),
+        total - suffix_max - block.u);
+      const long upper = std::min(
+        std::min(prefix_max, long(position)),
+        total - suffix_min - block.l);
+      if (block.u > 0 && position + 1 <= total - suffix_min &&
+          lower <= upper)
+        supported.include(block.S);
+      prefix_min += block.l;
+      prefix_max += block.u;
+    }
+    return supported;
   }
 
   forceinline double

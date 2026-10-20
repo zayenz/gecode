@@ -11,6 +11,9 @@ namespace Gecode { namespace String {
   UnknownRelation::UnknownRelation(const char* l):
     Exception(l, "Unknown relation.") {}
 
+  UnknownBranching::UnknownBranching(const char* l):
+    Exception(l, "Unknown branching type") {}
+
 }}
 
 // STATISTICS: string-core

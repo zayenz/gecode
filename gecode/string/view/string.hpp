@@ -88,9 +88,10 @@ namespace Gecode { namespace String {
 
   forceinline ModEvent
   StringView::commit(
-    Space& home, Branch::Level l, Branch::Value v, Branch::Block b, unsigned a
+    Space& home, Branch::Level l, Branch::Value v, Branch::Block b, int split,
+    unsigned a
   ) {
-    return x->commit(home, l, v, b, a);
+    return x->commit(home, l, v, b, split, a);
   }
 
   forceinline ModEvent

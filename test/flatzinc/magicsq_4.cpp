@@ -33,9 +33,55 @@
 
 #include "test/flatzinc.hh"
 
+#include <sstream>
+
 namespace Test { namespace FlatZinc {
 
   namespace {
+    /// Check that the output contains a valid normal 4x4 magic square
+    bool check(const std::string& output) {
+      const std::string prefix = "a = array2d(1..4, 1..4, [";
+      const std::string suffix = "]);\n----------\n";
+      if ((output.size() < prefix.size() + suffix.size()) ||
+          (output.compare(0, prefix.size(), prefix) != 0) ||
+          (output.compare(output.size() - suffix.size(), suffix.size(),
+                          suffix) != 0))
+        return false;
+
+      std::istringstream input(output.substr(
+        prefix.size(), output.size() - prefix.size() - suffix.size()));
+      int square[16];
+      bool seen[17] = {};
+      for (int i = 0; i < 16; ++i) {
+        if (!(input >> square[i]) ||
+            (square[i] < 1) || (square[i] > 16) || seen[square[i]])
+          return false;
+        seen[square[i]] = true;
+        if (i < 15) {
+          char separator;
+          if (!(input >> separator) || (separator != ','))
+            return false;
+        }
+      }
+      input >> std::ws;
+      if (!input.eof())
+        return false;
+
+      for (int i = 0; i < 4; ++i) {
+        int row = 0;
+        int column = 0;
+        for (int j = 0; j < 4; ++j) {
+          row += square[4*i+j];
+          column += square[4*j+i];
+        }
+        if ((row != 34) || (column != 34))
+          return false;
+      }
+      return
+        (square[0] + square[5] + square[10] + square[15] == 34) &&
+        (square[3] + square[6] + square[9] + square[12] == 34);
+    }
+
     /// Helper class to create and register tests
     class Create {
     public:
@@ -105,9 +151,7 @@ constraint int_lin_eq([1, 1, 1, 1], [a[5], a[6], a[7], a[8]], 34);\n\
 constraint int_lin_eq([1, 1, 1, 1], [a[9], a[10], a[11], a[12]], 34);\n\
 constraint int_lin_eq([1, 1, 1, 1], [a[13], a[14], a[15], a[16]], 34);\n\
 solve satisfy;\n\
-", "a = array2d(1..4, 1..4, [4, 5, 10, 15, 9, 16, 3, 6, 7, 2, 13, 12, 14, 11, 8, 1]);\n\
-----------\n\
-");
+", "", false, {}, check);
       }
     };
 

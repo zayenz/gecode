@@ -53,15 +53,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y flex bison libgmp-dev libmpfr-dev
 
-    - name: Install generated-source tools
-      if: runner.os == 'macOS'
-      shell: bash
-      run: |
-        # The freshness helper bootstraps the pinned Autoconf version itself.
-        brew install m4 bison flex
-
     - name: Check generated source freshness
-      if: runner.os == 'macOS'
+      if: runner.os == 'Linux'
       shell: bash
       run: bash .github/ci/generated-source-freshness.sh
 

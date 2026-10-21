@@ -8,6 +8,7 @@ rm -rf "$build_root"
 
 cmake -S "$source_dir" -B "$build_root/int" -G Ninja \
   -DGECODE_ENABLE_EXAMPLES=ON \
+  -DGECODE_ENABLE_STRING_VARS=OFF \
   -DGECODE_ENABLE_SET_VARS=OFF \
   -DGECODE_ENABLE_FLOAT_VARS=OFF \
   -DGECODE_ENABLE_FLATZINC=OFF \

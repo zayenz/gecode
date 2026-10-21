@@ -57,6 +57,25 @@ namespace Gecode { namespace String {
   DSBlock::DSBlock(void)
     : l(0), u(0), S() {}
 
+  // Space/Heap reallocation moves only the wrapper; the ranges remain
+  // allocator-owned.
+  DSBlock::DSBlock(const DSBlock& b)
+    : l(b.l), u(b.u), S() {
+    static_cast<Set::BndSet&>(S) =
+      static_cast<const Set::BndSet&>(b.S);
+  }
+
+  DSBlock&
+  DSBlock::operator=(const DSBlock& b) {
+    if (this != &b) {
+      l = b.l;
+      u = b.u;
+      static_cast<Set::BndSet&>(S) =
+        static_cast<const Set::BndSet&>(b.S);
+    }
+    return *this;
+  }
+
   DSBlock::DSBlock(Space& h, const DSBlock& b)
     : l(0), u(0), S() {
     init(h, b);

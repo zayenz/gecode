@@ -46,7 +46,7 @@ Version metadata shared by autoconf and CMake lives in `gecode-version.m4`.
 | `--enable-examples` | `GECODE_ENABLE_EXAMPLES` | Supported directly | Default `ON` for top-level builds, `OFF` for subprojects |
 | `--enable-search` | `GECODE_ENABLE_SEARCH` | Supported directly | Default `ON` |
 | `--enable-int-vars` | `GECODE_ENABLE_INT_VARS` | Supported directly | Default `ON` |
-| `--enable-string-vars` | `GECODE_ENABLE_STRING_VARS` | Supported directly | Default `ON`; requires integer variables |
+| `--enable-string-vars` | `GECODE_ENABLE_STRING_VARS` | Supported directly | Default `ON`; requires integer, set, and minimodel modules |
 | `--enable-set-vars` | `GECODE_ENABLE_SET_VARS` | Supported directly | Default `ON` |
 | `--enable-float-vars` | `GECODE_ENABLE_FLOAT_VARS` | Supported directly | Default `ON` |
 | `--enable-minimodel` | `GECODE_ENABLE_MINIMODEL` | Supported directly | Default `ON` |

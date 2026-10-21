@@ -1319,10 +1319,11 @@ namespace Gecode { namespace String {
       if (null())
       return 0;
       if (S.size() == 1)
-        return log(u - l + 1);
+        return std::log(u - l + 1);
       else {
         long double s = S.size();
-        return u * log(s) + log(1.0 - std::pow(s, l - u - 1)) - log(1 - 1 / s);
+        return u * std::log(s) + std::log(1.0 - std::pow(s, l - u - 1))
+          - std::log(1 - 1 / s);
       }
     }
 

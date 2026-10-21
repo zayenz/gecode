@@ -30,6 +30,7 @@ MODULES = {
     "int",
     "set",
     "float",
+    "string",
     "cpltset",
     "minimodel",
     "graph",

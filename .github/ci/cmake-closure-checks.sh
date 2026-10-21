@@ -9,6 +9,18 @@ cmake -S "$GITHUB_WORKSPACE" -B "$RUNNER_TEMP/gecode-closure-minimodel" \
   -DGECODE_ENABLE_INT_VARS=OFF
 grep -q 'GECODE_ENABLE_INT_VARS:BOOL=ON' "$RUNNER_TEMP/gecode-closure-minimodel/CMakeCache.txt"
 
+cmake -S "$GITHUB_WORKSPACE" -B "$RUNNER_TEMP/gecode-closure-string" \
+  -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+  -DGECODE_ENABLE_QT=OFF \
+  -DGECODE_ENABLE_GIST=OFF \
+  -DGECODE_ENABLE_STRING_VARS=ON \
+  -DGECODE_ENABLE_INT_VARS=OFF \
+  -DGECODE_ENABLE_SET_VARS=OFF \
+  -DGECODE_ENABLE_MINIMODEL=OFF
+grep -q 'GECODE_ENABLE_INT_VARS:BOOL=ON' "$RUNNER_TEMP/gecode-closure-string/CMakeCache.txt"
+grep -q 'GECODE_ENABLE_SET_VARS:BOOL=ON' "$RUNNER_TEMP/gecode-closure-string/CMakeCache.txt"
+grep -q 'GECODE_ENABLE_MINIMODEL:BOOL=ON' "$RUNNER_TEMP/gecode-closure-string/CMakeCache.txt"
+
 cmake -S "$GITHUB_WORKSPACE" -B "$RUNNER_TEMP/gecode-closure-examples" \
   -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DGECODE_ENABLE_QT=OFF \

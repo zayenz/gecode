@@ -194,6 +194,7 @@ git -C "$repo_root" ls-files -z |
 vis_files=(
   ./gecode/int/var-imp/int.vis
   ./gecode/int/var-imp/bool.vis
+  ./gecode/string/var-imp/string.vis
   ./gecode/set/var-imp/set.vis
   ./gecode/float/var-imp/float.vis
 )
@@ -238,6 +239,7 @@ normalize_generated_whitespace() {
     normalize_generated_whitespace "$output"
   done
   flex -ogecode/flatzinc/lexer.yy.cpp ./gecode/flatzinc/lexer.lxx
+  normalize_generated_whitespace gecode/flatzinc/lexer.yy.cpp
 )
 
 generated_files=(

@@ -184,6 +184,9 @@ namespace Gecode { namespace String {
 
   private:
 
+    friend class Gecode::Space;
+    friend class Gecode::Heap;
+
     DSBlock& operator=(const DSBlock& that);
     DSBlock(const DSBlock& that);
 

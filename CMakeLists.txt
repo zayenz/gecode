@@ -255,6 +255,8 @@ if(GECODE_ENABLE_FLOAT_VARS)
 endif()
 if(GECODE_ENABLE_STRING_VARS)
   gecode_force_option_on(GECODE_ENABLE_INT_VARS "String variables require int variables")
+  gecode_force_option_on(GECODE_ENABLE_SET_VARS "String variables require set variables")
+  gecode_force_option_on(GECODE_ENABLE_MINIMODEL "String variables require minimodel")
 endif()
 if(GECODE_ENABLE_MINIMODEL)
   gecode_force_option_on(GECODE_ENABLE_SEARCH "Minimodel requires search")
@@ -838,6 +840,10 @@ if(GECODE_ENABLE_INT_VARS)
     gecode/int/var-imp/int.vis
     gecode/int/var-imp/bool.vis)
 endif()
+if(GECODE_ENABLE_STRING_VARS)
+  list(APPEND GECODE_VIS_FILES
+    gecode/string/var-imp/string.vis)
+endif()
 if(GECODE_ENABLE_SET_VARS)
   list(APPEND GECODE_VIS_FILES
     gecode/set/var-imp/set.vis)
@@ -845,10 +851,6 @@ endif()
 if(GECODE_ENABLE_FLOAT_VARS)
   list(APPEND GECODE_VIS_FILES
     gecode/float/var-imp/float.vis)
-endif()
-if(GECODE_ENABLE_STRING_VARS)
-  list(APPEND GECODE_VIS_FILES
-    gecode/string/var-imp/string.vis)
 endif()
 if(GECODE_WITH_VIS)
   string(REPLACE "," ";" _extra_vis "${GECODE_WITH_VIS}")
@@ -1697,6 +1699,7 @@ if(GECODE_INSTALL)
     FILES_MATCHING
       PATTERN "**.hh"
       PATTERN "**.hpp"
+      PATTERN "**.h"
       PATTERN "LICENSE_1_0.txt"
       PATTERN "mznlib" EXCLUDE
       PATTERN "flatzinc/blackbox.hh" EXCLUDE

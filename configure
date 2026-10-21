@@ -1533,7 +1533,8 @@ Optional Features:
   --enable-set-vars       build finite set library (implies --enable-int-vars)
                           [default=yes]
   --enable-string-vars    build finite string library (implies
-                          --enable-int-vars) [default=yes]
+                          --enable-int-vars and --enable-minimodel)
+                          [default=yes]
   --enable-int-vars       build finite domain library [default=yes]
   --enable-mpfr           build with MPFR support [default=yes]
   --enable-qt             build with Qt support, requires Qt 5.15 or newer
@@ -13249,6 +13250,7 @@ printf %s "checking whether to build the string variables library... " >&6; }
 printf "%s\n" "yes" >&6; }
      enable_string_vars="yes";
      enable_int_vars="yes";
+	 enable_minimodel="yes";
 	 LINKSTRING=${LINKLIBDIR}${LINKPREFIX}${STRING}${DLL_ARCH}${LINKSUFFIX}
 
 
@@ -13267,6 +13269,13 @@ printf "%s\n" "no" >&6; }
    enable_string_vars=${enable_string_vars}
 
 
+if test "${enable_string_vars}" = "yes" &&
+       test "${enable_set_vars}" != "yes"
+then :
+
+  as_fn_error $? "The string variables library requires the set variables library" "$LINENO" 5
+
+fi
 
 
    # Check whether --enable-int-vars was given.

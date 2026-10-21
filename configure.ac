@@ -261,16 +261,21 @@ AC_GECODE_VTI(set,
 	)
 
 AC_GECODE_VTI(string,
-	[finite string library (implies --enable-int-vars)],
+	[finite string library (implies --enable-int-vars and --enable-minimodel)],
 	yes,
 	[\$(top_srcdir)/gecode/string/var-imp/string.vis],
 	[enable_int_vars="yes";
+	 enable_minimodel="yes";
 	 AC_SUBST(LINKSTRING,[${LINKLIBDIR}${LINKPREFIX}${STRING}${DLL_ARCH}${LINKSUFFIX}])
 	],
 	[
 	 AC_SUBST(LINKSTRING,[])
 	]
 	)
+AS_IF([test "${enable_string_vars}" = "yes" &&
+       test "${enable_set_vars}" != "yes"], [
+  AC_MSG_ERROR([The string variables library requires the set variables library])
+])
 
 AC_GECODE_VTI(int, finite domain library, yes,
 	[\$(top_srcdir)/gecode/int/var-imp/int.vis \$(top_srcdir)/gecode/int/var-imp/bool.vis],

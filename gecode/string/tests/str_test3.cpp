@@ -564,22 +564,26 @@ public:
 };
 
 int main() {
-  (new StrTest())->test01();
-  (new StrTest())->test02();
-  (new StrTest())->test03();
-  (new StrTest())->test04();
-  (new StrTest())->test05();
-  (new StrTest())->test06();
-  (new StrTest())->test07();
-  (new StrTest())->test08();
-  (new StrTest())->test09();
-  (new StrTest())->test10();
-  (new StrTest())->test11();
-  (new StrTest())->test12();
-  (new StrTest())->test13();
-  (new StrTest())->test14();
-  (new StrTest())->test15();
-  (new StrTest())->test16();
-  (new StrTest())->test17();
+  const auto run = [](void (StrTest::*test)()) {
+    StrTest space;
+    (space.*test)();
+  };
+  run(&StrTest::test01);
+  run(&StrTest::test02);
+  run(&StrTest::test03);
+  run(&StrTest::test04);
+  run(&StrTest::test05);
+  run(&StrTest::test06);
+  run(&StrTest::test07);
+  run(&StrTest::test08);
+  run(&StrTest::test09);
+  run(&StrTest::test10);
+  run(&StrTest::test11);
+  run(&StrTest::test12);
+  run(&StrTest::test13);
+  run(&StrTest::test14);
+  run(&StrTest::test15);
+  run(&StrTest::test16);
+  run(&StrTest::test17);
   return 0;
 }

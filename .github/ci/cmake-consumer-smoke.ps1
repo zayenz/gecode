@@ -21,6 +21,7 @@ New-Item -ItemType Directory -Force -Path `
   (Join-Path $work "a"), `
   (Join-Path $work "b"), `
   (Join-Path $work "c"), `
+  (Join-Path $work "d"), `
   (Join-Path $work "manual") | Out-Null
 
 @'
@@ -68,6 +69,22 @@ int main(void) {
 
 @'
 cmake_minimum_required(VERSION 3.21)
+project(consumer_d LANGUAGES CXX)
+find_package(Gecode CONFIG REQUIRED COMPONENTS string)
+add_executable(consumer_d main.cpp)
+target_link_libraries(consumer_d PRIVATE Gecode::gecodestring)
+'@ | Set-Content -Encoding utf8 (Join-Path $work "d\CMakeLists.txt")
+@'
+#include <gecode/string.hh>
+int main(void) {
+  const Gecode::String::StringVal value =
+    Gecode::String::StringVal::decode_utf8("Dashed");
+  return value.to_utf8() == "Dashed" ? 0 : 1;
+}
+'@ | Set-Content -Encoding utf8 (Join-Path $work "d\main.cpp")
+
+@'
+cmake_minimum_required(VERSION 3.21)
 project(manual_consumer LANGUAGES CXX)
 set(GECODE_PREFIX "" CACHE PATH "Installed Gecode prefix")
 find_path(GECODE_INCLUDE_DIR
@@ -109,6 +126,11 @@ cmake -S (Join-Path $work "c") -B (Join-Path $work "c\build") -G "Visual Studio 
 Assert-NativeCommandSucceeded $LASTEXITCODE "consumer_c configure"
 cmake --build (Join-Path $work "c\build") --config $env:BUILD_TYPE
 Assert-NativeCommandSucceeded $LASTEXITCODE "consumer_c build"
+
+cmake -S (Join-Path $work "d") -B (Join-Path $work "d\build") -G "Visual Studio 17 2022" -A x64 "-DCMAKE_PREFIX_PATH=$prefix"
+Assert-NativeCommandSucceeded $LASTEXITCODE "consumer_d configure"
+cmake --build (Join-Path $work "d\build") --config $env:BUILD_TYPE
+Assert-NativeCommandSucceeded $LASTEXITCODE "consumer_d build"
 
 # Exercise the installed headers and library without loading the CMake package
 # or inheriting compile definitions from an exported target.

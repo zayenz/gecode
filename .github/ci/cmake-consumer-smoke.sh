@@ -21,6 +21,7 @@ work="$RUNNER_TEMP/gecode-consumers"
 rm -rf "$work"
 mkdir -p "$work/a" "$work/b" "$work/c" "$work/d/cmake" "$work/e/cmake" "$work/e/stale" \
   "$work/f" "$work/g" "$work/h" "$work/i" "$work/j" "$work/k" \
+  "$work/l" \
   "$work/mpfr-prefix/lib/cmake/MPFR"
 
 cat > "$work/a/CMakeLists.txt" <<'EOF'
@@ -244,6 +245,25 @@ cat > "$work/k/main.cpp" <<'EOF'
 int main(void) { Gecode::Float::Rounding rounding; return rounding.sqrt_down(4.0) == 2.0 ? 0 : 1; }
 EOF
 
+cat > "$work/l/CMakeLists.txt" <<'EOF'
+cmake_minimum_required(VERSION 3.21)
+project(consumer_l LANGUAGES CXX)
+find_package(Gecode CONFIG REQUIRED COMPONENTS string)
+if(NOT Gecode_LIBRARIES STREQUAL "Gecode::gecodestring")
+  message(FATAL_ERROR "Expected string-only Gecode_LIBRARIES, got: ${Gecode_LIBRARIES}")
+endif()
+add_executable(consumer_l main.cpp)
+target_link_libraries(consumer_l PRIVATE ${Gecode_LIBRARIES})
+EOF
+cat > "$work/l/main.cpp" <<'EOF'
+#include <gecode/string.hh>
+int main(void) {
+  const Gecode::String::StringVal value =
+    Gecode::String::StringVal::decode_utf8("Dashed");
+  return value.to_utf8() == "Dashed" ? 0 : 1;
+}
+EOF
+
 cat > "$work/mpfr-prefix/lib/cmake/MPFR/MPFRConfig.cmake" <<'EOF'
 get_filename_component(PACKAGE_PREFIX_DIR "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 if(NOT TARGET MPFR::MPFR)
@@ -270,6 +290,9 @@ cmake --build "$work/b/build" -j4
 
 cmake -S "$work/c" -B "$work/c/build" -DCMAKE_PREFIX_PATH="$prefix"
 cmake --build "$work/c/build" -j4
+
+cmake -S "$work/l" -B "$work/l/build" -DCMAKE_PREFIX_PATH="$prefix"
+cmake --build "$work/l/build" -j4
 
 # A support-only consumer must not discover dependencies belonging exclusively
 # to Float, FlatZinc, or Gist, even when those targets exist in the package.

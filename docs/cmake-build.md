@@ -1,7 +1,8 @@
 # CMake Build and Package Guide
 
 This document describes the CMake build, install, and package-consumption flow
-for Gecode.
+for the Dashed-enabled Gecode tree. Gecode package and target names remain
+unchanged for compatibility.
 
 ## Requirements
 
@@ -168,8 +169,8 @@ target_link_libraries(app PRIVATE Gecode::gecode)
 
 Canonical component names:
 
-- `support`, `kernel`, `search`, `int`, `set`, `float`, `minimodel`, `driver`,
-  `flatzinc`, `gist`
+- `support`, `kernel`, `search`, `int`, `set`, `float`, `string`, `minimodel`,
+  `driver`, `flatzinc`, `gist`
 
 Example:
 
@@ -182,8 +183,8 @@ target_link_libraries(app PRIVATE Gecode::gecodedriver)
 Legacy component spellings are also accepted in `COMPONENTS`:
 
 - `gecodesupport`, `gecodekernel`, `gecodesearch`, `gecodeint`, `gecodeset`,
-  `gecodefloat`, `gecodeminimodel`, `gecodedriver`, `gecodeflatzinc`,
-  `gecodegist`
+  `gecodefloat`, `gecodestring`, `gecodeminimodel`, `gecodedriver`,
+  `gecodeflatzinc`, `gecodegist`
 
 ### Package location hints
 

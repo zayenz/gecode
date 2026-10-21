@@ -1,28 +1,26 @@
-# Gecode - Generic Constraint Development Environment
+# Dashed - String Variables for Gecode
 
 ![Gecode](images/gecode-logo-100.png "Gecode")
 
-Gecode is an open source C++ toolkit for developing
-constraint-based systems and applications. Gecode provides a
-constraint solver with state-of-the-art performance while being
-modular and extensible.
+Dashed is a finite string-variable solver integrated into Gecode 6.4. It was
+previously known as G-Strings. This repository contains the maintained Dashed
+implementation together with the Gecode source tree on which it is built.
 
-## Dashed String Variables
-
-Dashed is Gecode's finite string-variable module, previously known as
-G-Strings.
+Gecode is an open source C++ toolkit for developing constraint-based systems
+and applications. Its existing package, library, namespace, and header names
+are preserved for source and binary compatibility.
 
 [![CI](https://github.com/ramadini/gecode/actions/workflows/build.yml/badge.svg)](https://github.com/ramadini/gecode/actions/workflows/build.yml)
 
 ## Getting All the Info You Need...
 
-You can find lots of information on
-[Gecode's webpages](https://gecode.github.io),
-including how to download, compile, install, and use it.
+The [Gecode webpages](https://gecode.github.io) document the underlying
+constraint-programming toolkit.
 
 In particular,
 Gecode comes with
 [extensive tutorial and reference documentation](https://gecode.github.io/documentation.html).
+The build and package instructions below describe this Dashed-enabled tree.
 
 ## CMake Build Options
 
@@ -129,18 +127,23 @@ target_link_libraries(my_target PRIVATE Gecode::gecode)
 
 Use `Gecode_VERSION` from package config for version checks.
 
-## Download Gecode
+## Get Dashed
 
-Gecode 6.4.0 is distributed as source code. Source archives can be downloaded from
-[GitHub](https://github.com/Gecode/gecode/releases)
-or
-[Gecode's webpages](https://gecode.github.io/download.html).
+Clone this repository and use the `master` branch:
 
-## Contributing to Gecode
+```bash
+git clone https://github.com/ramadini/gecode.git
+cd gecode
+```
 
-We happily accept smaller contributions and fixes, please provide them as pull requests against the main branch. For larger contributions, please get in touch.
+Official Gecode source releases do not include Dashed.
 
-## Gecode License
+## Contributing to Dashed
 
-Gecode is licensed under the
-[MIT license](https://github.com/Gecode/gecode/blob/main/LICENSE).
+Submit fixes and improvements as pull requests against this repository's
+`master` branch.
+
+## License
+
+Dashed and the Gecode source tree are distributed under the
+[MIT license](LICENSE).

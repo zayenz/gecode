@@ -9,6 +9,7 @@ set(_gecode_supported_components
   int
   set
   float
+  string
   minimodel
   driver
   flatzinc
@@ -70,6 +71,8 @@ while(_gecode_dependency_queue)
     set(_gecode_component_dependencies int)
   elseif(_gecode_dependency_component STREQUAL float)
     set(_gecode_component_dependencies int kernel)
+  elseif(_gecode_dependency_component STREQUAL string)
+    set(_gecode_component_dependencies int set minimodel)
   elseif(_gecode_dependency_component STREQUAL minimodel)
     set(_gecode_component_dependencies int set search float)
   elseif(_gecode_dependency_component STREQUAL gist)

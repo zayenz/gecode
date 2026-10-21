@@ -25,6 +25,7 @@ New-Item -ItemType Directory -Force -Path `
   (Join-Path $work "b"), `
   (Join-Path $work "c"), `
   (Join-Path $work "d"), `
+  (Join-Path $work "e"), `
   $manifest | Out-Null
 
 $baseline = (Get-Content "$env:GITHUB_WORKSPACE\vcpkg.json" | ConvertFrom-Json).'builtin-baseline'
@@ -114,6 +115,22 @@ int main(void) {
 }
 '@ | Set-Content -Encoding utf8 (Join-Path $work "d\main.cpp")
 
+@'
+cmake_minimum_required(VERSION 3.21)
+project(consumer_e LANGUAGES CXX)
+find_package(Gecode CONFIG REQUIRED COMPONENTS string)
+add_executable(consumer_e main.cpp)
+target_link_libraries(consumer_e PRIVATE Gecode::gecodestring)
+'@ | Set-Content -Encoding utf8 (Join-Path $work "e\CMakeLists.txt")
+@'
+#include <gecode/string.hh>
+int main(void) {
+  const Gecode::String::StringVal value =
+    Gecode::String::StringVal::decode_utf8("Dashed");
+  return value.to_utf8() == "Dashed" ? 0 : 1;
+}
+'@ | Set-Content -Encoding utf8 (Join-Path $work "e\main.cpp")
+
 cmake -S (Join-Path $work "a") -B (Join-Path $work "a\build") -G "Visual Studio 17 2022" -A x64 `
   "-DCMAKE_TOOLCHAIN_FILE=$toolchain" `
   "-DVCPKG_MANIFEST_MODE=ON" `
@@ -157,6 +174,17 @@ cmake -S (Join-Path $work "d") -B (Join-Path $work "d\build") -G "Visual Studio 
 Assert-NativeCommandSucceeded $LASTEXITCODE "consumer_d configure"
 cmake --build (Join-Path $work "d\build") --config $env:BUILD_TYPE
 Assert-NativeCommandSucceeded $LASTEXITCODE "consumer_d build"
+
+cmake -S (Join-Path $work "e") -B (Join-Path $work "e\build") -G "Visual Studio 17 2022" -A x64 `
+  "-DCMAKE_TOOLCHAIN_FILE=$toolchain" `
+  "-DVCPKG_MANIFEST_MODE=ON" `
+  "-DVCPKG_MANIFEST_DIR=$manifest" `
+  "-DVCPKG_INSTALLED_DIR=$consumerVcpkgInstalled" `
+  "-DVCPKG_TARGET_TRIPLET=x64-windows" `
+  "-DCMAKE_PREFIX_PATH=$prefix"
+Assert-NativeCommandSucceeded $LASTEXITCODE "consumer_e configure"
+cmake --build (Join-Path $work "e\build") --config $env:BUILD_TYPE
+Assert-NativeCommandSucceeded $LASTEXITCODE "consumer_e build"
 
 if (-not (Select-String -Path (Join-Path $work "a\configure.log") -Pattern "Gecode_VERSION=" -Quiet)) {
   throw "Gecode_VERSION was not reported during consumer configure."

@@ -4,7 +4,8 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      - master
+      - develop
       - 'release/**'
 
 permissions:
@@ -78,6 +79,11 @@ jobs:
     - name: Check
       shell: bash
       run: make check
+
+    - name: Dashed String test suite
+      if: runner.os == 'Linux'
+      shell: bash
+      run: bash gecode/string/tests/run-tests
 
     - name: Autoconf install smoke
       shell: bash

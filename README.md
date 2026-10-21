@@ -12,7 +12,7 @@ modular and extensible.
 Dashed is Gecode's finite string-variable module, previously known as
 G-Strings.
 
-[![CI](https://github.com/Gecode/gecode/actions/workflows/build.yml/badge.svg)](https://github.com/Gecode/gecode/actions/workflows/build.yml)
+[![CI](https://github.com/ramadini/gecode/actions/workflows/build.yml/badge.svg)](https://github.com/ramadini/gecode/actions/workflows/build.yml)
 
 ## Getting All the Info You Need...
 

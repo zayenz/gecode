@@ -146,6 +146,10 @@ namespace Gecode { namespace String {
   check_find(const DashedString& x, const DashedString& y, Position* pos) {
     const DSBlocks& xblocks = x.blocks();
     const DSBlocks& yblocks = y.blocks();
+    pos[0] = Position({0, 0});
+    pos[1] = last_fwd(yblocks);
+    if (x.null())
+      return true;
     Position firstf({0, 0}), firstb(first_bwd(y));
     matching m;
     int xlen = x.length();

@@ -73,8 +73,10 @@ namespace Gecode { namespace String {
     ModEvent me = v.dom(home, dom);
     GECODE_ME_CHECK(me);
     // std::cerr << "Element::propagated " << x << "[" << y << "] = " << x[0] << "\n";
+#ifndef NDEBUG
     for (auto& v : x)
       assert (v.domain().is_normalized());
+#endif
     return me_modified(me) ? ES_NOFIX : ES_FIX;
   }
 

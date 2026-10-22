@@ -665,7 +665,7 @@ namespace Gecode { namespace String {
 
   template <typename DFA_t>
   forceinline ExecStatus
-  Reg::propagate_blocks(Space& home, NSBlocks& x, DFA_t* dfa) {
+  Reg::propagate_blocks(Space&, NSBlocks& x, DFA_t* dfa) {
     if (x.known()) {
       string bytes;
       const bool accepted = x.try_val_bytes(bytes)

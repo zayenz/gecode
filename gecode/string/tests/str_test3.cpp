@@ -561,6 +561,22 @@ public:
     assert(suffix[0].l == 1 && suffix[0].u == 1);
   }
 
+  void test18() {
+    std::cerr << "\n*** Test 18 ***" << std::endl;
+
+    StringVar empty(*this, "");
+    StringVar target(*this, "abc");
+    Position positions[2];
+    assert(check_find(empty.domain(), target.domain(), positions));
+    assert(positions[0] == Position({0, 0}));
+    assert(positions[1] == last_fwd(target.domain().blocks()));
+
+    StringVar empty_target(*this, "");
+    assert(check_find(empty.domain(), empty_target.domain(), positions));
+    assert(positions[0] == Position({0, 0}));
+    assert(positions[1] == Position({0, 0}));
+  }
+
 };
 
 int main() {
@@ -585,5 +601,6 @@ int main() {
   run(&StrTest::test15);
   run(&StrTest::test16);
   run(&StrTest::test17);
+  run(&StrTest::test18);
   return 0;
 }

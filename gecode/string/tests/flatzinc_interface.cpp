@@ -76,6 +76,11 @@ parse_rejected(const std::string& model) {
 int
 main(void) {
   assert(String::DashedString::_DECOMP_REGEX);
+  assert(parse_rejected(
+    "solve minimize missing[1];\n"));
+  assert(parse_rejected(
+    "var bool: value;\n"
+    "solve minimize value[1];\n"));
   assert(solve(
     "var string: text :: output_var;\n"
     "constraint str_eq(text, \"b\");\n"

@@ -2438,18 +2438,19 @@ solve_expr:
       {
         SymbolEntry e;
         ParserState *pp = static_cast<ParserState*>(parm);
-        if ( (!pp->symbols.get($1, e)) ||
-             (e.t != ST_INTVARARRAY && e.t != ST_FLOATVARARRAY)) {
+        if (!pp->symbols.get($1, e) ||
+            (e.t != ST_INTVARARRAY && e.t != ST_FLOATVARARRAY)) {
           pp->err << "Error: unknown int or float variable array " << $1
                   << " in line no. "
                   << yyget_lineno(pp->yyscanner) << std::endl;
           pp->hadError = true;
-        }
-        if ($3 == 0 || $3 > pp->arrays[e.i]) {
+          $$ = 0;
+        } else if ($3 == 0 || $3 > pp->arrays[e.i]) {
           pp->err << "Error: array index out of bounds for array " << $1
                   << " in line no. "
                   << yyget_lineno(pp->yyscanner) << std::endl;
           pp->hadError = true;
+          $$ = 0;
         } else {
           if (e.t == ST_INTVARARRAY)
             $$ = pp->arrays[e.i+$3];

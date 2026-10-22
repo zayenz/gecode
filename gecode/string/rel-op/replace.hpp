@@ -603,8 +603,6 @@ namespace Gecode { namespace String {
     }
     // x[0] != x[3] => x[1] occur in x[0] /\ x[2] occur in x[3].
     const DashedString& px  = x[0].domain();
-    const DashedString& pq  = x[1].domain();
-    const DashedString& pq1 = x[2].domain();
     const DashedString& py  = x[3].domain();
     if (min_occur == 0 && !px.check_equate(py))
       min_occur = 1;
@@ -649,8 +647,8 @@ namespace Gecode { namespace String {
     if (home.failed())
       return ES_FAILED;
 //     std::cerr<<"After replace: "<< x <<"\n";
-    assert (px.is_normalized() && pq.is_normalized()
-        && pq1.is_normalized() && py.is_normalized());
+    assert (px.is_normalized() && x[1].domain().is_normalized()
+        && x[2].domain().is_normalized() && py.is_normalized());
     switch (
       x[0].assigned() + x[1].assigned() + x[2].assigned() + x[3].assigned()
     ) {

@@ -167,8 +167,10 @@ namespace Gecode { namespace String {
     if (!refine_card(home))
       return ES_FAILED;
     assert (y.domain().is_normalized());
+#ifndef NDEBUG
     for (auto& xi : x)
       assert (xi.domain().is_normalized());
+#endif
 
     return x.assigned() ? assigned(home) : ES_FIX;
   }

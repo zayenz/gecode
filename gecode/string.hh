@@ -320,6 +320,8 @@ namespace Gecode {
      */
     GECODE_STRING_EXPORT
     StringVarArray(Space& home, int n, String::NSBlocks& v);
+    /// Assignment operator
+    StringVarArray& operator =(const StringVarArray&) = default;
     //@}
 
   };

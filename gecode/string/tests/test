@@ -8,6 +8,12 @@ SOURCE=$1
 shift
 BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/dashed-test.XXXXXX")
 trap 'rm -rf "$BUILD_DIR"' EXIT
+GIST_LIBS=()
+if grep -Eq \
+    '^[[:space:]]*#define[[:space:]]+GECODE_HAS_GIST([[:space:]]|$)' \
+    "$ROOT_DIR/gecode/support/config.hpp"; then
+  GIST_LIBS=(-lgecodegist)
+fi
 
 echo 'Compiling'
 time "${CXX:-g++}" -O0 -ggdb -pipe -Wall -Wno-switch -I"$ROOT_DIR" \
@@ -16,7 +22,8 @@ time "${CXX:-g++}" -O0 -ggdb -pipe -Wall -Wno-switch -I"$ROOT_DIR" \
 echo 'Linking'
 time "${CXX:-g++}" -o "$BUILD_DIR/test" "$BUILD_DIR/test.o" -std=c++11 \
   -L"$ROOT_DIR" -Wl,-rpath,"$ROOT_DIR" \
-  -lgecodeflatzinc -lgecodestring -lgecodeint -lgecodeset -lgecodedriver -lgecodesearch \
+  -lgecodeflatzinc -lgecodestring -lgecodeint -lgecodeset -lgecodedriver \
+  "${GIST_LIBS[@]}" -lgecodesearch \
   -lgecodeminimodel -lgecodekernel -lgecodesupport -pthread
 
 echo 'Executing'

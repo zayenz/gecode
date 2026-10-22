@@ -21,6 +21,8 @@ In particular,
 Gecode comes with
 [extensive tutorial and reference documentation](https://gecode.github.io/documentation.html).
 The build and package instructions below describe this Dashed-enabled tree.
+The [Dashed engineering and performance report](docs/dashed-final-report.md)
+summarizes the final refactoring, validation, and benchmark results.
 
 ## CMake Build Options
 

@@ -510,16 +510,12 @@ public:
     for (int i = 0; i < M; ++i)
       vy.push_back(NSBlock(NSIntSet('a' + i, 'a' + M - 1), 0, M));
     DashedString x(*this, vx, 0, N), y(*this, vy, 0, M);
-    std::cerr << "x = " << x << std::endl;
-    std::cerr << "y = " << y << std::endl;
     uvec u;
     bool b = sweep_x<DSBlock, DSBlocks, DSBlock, DSBlocks>(
       *this, x.blocks(), y.blocks(), u
     );
     assert (b);
     std::cerr << "===== After sweep_x =====" << std::endl;
-    std::cerr << "x = " << x << std::endl;
-    std::cerr << "y = " << y << std::endl;
     assert (ns_blocks(x) == vx);
   }
 

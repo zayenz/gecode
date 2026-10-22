@@ -19,7 +19,6 @@ namespace Gecode { namespace String {
   forceinline
   compDFA::compDFA(const trimDFA& d, const NSIntSet& alphabet)
     : stringDFA(d), q_bot(-1), delta(d.n_states) {
-//    std::cerr << d << "\n";
     bool add_bot = false;
     std::vector<NSIntSet> labels(n_states);
     for (int q = 0; q < d.n_states; ++q) {
@@ -46,13 +45,11 @@ namespace Gecode { namespace String {
       delta.back().emplace_back(alphabet, n_states);
       q_bot = n_states++;
     }
-//    std::cerr << *this << '\n';
   }
 
   forceinline
   compDFA::compDFA(const DFA& d, const NSIntSet& alphabet)
     : stringDFA(d), q_bot(-1), delta(d.n_states()) {
-//    std::cerr << d << "\n";
     for (DFA::Transitions t(d); t(); ++t) {
       int q_in = t.i_state(), a = t.symbol(), q_out = t.o_state();
       if (!alphabet.in(a))
@@ -83,7 +80,6 @@ namespace Gecode { namespace String {
       delta.back().emplace_back(alphabet, n_states);
       q_bot = n_states++;
     }
-//    std::cerr << *this << '\n';
   }
 
   forceinline int
@@ -107,7 +103,6 @@ namespace Gecode { namespace String {
 
   forceinline int
   compDFA::search(int q, int c) const {
-//    std::cerr << "search(q" << q << ", " << c << ")\n";
     for (auto& x : delta[q])
       if (x.first.in(c))
         return x.second;
@@ -285,7 +280,6 @@ namespace Gecode { namespace String {
   template<class CtrlView, ReifyMode rm>
   forceinline ExecStatus
   ReReg<CtrlView, rm>::propagate(Space& home, const ModEventDelta&) {
-//    std::cerr<<"ReDFA::propagate "<<b<<" <> "<<x0<<" in dfa "<<*dfa<<std::endl;
     while (true) {
       if (x0.assigned()) {
         string bytes;
@@ -307,11 +301,10 @@ namespace Gecode { namespace String {
         if (b.zero()) {
           if (rm == RM_IMP)
             return home.ES_SUBSUMED(*this);
-          //FIXME: Transform into trimDFA if corresponding delta is smaller?
         }
         else if (rm == RM_PMI)
           return home.ES_SUBSUMED(*this);
-        //FIXME: Transform into trimDFA if corresponding delta is smaller?
+        // Retaining the complete DFA avoids rebuilding shared transition data.
       }
       const DashedString& x = x0.domain();
       std::vector<std::vector<NSIntSet>> F(x.length());

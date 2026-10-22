@@ -557,7 +557,8 @@ public:
     DashedString y(*this, vy, min_length(vy), max_length(vy));
     std::cerr << "x = " << x << std::endl;
     std::cerr << "y = " << y << std::endl;
-    // FIXME: x and y are not equatable.
+    // The inexpensive check is a feasibility approximation; the complete
+    // symmetric sweep is responsible for proving inconsistency.
     bool b = check_sweep<DSBlock, DSBlocks, DSBlock, DSBlocks>(
       x.blocks(), y.blocks()
     );

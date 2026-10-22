@@ -66,7 +66,6 @@ namespace Gecode { namespace String {
   ReLex<CtrlView, rm>::propagate(
     Space& home, const ModEventDelta&
   ) {
-    // std::cerr<<"ReLex::propagate "<<b<<" <> "<<x0<<" lex "<<x1<<std::endl;
     if (b.zero()) {
       if (rm == RM_IMP)
         return home.ES_SUBSUMED(*this);
@@ -88,7 +87,6 @@ namespace Gecode { namespace String {
           GECODE_ME_CHECK(b.one_none(home));
         return home.ES_SUBSUMED(*this);
       }
-    // std::cerr<<"propagated: "<<b<<" lex "<<x0<<" = "<<x1<<std::endl;
     return ES_FIX;
   }
 

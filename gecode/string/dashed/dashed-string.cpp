@@ -17,16 +17,16 @@ namespace Gecode { namespace String {
 namespace Gecode { namespace String {
 
   DSIntSet::DSIntSet(void)
-    : USET() {}
+    : Gecode::Set::LUBndSet() {}
 
   DSIntSet::DSIntSet(Space& h, int a, int b)
-    : USET(h,a,b) {
+    : Gecode::Set::LUBndSet(h,a,b) {
     if (a < 0 || b > DashedString::_MAX_STR_ALPHA)
       throw OutOfLimitsDS("DSIntSet::DSIntSet");
   }
 
   DSIntSet::DSIntSet(Space& h, const NSIntSet& s)
-    : USET() {
+    : Gecode::Set::LUBndSet() {
     int n = s.size();
     _size = n;
     if (s.empty())
@@ -46,7 +46,7 @@ namespace Gecode { namespace String {
   }
 
   DSIntSet::DSIntSet(Space& h, const DSIntSet& s)
-    : USET() {
+    : Gecode::Set::LUBndSet() {
     this->init(h, s);
   }
 

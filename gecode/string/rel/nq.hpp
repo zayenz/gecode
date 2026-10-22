@@ -25,7 +25,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Nq::propagate(Space& home, const ModEventDelta&) {
-    // std::cerr<<"Nq::propagate "<<x0<<" != "<<x1<<std::endl;
     if (x1.assigned()) {
       if (x0.assigned()) {
         string x0_bytes, x1_bytes;
@@ -50,7 +49,6 @@ namespace Gecode { namespace String {
     if (!x0.check_equate(x1))
       return home.ES_SUBSUMED(*this);
     assert (x0.domain().is_normalized() && x1.domain().is_normalized());
-    // std::cerr << "Nq::propagated.\n";
     return ES_FIX;
   }
 

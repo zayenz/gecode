@@ -56,7 +56,6 @@ namespace Gecode { namespace String {
         }
       }
     }
-    // std::cerr << dom << '\n';
     return dom;
   }
 
@@ -139,7 +138,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   StrToNat::propagate(Space& home, const ModEventDelta&) {
-    // std::cerr<<"\nStrToNat::propagate "<<x0<<" => "<<x1<<std::endl;
     while (true) {
       if (x0.assigned()) {
         int value = -1;
@@ -155,7 +153,6 @@ namespace Gecode { namespace String {
           catch (const std::out_of_range&) {}
         }
         GECODE_ME_CHECK(x1.eq(home, value));
-        // std::cerr << "x1 = " << x1 << "\n";
         return home.ES_SUBSUMED(*this);
       }
       if (x1.assigned()) {
@@ -170,11 +167,9 @@ namespace Gecode { namespace String {
         }
         else
           extensional(home, x0, "[0-9][0-9]*", BoolVar(home, 0, 0), RM_EQV);
-        // std::cerr << "x0 = " << x0 << "\n";
         return home.ES_SUBSUMED(*this);
       }
       NSBlocks dom = strdom();
-      // std::cerr << dom << '\n';
       if (x1.min() > -1
       || dom.contains<DSBlock, DSBlocks>(x0.domain().blocks())) {
         if (x1.min() > 0)
@@ -188,11 +183,9 @@ namespace Gecode { namespace String {
       }
       else if (x1.max() == -1 || !x0.domain().check_equate(dom)) {
         extensional(home, x0, "[0-9][0-9]*", BoolVar(home, 0, 0), RM_EQV);
-        // std::cerr << x0 << " => -1 (subsumed)\n";
         return home.ES_SUBSUMED(*this);
       }
       GECODE_ES_CHECK(refine_int(home));
-      // std::cerr<<"\nStrToNat::propagated "<<x0<<" => "<<x1<<std::endl;
       assert (x0.domain().is_normalized());
       if (!x0.assigned() && !x1.assigned())
         return ES_FIX;

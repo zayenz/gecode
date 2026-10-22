@@ -14,7 +14,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   NatToStr::post(Home home, Gecode::Int::IntView x, StringView y) {
-    // std::cerr << "NatToStr::post " << x << " <-> " << y << '\n';
     extensional(home, y, "(()|0|[1-9][0-9]*)");
     if (x.max() < 0)
       GECODE_ME_CHECK(y.eq(home, ""));
@@ -71,7 +70,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   NatToStr::propagate(Space& home, const ModEventDelta&) {
-    // std::cerr<<"\nNatToStr::propagate "<<x0<<" => "<<x1<<std::endl;
     while (true) {
       if (x0.assigned()) {
         int n = x0.val();
@@ -148,7 +146,6 @@ namespace Gecode { namespace String {
         }
         catch (const std::out_of_range&) {}
       }
-      // std::cerr<<"\nNatToStr::propagated "<<x0<<" => "<<x1<<std::endl;
       assert (x1.domain().is_normalized());
       if (!x0.assigned() && !x1.assigned())
         return ES_FIX;

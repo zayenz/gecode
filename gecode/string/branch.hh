@@ -10,20 +10,33 @@
 
 namespace Gecode { namespace String { namespace Branch {
 
+  /**
+   * \brief Common brancher with archive-safe dashed-domain choices
+   *
+   * Direct choices split a dashed block when that split is a complete
+   * partition. Fixed-length domains with overlapping optional blocks instead
+   * use a positional restriction, so both alternatives remain exhaustive.
+   * Choices archive scalar data only and never retain pointers into a Space.
+   */
   class StringBrancher : public Brancher {
 
   protected:
 
+    /// Views owned by this brancher and cloned with it
     ViewArray<StringView> x;
+    /// First view that can still be unassigned
     mutable int start;
+    /// Rotating scan hint for mandatory-symbol selection
     mutable int preferred_start;
 
+    /// Encoding used to reconstruct a choice from an Archive
     enum class ChoiceKind {
-      DIRECT,
-      POSITION,
-      FIXED
+      DIRECT,   ///< Split one aggregate or dashed-block component
+      POSITION, ///< Restrict one concrete scalar position
+      FIXED     ///< Assign the only concrete scalar sequence
     };
 
+    /// Common archived choice header
     class StringChoice : public Choice {
     public:
 
@@ -43,6 +56,7 @@ namespace Gecode { namespace String { namespace Branch {
 
     };
 
+    /// Choice that replays a direct dashed-domain split
     class PosLevVal : public StringChoice {
     public:
 
@@ -70,6 +84,7 @@ namespace Gecode { namespace String { namespace Branch {
 
     };
 
+    /// Choice that replays a fixed-length positional symbol split
     class PositionVal : public StringChoice {
     public:
 
@@ -107,6 +122,7 @@ namespace Gecode { namespace String { namespace Branch {
 
     };
 
+    /// Choice that replays assignment to an encoding-neutral value
     class FixedVal : public StringChoice {
     public:
 
@@ -132,6 +148,13 @@ namespace Gecode { namespace String { namespace Branch {
 
     };
 
+    /**
+     * Test whether direct block splits partition all represented strings.
+     *
+     * Optional repetition in a multi-block domain can make one concrete
+     * position originate in several blocks; that case requires positional
+     * replay.
+     */
     bool
     direct_partition_safe(const DashedString* p) const {
       if (p->length() == 1)
@@ -142,6 +165,7 @@ namespace Gecode { namespace String { namespace Branch {
       return true;
     }
 
+    /// Select an extreme candidate, preferring symbols mandatory elsewhere
     template <typename CharacterSet>
     int
     preferred_symbol(const CharacterSet& candidates, Value val) const {
@@ -175,6 +199,7 @@ namespace Gecode { namespace String { namespace Branch {
       return selected;
     }
 
+    /// Build a direct length, repetition, or symbol-set decision
     PosLevVal*
     direct_decision(
       int pos, const Gecode::String::DashedString* p, Level lev, Value val
@@ -210,6 +235,12 @@ namespace Gecode { namespace String { namespace Branch {
       return new PosLevVal(*this, pos, lev, val, split, offset);
     }
 
+    /**
+     * Build an exhaustive fixed-length positional decision.
+     *
+     * The archived active alphabet reconstructs unconstrained prefix and
+     * suffix positions without depending on the current dashed layout.
+     */
     StringChoice*
     position_decision(
       int pos, const DashedString* p, Value val
@@ -247,6 +278,7 @@ namespace Gecode { namespace String { namespace Branch {
         *this, pos, StringVal::from_symbols(std::move(concrete)));
     }
 
+    /// Replay a direct choice, including against an already assigned clone
     ExecStatus
     commit_direct(
       Space& home, const PosLevVal& p, Block block, unsigned a
@@ -276,6 +308,7 @@ namespace Gecode { namespace String { namespace Branch {
       return selected == (a == 0) ? ES_OK : ES_FAILED;
     }
 
+    /// Replay any supported choice representation
     ExecStatus
     commit_choice(Space& home, const Choice& c, Block block, unsigned a) {
       const StringChoice& base = static_cast<const StringChoice&>(c);
@@ -374,14 +407,17 @@ namespace Gecode { namespace String { namespace Branch {
 
   public:
 
+    /// Initialize from view array \a x0
     StringBrancher(Home home, ViewArray<String::StringView>& x0):
       Brancher(home), x(x0), start(0), preferred_start(0) {};
 
+    /// Clone \a b and its complete view array into \a home
     StringBrancher(Space& home, StringBrancher& b):
       Brancher(home, b), start(b.start), preferred_start(b.preferred_start) {
       x.update(home, b.x);
     };
 
+    /// Test whether an unassigned view remains
     bool
     status(const Space&) const {
       for (int i = this-> start; i < x.size(); ++i)
@@ -392,6 +428,7 @@ namespace Gecode { namespace String { namespace Branch {
       return false;
     }
 
+    /// Reconstruct a choice from scalar archive data
     Choice*
     choice(const Space&, Archive& e) {
       int kind, pos;
@@ -472,6 +509,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
+  /// First-unassigned variable selection with LLLL value selection
   struct None_LLLL: public StringBrancher {
 
     None_LLLL(Home home, ViewArray<String::StringView>& x0);
@@ -493,6 +531,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
+  /// Minimum-length variable selection with LLLL value selection
   struct LenMin_LLLL: public StringBrancher {
 
     LenMin_LLLL(Home home, ViewArray<String::StringView>& x0);
@@ -514,6 +553,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
+  /// Maximum-length variable selection with LLLL value selection
   struct LenMax_LLLL: public StringBrancher {
 
     LenMax_LLLL(Home home, ViewArray<String::StringView>& x0);
@@ -535,6 +575,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
+  /// Minimum estimated-domain variable selection with LLUL value selection
   struct SizeMin_LLUL: public StringBrancher {
 
     SizeMin_LLUL(Home home, ViewArray<String::StringView>& x0);
@@ -556,6 +597,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
+  /// Minimum-block-count variable selection with LLLL value selection
   struct BlockMin_LLLL: public StringBrancher {
 
     BlockMin_LLLL(Home home, ViewArray<String::StringView>& x0);
@@ -577,6 +619,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
+  /// Minimum-block-count variable selection with LLLM value selection
   struct BlockMin_LLLM: public StringBrancher {
 
     BlockMin_LLLM(Home home, ViewArray<String::StringView>& x0);
@@ -598,6 +641,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
+  /// Minimum-length/block-count selection with LLLM value selection
   struct LenBlockMin_LLLM: public StringBrancher {
 
     LenBlockMin_LLLM(Home home, ViewArray<String::StringView>& x0);

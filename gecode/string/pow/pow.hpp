@@ -50,7 +50,6 @@ namespace Gecode { namespace String {
 
   ExecStatus
   Pow::propagate(Space& home, const ModEventDelta&) {
-    // std::cerr << "\nPow::propagate: " << x2 << " = " << x0 << " ** " << x1 << '\n';
     while (true) {
       if (x2.min_length() > 0)
         GECODE_ME_CHECK(x1.gq(home, 1));
@@ -61,7 +60,6 @@ namespace Gecode { namespace String {
       GECODE_ME_CHECK(x2.pow(home, x0, l, u));
       GECODE_ME_CHECK(x1.gq(home, l));
       GECODE_ME_CHECK(x1.lq(home, u));
-      // std::cerr << "After pow: " << x2 << " = " << x0 << " ** " << x1 << '\n';
       assert (x0.domain().is_normalized() && x2.domain().is_normalized());
       int assigned = x0.assigned() + x1.assigned() + x2.assigned();
       if (assigned == 3) {

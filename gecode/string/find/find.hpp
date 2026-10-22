@@ -83,7 +83,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Find::propagate(Space& home, const ModEventDelta&) {
-    // std::cerr << "\nFind::propagate: " << x2 << " = find " << x0 << " in " << x1 << "\n";
     int l = x2.min(), u = x2.max();
     // Adjusting x2 upper bound.
     int max_index = std::max(1, x1.max_length());
@@ -309,7 +308,6 @@ namespace Gecode { namespace String {
     }
     // General case.
     GECODE_ME_CHECK(x1.find(home, x0, l, u, mod));
-    // std::cerr << "After find: " << x0 << " in " << x1 << " (" << l << ", " << u << ")\n";
     GECODE_ME_CHECK(x2.lq(home, u));
     if (mod) {
       // Can modify x and y.
@@ -356,7 +354,6 @@ namespace Gecode { namespace String {
         GECODE_ME_CHECK(x2.minus_r(home, is));
       }
     }
-    // std::cerr << "index: " << x2 << "\n";
     assert (x0.domain().is_normalized() && x1.domain().is_normalized());
     return ES_FIX;
   }

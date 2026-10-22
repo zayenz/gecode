@@ -8,9 +8,9 @@ namespace Gecode { namespace String {
 
   /// Internal implementation choice used by tests and benchmark programs.
   enum MatchImplementation {
-    MATCH_AUTO,
-    MATCH_DFA,
-    MATCH_NFA
+    MATCH_AUTO, ///< Select from the compiled pattern language
+    MATCH_DFA,  ///< Use DFA-based propagation
+    MATCH_NFA   ///< Use NFA-based propagation
   };
 
   /// Test whether the language of a DFA contains exactly one word.
@@ -38,8 +38,11 @@ namespace Gecode { namespace String {
     TrimDFAHandle sRs;
     CompDFAHandle sRsC;
     int minR;
+    /// Return a block that must reach acceptance, or -1
     int must_idx(void) const;
+    /// Advance search states across one dashed block
     NSIntSet checkBlock(const DSBlock&, const NSIntSet&) const;
+    /// Classify a temporary domain as rejected, optional, or mandatory match
     template <typename DFA_t>
     int checkReg(const NSBlocks& x, DFA_t* d) const;
   protected:
@@ -76,10 +79,15 @@ namespace Gecode { namespace String {
     CompDFAHandle Rcomp;
     MatchNFAHandle Rnfa;
     int minR;
+    /// Lazily construct and share the complement of the full-search DFA
     compDFA* full_complement(void);
+    /// Test whether every represented string contains a match
     bool must_match(void) const;
+    /// Refine the first-match index with a complete forward/backward pass
     ExecStatus refine_idx(Space& home, int&, int&);
+    /// Compute forward NFA frontiers across one block
     std::vector<NSIntSet> reachFwd(const DSBlock&, const NSIntSet&) const;
+    /// Refine backward frontiers and match-position bounds for one block
     void reachBwd(int, NSIntSet&, const std::vector<NSIntSet>&, int&, int&) const;
   protected:
     using MixBinaryPropagator<StringView, PC_STRING_DOM, Gecode::Int::IntView,

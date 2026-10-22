@@ -35,7 +35,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Element::propagate(Space& home, const ModEventDelta&) {
-    // std::cerr << "Element::propagate "<<x<<"[" << y << "] = "<<x[0]<< "\n";
     if (y.assigned()) {
       rel(home, x[0], STRT_EQ, x[y.val()]);
       return home.ES_SUBSUMED(*this);
@@ -48,7 +47,6 @@ namespace Gecode { namespace String {
     int removed_size = 0;
     for (Gecode::Int::ViewValues<IntView> i(y); i(); ++i) {
       StringView& candidate = x[i.val()];
-      // std::cerr << "x["<< i.val() << "] = " << vi << "\n";
       if (v.check_equate(candidate)) {
         s.include(candidate.may_chars());
         int li = candidate.min_length(), ui = candidate.max_length();
@@ -72,7 +70,6 @@ namespace Gecode { namespace String {
     NSBlocks dom(1, NSBlock(s, l, u));
     ModEvent me = v.dom(home, dom);
     GECODE_ME_CHECK(me);
-    // std::cerr << "Element::propagated " << x << "[" << y << "] = " << x[0] << "\n";
 #ifndef NDEBUG
     for (auto& v : x)
       assert (v.domain().is_normalized());

@@ -23,20 +23,17 @@ namespace Gecode { namespace String { namespace Branch {
       int pos = start;
       for (int i = start + 1; i < x.size(); ++i) {
         double m = x[i].domain().logdim();
-        // std::cerr << "Var. " << i << ": " << x[i].domain() << " -- logdim: " << m << "\n";
         if (!x[i].assigned() && m < l) {
           p = &x[i].domain();
           l = m;
           pos = i;
         }
       }
-      // std::cerr << *p << " chosen for var. " << pos << '\n';
       return val_llul(pos, p);
     }
 
     ExecStatus
     SizeMin_LLUL::commit(Space& home, const Choice& c, unsigned a) {
-      // this->print(home, c, a, std::cerr); std::cerr << '\n';
       return commit_choice(home, c, Block::FIRST, a);
     }
 

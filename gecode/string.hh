@@ -194,6 +194,7 @@ namespace Gecode {
     /// Return the assigned encoding-neutral scalar-value sequence
     String::StringVal val_symbols(void) const;
 
+    /// Test whether the domain contains exactly one concrete string
     bool assigned(void) const;
 
     /// Return the size (number of strings) of the domain
@@ -313,10 +314,10 @@ namespace Gecode {
     /// Allocate array for \a n string variables (variables are uninitialized)
     GECODE_STRING_EXPORT
     StringVarArray(Space& home, int n);
-    /*
+    /**
      * \brief Create an array of size \a n.
      *
-     * Each variable is initialized with domain \d
+     * Each variable is initialized with domain \a v.
      */
     GECODE_STRING_EXPORT
     StringVarArray(Space& home, int n, String::NSBlocks& v);
@@ -326,9 +327,13 @@ namespace Gecode {
 
   };
 
+  /// Variables introduced by regular-expression decomposition
   struct VarArgs {
+    /// Introduced integer variables
     IntVarArgs    iva;
+    /// Introduced Boolean variables
     BoolVarArgs   bva;
+    /// Introduced string variables
     StringVarArgs sva;
   };
 }
@@ -359,27 +364,41 @@ namespace Gecode {
    * \ingroup TaskModelString
    */
   //@{
+  /// Post unary prefix or suffix relation \a r on \a x
   GECODE_STRING_EXPORT void
   rel(Home home, StringVar x, StringRelType r);
 
-  /// Post propagator for \f$ x \sim_r y\f$
+  /// Post binary relation \f$ x \sim_r y\f$
   GECODE_STRING_EXPORT void
   rel(Home home, StringVar x, StringRelType r, StringVar y);
 
+  /**
+   * \brief Restrict \a x by ordinary-lifetime dashed domain \a d
+   *
+   * For \c STRT_DOM, \a a and \a b are ignored. Other relations compare
+   * \a x with a temporary string variable initialized from \a d using
+   * length bounds \a a and \a b.
+   */
   GECODE_STRING_EXPORT void
-  rel(Home home, StringVar x, StringRelType r, String::NSBlocks& d, int, int);
+  rel(Home home, StringVar x, StringRelType r, String::NSBlocks& d,
+      int a, int b);
 
+  /// Post reified relation \f$ x \sim_{rt} y\f$
   GECODE_STRING_EXPORT void
   rel(Home home, StringVar x, StringRelType rt, StringVar y, Reify r);
 
+  /// Post unary operation \f$ y = ot(x)\f$
   GECODE_STRING_EXPORT void
   rel(Home home, StringVar x, StringOpType ot, StringVar y);
 
+  /// Post binary operation \f$ z = ot(x,y)\f$
   GECODE_STRING_EXPORT void
   rel(Home home, StringVar x, StringVar y, StringOpType ot, StringVar z);
 
+  /// Post ternary operation \f$ t = ot(x,y,z)\f$
   GECODE_STRING_EXPORT void
-  rel(Home home, StringVar, StringVar, StringVar, StringOpType, StringVar);
+  rel(Home home, StringVar x, StringVar y, StringVar z,
+      StringOpType ot, StringVar t);
   //@}
 
   /**
@@ -401,13 +420,17 @@ namespace Gecode {
   GECODE_STRING_EXPORT void
   substr(Home home, StringVar x, IntVar i, IntVar j, StringVar y);
 
+  /// Post propagator for \f$ x\f$ starting with \f$ y\f$
   GECODE_STRING_EXPORT void
   startswith(Home home, StringVar x, StringVar y);
+  /// Post propagator for \f$ b \iff x\f$ starts with \f$ y\f$
   GECODE_STRING_EXPORT void
   startswith(Home home, StringVar x, StringVar y, BoolVar b);
 
+  /// Post propagator for \f$ x\f$ ending with \f$ y\f$
   GECODE_STRING_EXPORT void
   endswith(Home home, StringVar x, StringVar y);
+  /// Post propagator for \f$ b \iff x\f$ ends with \f$ y\f$
   GECODE_STRING_EXPORT void
   endswith(Home home, StringVar x, StringVar y, BoolVar b);
 
@@ -485,8 +508,15 @@ namespace Gecode {
   /// Reified variant of extensional(Home,StringVar,string)
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, string expr, BoolVar b, ReifyMode rm);
+  /// Post reified membership of \a x in DFA \a d
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, const DFA& d, BoolVar b, ReifyMode rm);
+  /**
+   * \brief Post regex membership with variables introduced by decomposition
+   *
+   * \a va receives the integer, Boolean, and string variables introduced by
+   * the selected regular-expression decomposition.
+   */
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, string expr, VarArgs& va);
   /// Post propagator for \f$ x \in L(M) \f$
@@ -503,7 +533,13 @@ namespace Gecode {
   GECODE_STRING_EXPORT void
   extensional(Home home, StringVar x, const std::vector<std::string>& a);
 
-  /// Match strict UTF-8 regex text; \a i counts matched scalar values
+  /**
+   * \brief Set \a i to the first match position of strict UTF-8 regex \a expr
+   *
+   * Positions are one-based Unicode scalar offsets. The value zero means that
+   * no non-empty substring matches. Patterns accepting the empty string
+   * violate the posting precondition.
+   */
   GECODE_STRING_EXPORT void
   match(Home home, StringVar x, string expr, IntVar i);
   //@}
@@ -529,7 +565,7 @@ namespace Gecode {
 
 namespace Gecode {
 
-  // FIXME: Stubs for compatibility with version 6.
+  // Compatibility aliases required by the generic Gecode branch interface.
   typedef std::function<double(const Space& home, StringVar x, int i)>
     StringBranchMerit;
 
@@ -562,12 +598,12 @@ namespace Gecode {
   public:
     /// Which variable selection
     enum Select {
-      STRING_VAR_NONE = 0,    ///< First unassigned
-      STRING_VAR_LENBLOCKMIN,
-      STRING_VAR_BLOCKMIN,
-      STRING_VAR_SIZEMIN,
-      STRING_VAR_LENMIN,
-      STRING_VAR_LENMAX
+      STRING_VAR_NONE = 0,  ///< First unassigned variable
+      STRING_VAR_LENBLOCKMIN, ///< Smallest minimum length, then fewest blocks
+      STRING_VAR_BLOCKMIN, ///< Fewest dashed blocks
+      STRING_VAR_SIZEMIN,  ///< Smallest estimated domain
+      STRING_VAR_LENMIN,   ///< Smallest minimum length
+      STRING_VAR_LENMAX    ///< Largest maximum length
     };
 
   protected:
@@ -575,7 +611,7 @@ namespace Gecode {
      Select s;
 
   public:
-     /// Initialize with strategy STRING_VAR_NONE
+     /// Initialize with strategy STRING_VAR_BLOCKMIN
      StringVarBranch(void);
 
      /// Initialize with selection strategy \a s
@@ -597,19 +633,20 @@ namespace Gecode {
   class StringValBranch : public ValBranch<StringVar> {
 
   public:
-    /// Which variable selection
+    /// Which value selection
     enum Select {
-      STRING_VAL_LLLL,
-      STRING_VAL_LLUL,
-      STRING_VAL_LLLM
+      STRING_VAL_LLLL, ///< Lower length, lower repetition, lower symbol
+      STRING_VAL_LLUL, ///< Lower length, upper repetition, lower symbol
+      STRING_VAL_LLLM  ///< Lower length/repetition, preferred mandatory symbol
     };
 
   protected:
-     /// Which variable to select
+     /// Which value strategy to use
      Select s;
 
   public:
 
+     /// Initialize with strategy STRING_VAL_LLLM
      StringValBranch(void);
 
      /// Initialize with selection strategy \a s
@@ -624,59 +661,88 @@ namespace Gecode {
 
 namespace Gecode {
 
+  /// Branch on the first unassigned variable using STRING_VAL_LLLL
   GECODE_STRING_EXPORT void
   none_llll(Home home, const StringVarArray& x);
 
+  /// Branch on the first unassigned variable using STRING_VAL_LLLL
   GECODE_STRING_EXPORT void
   none_llll(Home home, const StringVarArgs& x);
 
+  /// Branch on the smallest estimated domain using STRING_VAL_LLUL
   GECODE_STRING_EXPORT void
   sizemin_llul(Home home, const StringVarArray& x);
 
+  /// Branch on the smallest estimated domain using STRING_VAL_LLUL
   GECODE_STRING_EXPORT void
   sizemin_llul(Home home, const StringVarArgs& x);
 
+  /// Branch on the largest maximum length using STRING_VAL_LLLL
   GECODE_STRING_EXPORT void
   lenmax_llll(Home home, const StringVarArray& x);
 
+  /// Branch on the largest maximum length using STRING_VAL_LLLL
   GECODE_STRING_EXPORT void
   lenmax_llll(Home home, const StringVarArgs& x);
 
+  /// Branch on the smallest minimum length using STRING_VAL_LLLL
   GECODE_STRING_EXPORT void
   lenmin_llll(Home home, const StringVarArray& x);
 
+  /// Branch on the smallest minimum length using STRING_VAL_LLLL
   GECODE_STRING_EXPORT void
   lenmin_llll(Home home, const StringVarArgs& x);
 
+  /// Branch on the fewest dashed blocks using STRING_VAL_LLLL
   GECODE_STRING_EXPORT void
   blockmin_llll(Home home, const StringVarArray& x);
 
+  /// Branch on the fewest dashed blocks using STRING_VAL_LLLL
   GECODE_STRING_EXPORT void
   blockmin_llll(Home home, const StringVarArgs& x);
 
+  /// Branch on the fewest dashed blocks using STRING_VAL_LLLM
   GECODE_STRING_EXPORT void
   blockmin_lllm(Home home, const StringVarArray& x);
 
+  /// Branch on the fewest dashed blocks using STRING_VAL_LLLM
   GECODE_STRING_EXPORT void
   blockmin_lllm(Home home, const StringVarArgs& x);
 
+  /// Branch by minimum length and block count using STRING_VAL_LLLM
   GECODE_STRING_EXPORT void
   lenblockmin_lllm(Home home, const StringVarArray& x);
 
+  /// Branch by minimum length and block count using STRING_VAL_LLLM
   GECODE_STRING_EXPORT void
   lenblockmin_lllm(Home home, const StringVarArgs& x);
 
+  /// Select the first unassigned variable
   StringVarBranch STRING_VAR_NONE(void);
+  /// Select the variable with the smallest estimated domain
   StringVarBranch STRING_VAR_SIZEMIN(void);
+  /// Select the variable with the fewest dashed blocks
   StringVarBranch STRING_VAR_BLOCKMIN(void);
+  /// Select by minimum length, breaking ties by block count
   StringVarBranch STRING_VAR_LENBLOCKMIN(void);
+  /// Select the variable with the smallest minimum length
   StringVarBranch STRING_VAR_LENMIN(void);
+  /// Select the variable with the largest maximum length
   StringVarBranch STRING_VAR_LENMAX(void);
 
+  /// Select lower length, repetition, and symbol alternatives
   StringValBranch STRING_VAL_LLLL(void);
+  /// Select lower length/symbol and upper repetition alternatives
   StringValBranch STRING_VAL_LLUL(void);
+  /// Prefer mandatory symbols after lower length/repetition alternatives
   StringValBranch STRING_VAL_LLLM(void);
 
+  /**
+   * \brief Post string branching with compatible selectors
+   *
+   * Unsupported variable/value selector combinations raise
+   * String::UnknownBranching.
+   */
   GECODE_STRING_EXPORT void
   branch(Home home, const StringVarArgs& x,
          StringVarBranch vars, StringValBranch vals);

@@ -43,8 +43,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Inc::propagate(Space& home, const ModEventDelta&) {
-    //  strict ? std::cerr<<"\nInc lt ::propagate "<<x0<<std::endl
-    //         : std::cerr<<"\nInc le ::propagate "<<x0<<std::endl;
     if (x0.assigned())
       return assigned_ok() ? home.ES_SUBSUMED(*this) : ES_FAILED;
     if (strict) {
@@ -68,7 +66,6 @@ namespace Gecode { namespace String {
       return home.ES_SUBSUMED(*this);
     }
     assert (x0.domain().is_normalized());
-    // std::cerr<<"propagated: "<<x0<<std::endl;
     return ES_FIX;
   }
 

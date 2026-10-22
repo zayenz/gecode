@@ -2025,7 +2025,7 @@ constraint_item :
             pp->domainConstraints.push_back(new ConExpr($2, $4, $6));
           }
           else if (cid=="str_reg" && DashedString::_DECOMP_REGEX && $4->a[0]->isStringVar()) {
-            // FIXME: RegEx will be computed twice!
+            // Parse to detect variable-introducing decompositions; native posting reparses retained text.
             unique_ptr<RegEx> r = RegExParser($4->a[1]->getRegex()).parse();
             if (r->intro_vars()) {
               AST::StringVar* x = dynamic_cast<AST::StringVar*>($4->a[0]);

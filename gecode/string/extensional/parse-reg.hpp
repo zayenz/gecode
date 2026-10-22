@@ -36,6 +36,7 @@ namespace Gecode { namespace String {
   class RangeEx;
   class trimDFA;
 
+  /// Visitor interface for the regular-expression syntax tree
   class RegExVisitor {
   public:
     virtual void visit(const EmptyEx&) = 0;
@@ -48,6 +49,13 @@ namespace Gecode { namespace String {
     virtual ~RegExVisitor(void) {}
   };
 
+  /**
+   * \brief Owned regular-expression syntax-tree node
+   *
+   * Nodes can either post a decomposition or compile into a symbolic
+   * automaton. Symbolic compilation partitions all participating scalar sets
+   * before invoking Gecode's integer-labelled REG machinery.
+   */
   class RegEx {
   protected:
     static REG
@@ -68,7 +76,7 @@ namespace Gecode { namespace String {
     virtual bool has_star()   const { return false; }
     virtual bool has_empty()  const { return false; }
     virtual bool intro_vars() const { return false; }
-    // FIXME: post only works in a positive context.
+    /// Post a decomposition in a positive Boolean context
     virtual void post(Home, StringVar, VarArgs&)    const = 0;
     virtual void accept(RegExVisitor&) const = 0;
     virtual string str() const = 0;
@@ -179,7 +187,6 @@ namespace Gecode { namespace String {
     void
     post(Home home, StringVar x, VarArgs& va) const {
       GECODE_POST;
-      // std::cerr << "ConcatEx::post " << x << "\n";
       if (lhs->empty()) {
         if (rhs->empty()) {
           if (x.min_length() > 0)
@@ -197,7 +204,6 @@ namespace Gecode { namespace String {
           const NSIntSet alphabet = x.may_chars();
           StringVar x1(home, alphabet, 0, x.max_length());
           StringVar x2(home, alphabet, 0, x.max_length());
-          // std::cerr << "Posting " << x << " = " << x1 << " + " << x2 << "\n";
           lhs->post(home, x1, va);
           rhs->post(home, x2, va);
           rel(home, x1, x2, STRT_CAT, x);
@@ -255,16 +261,11 @@ namespace Gecode { namespace String {
       bool has_concat() const { return lhs->has_concat() || rhs->has_concat(); }
       bool intro_vars() const { return lhs->intro_vars() || rhs->intro_vars(); }
       string get_string() const {
-        try {
-          string x = lhs->get_string(), y = rhs->get_string();
-          if (x == y)
-            return x;
-          std::cerr << "Can't get a string from empty regex!\n";
-          throw 0;
-        }
-        catch (const std::runtime_error& e) {
-          throw std::runtime_error("Can't get a string from <E & E'> regex!");
-        }
+        string x = lhs->get_string(), y = rhs->get_string();
+        if (x != y)
+          throw std::runtime_error(
+            "Regular-expression intersection is not a singleton");
+        return x;
       }
       NSIntSet
       get_chars() const {
@@ -300,17 +301,13 @@ namespace Gecode { namespace String {
         try {
           if (lhs->get_string() == rhs->get_string())
             return lhs->reg();
-        }
-        catch (int) {
-          // FIXME: Workaround for empty regular expression.
+          // Distinct singleton languages have an empty intersection.
           return REG(IntArgs::create(0, 1));
         }
-        catch (...) {
-          std::cerr << "REG intersection not implemented!\n";
-          throw 1;
+        catch (const std::runtime_error&) {
+          throw std::runtime_error(
+            "General REG intersection is not implemented");
         }
-        GECODE_NEVER;
-        return REG();
       }
       REG symbolic_reg(
         const std::vector<NSIntSet>& partitions,
@@ -318,16 +315,12 @@ namespace Gecode { namespace String {
         try {
           if (lhs->get_string() == rhs->get_string())
             return lhs->symbolic_reg(partitions, active_alphabet);
-        }
-        catch (int) {
           return REG(IntArgs::create(0, 1));
         }
-        catch (...) {
+        catch (const std::runtime_error&) {
           throw std::runtime_error(
-            "Symbolic REG intersection is not implemented");
+            "General symbolic REG intersection is not implemented");
         }
-        GECODE_NEVER;
-        return REG();
       }
       void collect_symbol_sets(
         const NSIntSet& active_alphabet, std::vector<NSIntSet>& sets) const {
@@ -562,6 +555,12 @@ namespace Gecode { namespace String {
     bool wildcard;
     const int _MAX_SIZE = 500;
 
+    void check_automaton_size(int symbol_count) const {
+      if (static_cast<long long>(u) * symbol_count > _MAX_SIZE)
+        throw std::length_error(
+          "Regular expression exceeds the DFA construction limit");
+    }
+
     NSIntSet effective(const NSIntSet& active_alphabet) const {
       if (wildcard)
         return active_alphabet;
@@ -573,15 +572,11 @@ namespace Gecode { namespace String {
     }
 
     REG legacy_reg(const NSIntSet& symbols) const {
+      check_automaton_size(symbols.size());
       IntArgs values;
       for (NSIntSet::iterator symbol(symbols); symbol(); ++symbol)
         values << *symbol;
       REG result(values);
-      if (static_cast<long long>(u) * symbols.size() > _MAX_SIZE) {
-        std::cerr << "Warning: The resulting DFA size is too big! "
-                  << "Ignored max cardinality " << u << "\n";
-        return result(l);
-      }
       return result(l, u);
     }
 
@@ -665,11 +660,7 @@ namespace Gecode { namespace String {
       for (const NSIntSet& partition : partitions)
         if (!symbols.disjoint(partition))
           ++selected;
-      if (static_cast<long long>(u) * selected > _MAX_SIZE) {
-        std::cerr << "Warning: The resulting DFA size is too big! "
-                  << "Ignored max cardinality " << u << "\n";
-        return result(l);
-      }
+      check_automaton_size(selected);
       return result(l, u);
     }
     void collect_symbol_sets(
@@ -678,6 +669,12 @@ namespace Gecode { namespace String {
     }
   };
 
+  /**
+   * \brief Recursive-descent parser for strict UTF-8 regular expressions
+   *
+   * Input is decoded to Unicode scalar values before parsing. All AST
+   * ownership is represented by std::unique_ptr.
+   */
   class RegExParser {
 
   private:
@@ -717,7 +714,6 @@ namespace Gecode { namespace String {
 
     forceinline void
     consume(StringSymbol c, bool escaped = false) {
-      // std::cerr << "consume <" << c << "> (top = <" << top() << ">)\n";
       if (top() == c) {
         _currI++;
         if (c == '(' && !escaped)
@@ -893,7 +889,6 @@ namespace Gecode { namespace String {
 
     std::unique_ptr<RegEx>
     term() {
-      // std::cerr << "*** term ***\n";
       std::unique_ptr<RegEx> curr(new EmptyEx());
       if (!more())
         return curr;
@@ -911,7 +906,6 @@ namespace Gecode { namespace String {
 
     std::unique_ptr<RegEx>
     regex() {
-      // std::cerr << "*** regex ***\n";
       std::unique_ptr<RegEx> curr = term();
       if (more() && (top() == '|' || top() == '&')) {
         const StringSymbol c = top();
@@ -930,7 +924,6 @@ namespace Gecode { namespace String {
 
     std::unique_ptr<RegEx>
     factor() {
-      // std::cerr << "*** factor ***\n";
       std::unique_ptr<RegEx> b = base();
       while (more() && top() == '*') {
         consume('*');
@@ -941,7 +934,6 @@ namespace Gecode { namespace String {
 
     std::unique_ptr<RegEx>
     base() {
-      // std::cerr << "*** base ***" << top() << "\n";
       if (!more())
         throw std::runtime_error("Missing regular-expression term");
       switch (top()) {
@@ -968,19 +960,21 @@ namespace Gecode { namespace String {
 
   public:
 
+    /// Initialize from strict UTF-8 text
     RegExParser(const string& in)
       : _open(0), _currI(0), _input(StringVal::decode_utf8(in)) {}
 
+    /// Initialize from an already decoded scalar sequence
     explicit RegExParser(const StringVal& in)
       : _open(0), _currI(0), _input(in) {}
 
+    /// Parse the complete input or throw on malformed syntax
     std::unique_ptr<RegEx> parse() {
       std::unique_ptr<RegEx> r = regex();
       if (_open != 0)
         throw std::runtime_error("Unbalanced brackets");
       else if (more())
         throw std::runtime_error("Ill-formed expression");
-//       std::cerr << r->str() << "\n";
       return r;
     }
 

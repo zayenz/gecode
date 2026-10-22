@@ -51,25 +51,27 @@ typedef std::set<tpl6> set6;
 typedef std::list<tpl6> lst6;
 typedef std::vector<tpl2> vec2;
 
-#define USET Gecode::Set::LUBndSet
-
 namespace Gecode { namespace String {
 
   class NSBlocks;
+  /// Sequence of ordinary-lifetime dashed domains
   typedef std::vector<NSBlocks> vecm;
 
+  /// Exception for symbols, lengths, or alphabets outside configured limits
   class GECODE_STRING_EXPORT OutOfLimitsDS : public Exception {
   public:
     /// Initialize with location \a l
     OutOfLimitsDS(const char* l);
   };
 
+  /// Exception for an operation requiring a non-empty dashed domain
   class GECODE_STRING_EXPORT EmptyDS : public Exception {
   public:
     /// Initialize with location \a l
     EmptyDS(const char* l);
   };
 
+  /// Exception for extracting a value from an unassigned dashed domain
   class GECODE_STRING_EXPORT UnknownValDS : public Exception {
   public:
     /// Initialize with location \a l
@@ -82,7 +84,14 @@ namespace Gecode { namespace String {
 
   class NSIntSet;
 
-  class GECODE_STRING_EXPORT DSIntSet : public USET {
+  /**
+   * \brief Space-owned finite set of string symbols
+   *
+   * The backing ranges are allocated by a Gecode Space. Copies therefore
+   * require the destination Space and must not be retained outside its
+   * lifetime. Use NSIntSet for ordinary-lifetime temporary sets.
+   */
+  class GECODE_STRING_EXPORT DSIntSet : public Gecode::Set::LUBndSet {
 
   private:
 
@@ -135,6 +144,12 @@ namespace Gecode { namespace String {
 
   class NSBlock;
 
+  /**
+   * \brief Space-owned dashed block
+   *
+   * A block represents between \a l and \a u consecutive symbols, each drawn
+   * from \a S. Range storage in \a S belongs to the containing Space.
+   */
   struct GECODE_STRING_EXPORT DSBlock {
 
     int l;
@@ -192,6 +207,7 @@ namespace Gecode { namespace String {
 
   };
 
+  /// Read/write block-sequence interface used by generic sweep algorithms
   struct DashedView {
     virtual const DSBlock& at(int) const = 0;
     virtual DSBlock& at(int i) = 0;
@@ -206,6 +222,13 @@ namespace Gecode { namespace String {
 
 namespace Gecode { namespace String {
 
+  /**
+   * \brief Space-owned sequence of dashed blocks
+   *
+   * This container explicitly initializes and disposes each block's
+   * space-allocated symbol ranges when resizing or replacing storage.
+   * Ordinary temporary block sequences must use NSBlocks instead.
+   */
   class GECODE_STRING_EXPORT DSBlocks :
   public Gecode::Support::DynamicArray<DSBlock, Space> {
 
@@ -267,6 +290,7 @@ namespace Gecode { namespace String {
     void init(Space& h, const NSBlocks& v);
 
     void update(Space& h, const DSBlocks& d);
+    /// Replace from ordinary storage and return aggregate length bounds
     void update(Space& h, const NSBlocks& that, int& l, int& u);
     void update(Space& h, const string& s);
     void update(Space& h, const StringVal& value);
@@ -274,9 +298,10 @@ namespace Gecode { namespace String {
     template <typename Block>
     void insert(Space& h, int k, const Block& d);
 
-    //void normalize(Space& h);
+    /// Remove null blocks, merge equal neighbours, and return length bounds
     void normalize(Space& h, int&, int&);
 
+    /// Replace current storage by taking ownership of space-allocated \a y
     void become(Space& h, DSBlock* y, int m);
 
     template <typename Blocks> bool operator==(const Blocks& that) const;
@@ -289,22 +314,25 @@ namespace Gecode { namespace String {
 
 namespace Gecode { namespace String { namespace Branch {
 
+  /// Component of a dashed-domain branching decision
   enum Level {
-    LENGTH,
-    CARD,
-    BASE
+    LENGTH, ///< Aggregate string length
+    CARD,   ///< Repetition count of a selected block
+    BASE    ///< Symbol set of a selected block
   };
 
+  /// Split direction for a branching decision
   enum Value {
-    MIN,
-    MAX,
-    MUSTMIN,
-    MUSTMAX
+    MIN,     ///< Select the lower endpoint
+    MAX,     ///< Select the upper endpoint
+    MUSTMIN, ///< Prefer the smallest mandatory symbol
+    MUSTMAX  ///< Prefer the largest mandatory symbol
   };
 
+  /// Strategy for selecting a non-assigned block
   enum Block {
-    FIRST,
-    SMALLEST
+    FIRST,   ///< First non-assigned block
+    SMALLEST ///< Non-assigned block with the smallest estimated domain
   };
 
 }}}
@@ -315,7 +343,17 @@ namespace Gecode { namespace String {
   class DashedView;
 
   /**
-   * \brief Class implementing the dashed string representation.
+   * \brief Space-owned dashed string domain
+   *
+   * A domain is an ordered sequence of DSBlock values plus aggregate minimum
+   * and maximum lengths. Normalized domains have no null block (except the
+   * unique block representing the empty string), no adjacent blocks with the
+   * same symbol set, and length bounds consistent with their blocks.
+   *
+   * Mutation methods return \c false when refinement proves inconsistency.
+   * Successful changes set an internal marker consumed by StringVarImp when
+   * it emits the single aggregate modification event for a transaction.
+   * DashedString itself never schedules propagators.
    */
   class GECODE_STRING_EXPORT DashedString {
 
@@ -331,6 +369,7 @@ namespace Gecode { namespace String {
   static int  _MAX_STR_LENGTH;
   static int  _MAX_STR_ALPHA;
 
+  /// Test whether two block sequences share at least one concrete string
   static bool deep_check_dp(
     const NSBlocks& x, int i, const NSBlock& x_i,
     const NSBlocks& y, int j, const NSBlock& y_j, set6 nogoods
@@ -344,18 +383,25 @@ namespace Gecode { namespace String {
     const DashedString& ds1, const DashedString& ds2
   );
 
+  /// Initialize the top domain in \a h
   DashedString(Space& h);
 
+  /// Initialize from a legacy one-byte-per-symbol value
   DashedString(Space& h, const std::string& s);
 
+  /// Initialize from an encoding-neutral scalar-value sequence
   DashedString(Space& h, const StringVal& value);
 
+  /// Initialize from one space-owned block
   DashedString(Space& h, const DSBlock& b);
 
+  /// Initialize from space-owned blocks
   DashedString(Space& h, const DSBlocks& bv);
 
+  /// Initialize from temporary blocks and explicit aggregate length bounds
   DashedString(Space& h, NSBlocks& v, int mil, int mal);
 
+  /// Clone \a d into destination Space \a h
   DashedString(Space& h, const DashedString& d);
 
   DSBlocks& blocks();
@@ -400,53 +446,87 @@ namespace Gecode { namespace String {
 
   bool is_normalized() const;
 
+  /// Replace the domain with the singleton empty string
   void set_null(Space& h);
 
+  /// Return assigned legacy bytes; throw if unassigned or not byte-valued
   string val() const;
 
   /// Extract the assigned value as bytes, returning false for symbols > 255.
   bool try_val_bytes(string& value) const;
 
+  /// Return the assigned encoding-neutral scalar-value sequence
   StringVal val_symbols() const;
 
+  /// Normalize \a v and replace this domain with the normalized result
   void norm_update(Space& h, NSBlocks& v);
 
+  /// Reconcile aggregate length bounds with the current block bounds
   void refresh_cardinality(Space& h);
 
+  /// Restore block and aggregate-length normalization invariants
   void normalize(Space& h);
 
+  /// Test whether equality with \a that can have at least one solution
   bool check_equate(const DashedString& that) const;
+  /// Test whether equality with \a that can have at least one solution
   bool check_equate(const NSBlocks& that) const;
+  /// Test whether equality with \a that can have at least one solution
   bool check_equate(const StringVal& that) const;
 
+  /**
+   * \brief Refine both domains to enforce equality
+   *
+   * Return \c false on inconsistency. Each modified domain records its own
+   * change marker; notification remains the caller's responsibility.
+   */
   bool equate(Space& h, DashedString& that);
+  /// Refine this domain to equality with temporary domain \a that
   bool equate(Space& h, const NSBlocks& that);
+  /// Refine this domain to assigned scalar sequence \a that
   bool equate(Space& h, const StringVal& that);
 
+  /// Replace the domain with legacy byte value \a s
   void update(Space& h, string s);
+  /// Replace the domain with encoding-neutral value \a value
   void update(Space& h, const StringVal& value);
+  /// Replace the domain with a space-owned copy of \a that
   void update(Space& h, const DashedString& that);
+  /// Replace the domain with ordinary-lifetime block sequence \a that
   void update(Space& h, const NSBlocks& that);
 
+  /// Test exact representation equality with \a that
   bool equals(const DashedString& that) const;
+  /// Test exact representation equality with \a that
   bool equals(const NSBlocks& that) const;
 
+  /// Test whether every value represented by \a that is represented here
   bool contains(const NSBlocks&) const;
+  /// Test whether every value represented by \a that is represented here
   bool contains(const DashedString&) const;
+  /// Test whether this domain contains all concatenations of two domains
   bool contains(const DashedString&, const DashedString&) const;
 
+  /**
+   * \brief Refine a find relation against pattern domain \a x
+   *
+   * \a lb and \a ub are one-based candidate start bounds. If \a mod is true,
+   * length and position bounds are refined in addition to feasibility.
+   */
   bool find(Space&, DashedString&, int&, int&, bool);
 
   int first_na_block() const;
 
   int smallest_na_block() const;
 
+  /// Test whether lexicographic relation with \a that is feasible
   bool check_lex(const DashedString& that, bool lt) const;
 
   NSBlocks lex_least(const std::vector<float>& succ) const;
 
   NSBlocks lex_greatest(const std::vector<float>& succ) const;
 
+  /// Refine the domain to strictly/non-strictly increasing concrete strings
   bool increasing(Space&h, bool strict);
 
   /// Return a shortest concrete legacy byte string represented by this domain.
@@ -454,31 +534,51 @@ namespace Gecode { namespace String {
   /// Return a shortest concrete encoding-neutral value represented by this domain.
   StringVal min_value() const;
 
+  /**
+   * \brief Apply branch alternative \a a at the requested domain level
+   *
+   * The operation selects a block using \a b, restores normalization, and
+   * records a domain change. Alternative zero selects the split value;
+   * alternative one excludes it or selects the complementary bound.
+   */
   void commit(
     Space&, Branch::Level, Branch::Value, Branch::Block, int, unsigned);
 
+  /// Raise the aggregate minimum length; return false on inconsistency
   bool refine_lb(int l);
 
+  /// Lower the aggregate maximum length; return false on inconsistency
   bool refine_ub(Space&, int u);
 
+  /// Intersect aggregate and per-block length bounds with [\a mil,\a mal]
   bool refine_card(Space&, int mil, int mal);
 
+  /// Reconcile aggregate lengths for equality with \a that
   bool refine_card_eq(Space& h, DashedString& that);
 
+  /// Reconcile aggregate lengths for this = \a x concatenated with \a y
   bool refine_card_cat(Space& h, DashedString& x, DashedString& y);
 
+  /// Reconcile aggregate lengths for this = \a x repeated in [\a n1,\a n2]
   bool refine_card_pow(Space& h, DashedString& x, int n1, int n2);
 
+  /// Refine all three domains for this = \a x concatenated with \a y
   bool concat(Space& h, DashedString& x, DashedString& y);
 
+  /// Return the temporary domain for exactly \a n repetitions
   NSBlocks pow(int n) const;
+  /// Refine this = \a x repeated between \a lx and \a ux times
   bool pow(Space& h, DashedString& x, int& lx, int& ux);
 
+  /// Refine both domains for this = reverse(\a x)
   bool rev(Space& h, DashedString& x);
 
-  bool lex(Space& h, DashedString& y, bool neq);
+  /// Refine both domains for this lexicographically before \a y
+  bool lex(Space& h, DashedString& y, bool lt);
 
+  /// Test whether the current mutation transaction changed this domain
   bool changed() const;
+  /// Set the mutation marker consumed by StringVarImp
   void changed(bool b);
 
   bool operator==(const DashedString& that) const;
@@ -487,13 +587,13 @@ namespace Gecode { namespace String {
 
   private:
 
-    // True iff the dashed string has changed after a propagation method.
+    /// Whether the current mutation transaction changed this domain
     bool _changed;
-    // The blocks of the dashed string.
+    /// Space-owned normalized block sequence
     DSBlocks _blocks;
-    // Length of the shortest concrete string this dashed dtring can represent.
+    /// Length of the shortest represented concrete string
     int _min_length;
-    // Length of the longest concrete string this dashed dtring can represent.
+    /// Length of the longest represented concrete string
     int _max_length;
 
     void _commit0(Space&, Branch::Level, Branch::Value, int, int);

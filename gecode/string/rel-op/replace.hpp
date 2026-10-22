@@ -124,7 +124,6 @@ namespace Gecode { namespace String {
   // Decomposes decomp_all into basic constraints.
   forceinline ExecStatus
   Replace::decomp_all(Space& home) {
-    // std::cerr << "decomp_all\n";
     string sx, sq;
     if (!x[0].domain().try_val_bytes(sx) ||
         !x[1].domain().try_val_bytes(sq))
@@ -205,7 +204,6 @@ namespace Gecode { namespace String {
           rel(home, vx.back(), STRT_EQ, x[3]);
       }
     }
-    // std::cerr << "After decomp_all: " << x << "\n";
     return home.ES_SUBSUMED(*this);
   }
 
@@ -399,7 +397,6 @@ namespace Gecode { namespace String {
       // Prefix: x[0][: es]
       NSBlocks v;
       Position es = pos[0], le = pos[1];
-//       std::cerr << "ES: " << es << ", LE: " << le << "\n";
       if (es != Position({0, 0}))
         v = x[0].domain().prefix(es.idx, es.off);
       // Crush x[0][es : le], possibly adding x[2].
@@ -424,11 +421,9 @@ namespace Gecode { namespace String {
       if (le != last_fwd(px.blocks()))
         v.extend(x[0].domain().suffix(le.idx, le.off));
       v.normalize();
-//       std::cerr << "1c) Equating " << x[3] << " with " << v << " => \n";
       ModEvent me = x[3].dom(home, v);
       GECODE_ME_CHECK(me);
       repeat |= me_modified(me);
-      //std::cerr << x[3] << "\n";
     }
     else {
       if (min_occur > 0)
@@ -452,7 +447,6 @@ namespace Gecode { namespace String {
       // Prefix: x[3][: es].
       NSBlocks v;
       Position es = pos[0], le = pos[1];
-      // std::cerr << "ES: " << es << ", LE: " << le << "\n";
       if (es != Position({0, 0}))
         v = x[3].domain().prefix(es.idx, es.off);
       // Crush x[3][es : ls], possibly adding x[1].
@@ -478,11 +472,9 @@ namespace Gecode { namespace String {
       if (le != last_fwd(py.blocks()))
         v.extend(x[3].domain().suffix(le.idx, le.off));
       v.normalize();
-      // std::cerr << "2) Equating " << x[0] << " with " << v << " => \n";
       ModEvent me = x[0].dom(home, v);
       GECODE_ME_CHECK(me);
       repeat |= me_modified(me);
-      //std::cerr << x[0] << "\n";
     }
     else {
       if (min_occur > 0)
@@ -496,7 +488,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Replace::propagate_pass(Space& home, bool& repeat) {
-//     std::cerr<<"\nReplace" << (all ? "All" : last ? "Last" : "") << "::propagate: "<< x <<"\n";
     repeat = false;
     assert(x[0].domain().is_normalized() && x[1].domain().is_normalized() &&
            x[2].domain().is_normalized() && x[3].domain().is_normalized());
@@ -607,7 +598,6 @@ namespace Gecode { namespace String {
     if (min_occur == 0 && !px.check_equate(py))
       min_occur = 1;
     if (min_occur > 0 && !all) {
-      // std::<<cerr << "min_occur = "<<min_occur<<": rewriting into concat!\n";
       NSIntSet intermediate_alphabet = x[0].may_chars();
       intermediate_alphabet.include(x[1].may_chars());
       intermediate_alphabet.include(x[2].may_chars());
@@ -631,22 +621,18 @@ namespace Gecode { namespace String {
       find(home, x[1], last ? suff : pref, IntVar(home, 0, 0));
       return home.ES_SUBSUMED(*this);
     }
-//     std::cerr << "min_occur: " << min_occur << "\n";
     ExecStatus es = replace_q_x(home, min_occur, repeat);
     if (es != ES_OK)
       return es;
-    // std::cerr<<"After replace_q_x: "<< x <<"\n";
     es = replace_q1_y(home, min_occur, repeat);
     if (es != ES_OK)
       return es;
-    // std::cerr<<"After replace_q1_y: "<< x <<"\n";
     if (!all && !check_card()) {
       rel(home, x[0], STRT_EQ, x[3]);
       return home.ES_SUBSUMED(*this);
     }
     if (home.failed())
       return ES_FAILED;
-//     std::cerr<<"After replace: "<< x <<"\n";
     assert (px.is_normalized() && x[1].domain().is_normalized()
         && x[2].domain().is_normalized() && py.is_normalized());
     switch (

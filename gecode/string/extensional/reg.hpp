@@ -203,7 +203,6 @@ namespace Gecode { namespace String {
 
   forceinline NSBlocks
   Reg::dom(trimDFA* dfa) {
-    // std::cerr << "dom: " << dfa << '\n';
     NSIntSet S = dfa->alphabet();
     int l = 0, u = 0, n_states = dfa->n_states;
     std::vector<int> dist(n_states);
@@ -225,19 +224,16 @@ namespace Gecode { namespace String {
         int q = stack.back().first, open = stack.back().second;
         stack.pop_back();
         if (open) {
-//          std::cerr << "Closing " << q << '\n';
           dist[q] = 2;
           sorted.push_back(q);
         }
         else {
-//          std::cerr << "Opening " << q << "\n";
           dist[q] = 1;
           // push again q in "exit" mode.
           stack.push_back(std::pair<int,bool>(q,1));
           for (const auto& transition : dfa->delta[q]) {
             int qi = transition.second;
             if (dist[qi] == 1) {
-//              std::cerr << "Loop! " << qi << "\n";
               u = DashedString::_MAX_STR_LENGTH;
               break;
             }
@@ -247,7 +243,6 @@ namespace Gecode { namespace String {
         }
       }
       if (u != DashedString::_MAX_STR_LENGTH) {
-//        std::cerr << "Topo. sort: "; for (auto i = sorted.rbegin(); i != sorted.rend(); ++i) std::cerr << *i << " "; std::cerr <<"\n";
         dist[0] = 0;
         for (int i = 1; i < n_states; ++i)
           dist[i] = -1;
@@ -265,10 +260,8 @@ namespace Gecode { namespace String {
             }
           }
         }
-//        std::cerr << "dist: "; for (auto& x : dist) std::cerr << x << " "; std::cerr <<"\n";
       }
     }
-//    std::cerr << l << ' ' << u << '\n';
     assert (l <= u);
     return NSBlocks(1, NSBlock(S, l, u));
   }
@@ -279,7 +272,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Reg::post(Home home, StringView x, const DFA& d) {
-    // std::cerr << "Reg::post" << x << ' ' << d << '\n';
     if (d.final_fst() >= d.final_lst())
       return ES_FAILED;
     if (x.assigned()) {
@@ -316,7 +308,6 @@ namespace Gecode { namespace String {
     }
     trimDFA* dfa = new trimDFA(d);
     NSBlocks dx(dom(dfa));
-    // std::cerr << "ExtDFA dom: " << dx << '\n';
     rel(home, x, STRT_DOM, dx, x.min_length(), x.max_length());
     (void) new (home) Reg(home, x, dfa);
     return ES_OK;
@@ -324,7 +315,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Reg::post(Home home, StringView x, trimDFA* p) {
-    // std::cerr << "Reg::post" << x << ' ' << *p << '\n';
     (void) new (home) Reg(home, x, p);
     return ES_OK;
   }
@@ -704,7 +694,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Reg::propagate(Space& home, const ModEventDelta&) {
-    // std::cerr<<"\nExtDFA<StringView>::propagate "<<x0<<" in dfa "<<*dfa<<std::endl;
     while (true) {
       if (x0.assigned()) {
         string bytes;
@@ -735,7 +724,6 @@ namespace Gecode { namespace String {
         y[i] = reach_bwd(dfa.get(), F[i], E, x.at(i), changed);
       if (changed) {
         GECODE_ME_CHECK(commit_refined_blocks(home, x0, std::move(y)));
-        // std::cerr<<"ExtDFA<StringView>::propagated (changed) "<<x0<<"\n\n";
         assert (x0.domain().is_normalized());
         if (x0.assigned())
           return home.ES_SUBSUMED(*this);
@@ -743,7 +731,6 @@ namespace Gecode { namespace String {
       }
       // Reverse run.
       if (DashedString::_REVERSE_REGEX) {
-        // std::cerr << "Reverse propagation\n";
         states = &accepting;
         for (int i = 0; i < n; ++i) {
           F[i] = reach_fwd(dfa.get(), *states, x.at(n - i - 1), true);
@@ -764,14 +751,12 @@ namespace Gecode { namespace String {
         }
         if (changed) {
           GECODE_ME_CHECK(commit_refined_blocks(home, x0, std::move(y)));
-          // std::cerr<<"ExtDFA<StringView>::propagated (changed) "<<x0<<"\n\n";
           assert (x0.domain().is_normalized());
           if (x0.assigned())
             return home.ES_SUBSUMED(*this);
           continue;
           }
       }
-      // std::cerr<<"ExtDFA<StringView>::propagated (no change) "<<x0<<"\n\n";
       assert (x0.domain().is_normalized());
       return ES_FIX;
     }

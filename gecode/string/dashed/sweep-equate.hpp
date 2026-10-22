@@ -14,7 +14,6 @@ namespace Gecode { namespace String {
   template <class Succ, class Block1, class Block2, class Blocks2>
   forceinline Position
   push(const Blocks2& x, const Block1& b, Position& p, const Position& end) {
-    // std::cerr << "push " <<b<< " in " <<x<< " from " <<p<< " to " <<end<< "\n";
     Position start(p);
     int k = lower(b);
     while (k > 0) {
@@ -55,7 +54,6 @@ namespace Gecode { namespace String {
   template <class Succ, class Block1, class Block2, class Blocks2>
   forceinline Position
   stretch(const Blocks2& x, const Block1& b, Position& p, const Position& end) {
-    // std::cerr << "stretch " <<b<< " in " <<x<< " from " <<p<< " to " <<end<< "\n";
     int k = upper(b);
     while (Succ::lt(p, end)) {
       const Block2& x_i = x.at(p.idx);
@@ -280,7 +278,6 @@ namespace Gecode { namespace String {
   opt_region(
     const Blocks& x, const Position& p, const Position& q, NSBlocks& v
   ) {
-    // std::cerr << "split opt " <<p<<' '<<q << std::endl;
     if (p.idx > q.idx)
       return;
     if (p.idx == q.idx) {
@@ -386,7 +383,6 @@ namespace Gecode { namespace String {
     for (int i = 0; i < xlen; ++i) {
       curr = stretch<Fwd, Block1, Block2, Blocks2>(y, x.at(i), curr, lastf);
       m.lep[i] = dual(y, curr);
-      // std::cerr << i << ": LEP(" << x.at(i) << ") = " << m.lep[i] << "\n";
     }
     if (Bwd::lt(firstb, m.lep.last()))
       return false;
@@ -395,7 +391,6 @@ namespace Gecode { namespace String {
     for (int i = xlen - 1; i >= 0; --i) {
       curr = stretch<Bwd, Block1, Block2, Blocks2>(y, x.at(i), curr, lastb);
       m.esp[i] = dual(y, curr);
-      // std::cerr << i << ": ESP(" << x.at(i) << ") = " << m.esp[i] << "\n";
     }
     return !Fwd::lt(firstf, m.esp[0]);
   }
@@ -406,8 +401,6 @@ namespace Gecode { namespace String {
   check_positions(
     const Blocks& x, Position& es, Position& ls, Position& ee, Position& le
   ) {
-    // std::cerr<<"check "<<"  es: "<<es<<" ls: "<<ls<<" ee: "<<ee<<" le: "<<le<<'\n';
-    // std::cerr<<"in "<<x<<'\n';
     if (!Fwd::le(es, ls, upper(x.at(ls.idx))) ||
         !Bwd::le(le, ee, upper(x.at(ee.idx))))
       return false;
@@ -424,7 +417,6 @@ namespace Gecode { namespace String {
   template <class Block1, class Blocks1, class Block2, class Blocks2>
   forceinline bool
   sweep_x(Space& h, Blocks1& x, const Blocks2& y, uvec& up) {
-    // std::cerr << "sweep_x " << x << " vs " << y << std::endl;
     matching m;
     if (!init_x<Block1, Blocks1, Block2, Blocks2>(x, y, m))
       return false;
@@ -470,8 +462,6 @@ namespace Gecode { namespace String {
       Position ls = i ? dual(y, m.lep[i - 1]) : m.esp[0]; // Fwd.
       Position le = m.lep[i]; // Bwd direction (negative offset).
       Position ee = i < xlen - 1 ? dual(y, m.esp[i + 1]) : m.lep[i]; // Bwd.
-      // std::cerr<<"Block "<<i<<": "<<x.at(i)<<"  es: "<<es<<" ls: "<<ls
-      //   <<" ee: "<<ee<<" le: "<<le<<'\n';
       if (!check_positions(y, es, ls, ee, le))
         return false;
       Block1& xi = x.at(i);
@@ -498,7 +488,6 @@ namespace Gecode { namespace String {
         for (int i = 0; i < p_reg.length(); ++i)
           // p_reg[i].u - p.reg[i].l + p_l <= xi.u.
           u += min(k + p_reg[i].l, p_reg[i].u);
-      // std::cerr << xi << ' ' << p_l << ' ' << u << '\n';
       assert (xi.l <= u);
       if (u == 0) {
         up.push(std::make_pair(i, NSBlocks(1)));
@@ -520,7 +509,6 @@ namespace Gecode { namespace String {
           if (!kpref.empty() || !ksuff.empty() ||
               p_reg.logdim() < x.at(0).logdim()) {
             up.push(std::make_pair(0, std::move(p_reg)));
-            // std::cerr << "1) x'_i: " << p_reg << "\n";
             return true;
           }
         }
@@ -544,7 +532,6 @@ namespace Gecode { namespace String {
             v.extend(NSBlocks(ksuff));
           }
           up.push(std::make_pair(i, std::move(v)));
-          // std::cerr << "2) x'_i: " << v << "\n";
         }
         continue;
       }
@@ -562,7 +549,6 @@ namespace Gecode { namespace String {
           assert (xi.l == 0 || p_reg[i].l == 0);
       }
       w.normalize();
-      // std::cerr << "3) x'_i: " << w << "\n";
       assert (w.logdim() <= xi.logdim());
       if (w.size() != 1 || !(w[0] == xi))
         up.push(std::make_pair(i, std::move(w)));
@@ -577,7 +563,6 @@ namespace Gecode { namespace String {
   template <class Block1, class Blocks1, class Block2, class Blocks2>
   forceinline bool
   check_sweep(const Blocks1& x, const Blocks2& y) {
-    // std::cerr << "check_sweep " << x << " vs " << y << std::endl;
     matching m;
     if (!init_x<Block1, Blocks1, Block2, Blocks2>(x, y, m))
       return false;
@@ -620,12 +605,9 @@ namespace Gecode { namespace String {
       Position ls = i ? dual(y, m.lep[i - 1]) : m.esp[0]; // Fwd.
       Position le = m.lep[i]; // Bwd direction (negative offset).
       Position ee = i < xlen - 1 ? dual(y, m.esp[i + 1]) : m.lep[i]; // Bwd.
-      // std::cerr<<"Block "<<i<<": "<<x.at(i)<<"  es: "<<es<<" ls: "<<ls
-      //   <<" ee: "<<ee<<" le: "<<le<<'\n';
       if (!check_positions(y, es, ls, ee, le))
         return false;
     }
-    // std::cerr << m.esp[0] << ' ' << m.lep[xlen-1] << "\n";
     assert ((m.esp[0] == Position({0, 0}) || null(y.at(0))) &&
             (m.lep[xlen - 1] == first_bwd(y) || null(y.at(y.length() - 1))));
     return true;
@@ -638,7 +620,6 @@ namespace Gecode { namespace String {
 
   forceinline void
   refine_eq(Space& h, DashedString& x, const uvec& up) {
-    // std::cerr << "refine_eq " << x << "\n";
     x.changed(true);
     int m = 0;
     for (auto& pair : up) {
@@ -814,7 +795,6 @@ namespace Gecode { namespace String {
 
   forceinline void
   refine_rev(Space& h, DashedString& x, const uvec& up) {
-    // std::cerr << "refine_rev: " << x << "\n";
     x.changed(true);
     int m = 0;
     for (auto& pair : up) {

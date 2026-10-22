@@ -65,14 +65,12 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Concat::propagate(Space& home, const ModEventDelta&) {
-//    std::cerr<<"\nConcat::propagate: "<<x2<<" = "<<x0<<" ++ "<<x1<<std::endl;
     while (true) {
       assert (x0.domain().is_normalized() && x1.domain().is_normalized() &&
               x2.domain().is_normalized());
       GECODE_ME_CHECK(x2.concat(home, x0, x1));
       if(home.failed())
         return ES_FAILED;
-      //std::cerr<<"After concat: "<<x2<<" = "<<x0<<" ++ "<<x1<<std::endl;
       assert (x0.domain().is_normalized() && x1.domain().is_normalized() &&
               x2.domain().is_normalized());
       int assigned = x0.assigned() + x1.assigned() + x2.assigned();

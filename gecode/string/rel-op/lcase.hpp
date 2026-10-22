@@ -29,7 +29,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   LowerCase::propagate(Space& home, const ModEventDelta&) {
-    // std::cerr<<"LowerCase::propagate "<<x1<<" = lcase("<<x0<<")\n";
     int n = x0.domain().length();
     NSBlocks lx(n);
     bool changed = false;
@@ -67,7 +66,6 @@ namespace Gecode { namespace String {
     if (changed)
       uy.normalize();
     GECODE_ME_CHECK(x0.dom(home, uy));
-    // std::cerr<<"LowerCase::propagated "<<x1<<" = lcase("<<x0<<")\n";
     assert (x0.domain().is_normalized() && x1.domain().is_normalized());
     return x0.assigned() && x1.assigned() ?
       home.ES_SUBSUMED(*this) : ES_FIX;

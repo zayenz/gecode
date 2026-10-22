@@ -24,11 +24,9 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Eq::propagate(Space& home, const ModEventDelta&) {
-    // std::cerr<<"\nEq::propagate "<<x0<<" = "<<x1<<std::endl;
     GECODE_ME_CHECK(x0.eq(home, x1));
     if (home.failed())
       return ES_FAILED;
-    // std::cerr<<"propagated: "<<x0<<" = "<<x1<<std::endl;
     assert (x0.domain().is_normalized() && x1.domain().is_normalized());
     if (x0.assigned()) {
       if (!x1.assigned()) {

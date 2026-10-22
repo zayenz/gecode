@@ -64,7 +64,6 @@ namespace Gecode { namespace String {
   GCC::propagate(Space& home, const ModEventDelta&) {
     const vec2& A = data->characters;
     const NSIntSet& C = data->cover;
-    //std::cerr<<"\nGCC::propagate GCC("<<y<<", "<<x<<") -- chars = "<<C<<"\n";
     if (y.assigned())
       return assigned(home);
     int n = x.size();
@@ -196,7 +195,6 @@ namespace Gecode { namespace String {
       pd.refine_card(home, sl, su);
       GECODE_ME_CHECK(y.commit_refinement(home, y_state));
     }
-    //std::cerr<<"\nGCC::propagated GCC("<<y<<", "<<x<<") -- chars = "<<C<<"\n";
     assert (pd.is_normalized());
     return y.assigned() ? assigned(home) : ES_FIX;
   }

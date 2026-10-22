@@ -52,12 +52,10 @@ namespace Gecode { namespace String {
       const DSBlock& b = x.at(i);
       v[i] = suff;
       int c = b.S.max();
-      //std::cerr << b << ' ' << m << ' ' << curr << '\n';
       if (c > suff)
         suff = c - eps;
       else if (b.l > 0)
         suff = c + eps;
-      // std::cerr << v[i] << '\n';
     }
     return v;
   }

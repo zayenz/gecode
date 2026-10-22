@@ -3,6 +3,7 @@
 
 namespace Gecode { namespace String {
 
+  /// Linked inclusive range node owned by NSIntSet
   struct NSRange {
 
     int l, u;
@@ -23,6 +24,13 @@ namespace Gecode { namespace String {
 
 namespace Gecode { namespace String {
 
+  /**
+   * \brief Ordinary-lifetime finite set of string symbols
+   *
+   * The set owns a normalized linked list of disjoint inclusive ranges.
+   * Unlike DSIntSet it is independent of a Gecode Space and is suitable for
+   * temporary analysis, automata labels, and refinements.
+   */
   class NSIntSet {
 
   private:
@@ -37,6 +45,7 @@ namespace Gecode { namespace String {
 
   public:
 
+    /// Forward iterator over individual symbols in ascending order
     class iterator {
 
     private:
@@ -101,6 +110,7 @@ namespace Gecode { namespace String {
 
     NSIntSet(NSIntSet&& that) noexcept;
 
+    /// Check range ordering, cached counts, and endpoint invariants
     bool consistent() const;
 
     NSIntSet& operator=(const NSIntSet& that);
@@ -118,8 +128,10 @@ namespace Gecode { namespace String {
 
     int max() const;
 
+    /// Return the number of individual symbols
     int size() const;
 
+    /// Return the number of stored ranges
     int length() const;
 
     bool empty() const;
@@ -151,8 +163,10 @@ namespace Gecode { namespace String {
 
     void exclude(const NSIntSet& that);
 
+    /// Return the complement within the configured active symbol universe
     NSIntSet comp() const;
 
+    /// Return the one-based \a n-th symbol, or zero when out of range
     int nth(int n) const;
 
     std::string toString() const;
@@ -250,7 +264,6 @@ namespace Gecode { namespace String {
 
     forceinline
     NSIntSet::NSIntSet(int l) {
-      // std::cerr << "NSIntSet::NSIntSet(int l) " << l << "\n";
       if (l < 0)
         l = static_cast<unsigned char>(l);
       NSRange* p = new NSRange(l, l);
@@ -261,7 +274,6 @@ namespace Gecode { namespace String {
 
     forceinline
     NSIntSet::NSIntSet(int l, int u) {
-      // std::cerr << "NSIntSet::NSIntSet(int l, int u)" << l << " " << u << "\n";
       if (l < 0)
         l = static_cast<unsigned char>(l);
       if (u < 0)
@@ -343,7 +355,6 @@ namespace Gecode { namespace String {
 
     forceinline bool
     NSIntSet::empty() const {
-      // std::cerr << "NSIntSet::empty()\n";
       return _fst == NULL && _lst == NULL && _len == 0 && _size == 0;
     }
 
@@ -477,7 +488,6 @@ namespace Gecode { namespace String {
 
     forceinline void
     NSIntSet::intersect(const NSIntSet& that) {
-	    // std::cerr << "NSIntSet::intersectNS " << *this << " " << that << "\n";
       if (empty())
         return;
       if (that.empty()
@@ -528,12 +538,10 @@ namespace Gecode { namespace String {
       this->_lst  = last;
       this->_len  = len;
       this->_size = size;
-      // std::cerr << "intersected " << *this << "\n";
     }
 
     forceinline void
     NSIntSet::intersect(const DSIntSet& that) {
-      // std::cerr << "NSIntSet::intersectDS " << *this << " " << that << "\n";
       if (empty())
         return;
       if (that.empty()
@@ -584,7 +592,6 @@ namespace Gecode { namespace String {
       this->_lst  = last;
       this->_len  = len;
       this->_size = size;
-      // std::cerr << "intersected " << *this << "\n";
     }
 
     forceinline NSIntSet
@@ -677,7 +684,6 @@ namespace Gecode { namespace String {
 
     forceinline void
     NSIntSet::include(const NSIntSet& that) {
-      //std::cerr<<"NSIntSet::includeNS "<<*this<<' '<<that<<std::endl;
       if (empty()) {
         *this = that;
         return;
@@ -819,12 +825,10 @@ namespace Gecode { namespace String {
       this->_lst = last;
       this->_len = len;
       this->_size = size;
-      //std::cerr << "Included " << *this << "\n";
     }
 
     forceinline void
     NSIntSet::include(const DSIntSet& that) {
-      // std::cerr<<"NSIntSet::includeDS "<<*this<<' '<<that<<std::endl;
       if (empty()) {
         *this = NSIntSet(that);
         return;
@@ -940,14 +944,12 @@ namespace Gecode { namespace String {
       }
       if (i1)
         for (NSRange* p = i1; p; p = p->next) {
-	    //std::cerr << "NSRange* p " << p->l << " " << p->u << "\n";
           NSRange* q = new NSRange(p->l, p->u);
           last->next = q;
           last = q;
         }
       else if (i2)
         for (RangeList* p = i2; p; p = p->next()) {
-	    //std::cerr << "RangeList* p " << p->min() << ".." << p->max() << "\n";
           NSRange* q = new NSRange(p->min(), p->max());
           last->next = q;
           last = q;
@@ -971,7 +973,6 @@ namespace Gecode { namespace String {
       this->_lst = last;
       this->_len = len;
       this->_size = size;
-      // std::cerr << "Included " << *this << "\n";
     }
 
     forceinline void
@@ -1089,7 +1090,6 @@ namespace Gecode { namespace String {
 
     forceinline NSIntSet&
     NSIntSet::operator=(const NSIntSet& that) {
-      // std::cerr << *this << " = " << that << '\n';
       if (this != &that) {
         if (that.empty()) {
           this->clear();
@@ -1151,7 +1151,6 @@ namespace Gecode { namespace String {
 
     forceinline void
     NSIntSet::clear() {
-      // std::cerr << "NSIntSet::clear " << *this << '\n';
       if (empty())
         return;
       NSRange* q = NULL;
@@ -1216,6 +1215,12 @@ namespace Gecode { namespace String {
 
 namespace Gecode { namespace String {
 
+  /**
+   * \brief Ordinary-lifetime dashed block
+   *
+   * The block represents between \a l and \a u consecutive symbols, each
+   * drawn from \a S. A null block represents the empty contribution.
+   */
   struct NSBlock {
 
     NSIntSet S;
@@ -1354,6 +1359,13 @@ namespace Gecode { namespace String {
 
 namespace Gecode { namespace String {
 
+  /**
+   * \brief Ordinary-lifetime sequence of dashed blocks
+   *
+   * NSBlocks owns all character ranges through normal C++ lifetime rules.
+   * It is used for temporary analysis and must be normalized before replacing
+   * a space-owned DashedString domain.
+   */
   class NSBlocks : public std::vector<NSBlock> {
 
   public:
@@ -1459,6 +1471,7 @@ namespace Gecode { namespace String {
       return true;
     }
 
+    /// Extract assigned legacy bytes, returning false for non-byte symbols
     forceinline bool
     try_val_bytes(string& value) const {
       if (!known())
@@ -1482,6 +1495,7 @@ namespace Gecode { namespace String {
       return true;
     }
 
+    /// Return assigned legacy bytes or throw for non-byte symbols
     forceinline string
     val() const {
       string value;
@@ -1490,6 +1504,7 @@ namespace Gecode { namespace String {
       return value;
     }
 
+    /// Return the assigned encoding-neutral scalar-value sequence
     forceinline StringVal
     val_symbols() const {
       if (!known())
@@ -1540,6 +1555,7 @@ namespace Gecode { namespace String {
       insert(begin(), std::move(front));
     }
 
+    /// Drop null blocks and merge adjacent blocks with equal symbol sets
     forceinline void
     normalize() {
       int n = size();
@@ -1588,6 +1604,11 @@ namespace Gecode { namespace String {
       return NSBlocks(std::vector<NSBlock>(begin() + i, begin() + j));
     }
 
+    /**
+     * Concatenate this sequence and \a y into \a z.
+     *
+     * Aliasing \a z with \a y is supported.
+     */
     forceinline void
     concat(const NSBlocks& y, NSBlocks& z) const {
       if (&z == &y) {

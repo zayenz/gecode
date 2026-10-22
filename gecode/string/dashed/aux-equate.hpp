@@ -2,6 +2,7 @@
 
 namespace Gecode { namespace String {
 
+  /// Deferred per-block refinements produced by a sweep pass
   typedef vec<std::pair<int, NSBlocks>> uvec;
 
   /// Read-only block adapter for a concrete encoding-neutral value.
@@ -76,9 +77,10 @@ namespace Gecode { namespace String {
   forceinline int null(char) { return false; }
   forceinline int null(StringSymbol) { return false; }
 
+  /// Zero-based block index and scalar offset within that block
   struct Position {
-    int idx; // Block. FIXME: Blocks are 0-based, not 1-based.
-    int off; // How far into the block?
+    int idx;
+    int off;
 
     forceinline bool
     operator==(const Position& x) const {
@@ -97,6 +99,7 @@ namespace Gecode { namespace String {
     return os;
   }
 
+  /// Forward position-order policy for generic sweep helpers
   struct Fwd {
 
     forceinline static bool
@@ -134,6 +137,7 @@ namespace Gecode { namespace String {
 
   };
 
+  /// Backward position-order policy for generic sweep helpers
   struct Bwd {
 
     forceinline static bool
@@ -200,11 +204,13 @@ namespace Gecode { namespace String {
     return Position { 0, upper(x.front()) };
   }
 
+  /// Earliest-start and latest-end positions for every source block
   struct matching {
     vec<Position> esp;
     vec<Position> lep;
   };
 
+  /// Work stack that suppresses consecutive duplicate block indices
   struct sweep_stack: public vec<int> {
 
     void sweep_push(int i) {
@@ -229,6 +235,7 @@ namespace Gecode { namespace String {
     return Position { p.idx, upper(x.at(p.idx)) - p.off };
   }
 
+  /// Mutable virtual concatenation of two dashed domains
   class ConcatView : public DashedView {
   private:
     int l;
@@ -262,6 +269,11 @@ namespace Gecode { namespace String {
     return os;
   }
 
+  /**
+   * \brief Mutable virtual concatenation of any number of dashed domains
+   *
+   * The pointer table has Region lifetime and does not own its blocks.
+   */
   class GConcatView {
   private:
     DSBlock** blocks;
@@ -307,6 +319,7 @@ namespace Gecode { namespace String {
     }
   };
 
+  /// Mutable reverse-order view of one dashed domain
   class ReverseView : public DashedView {
     const int n;
     DashedString& x;

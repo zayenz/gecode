@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 using Gecode::IntVar;
@@ -121,6 +122,19 @@ int main(void) {
     wildcard->symbolic_dfa(unicode, true, true));
   assert(transition_count(*full) < 10);
   assert(full->alphabet() == unicode);
+
+  std::unique_ptr<RegEx> oversized = RegExParser("[a,1,501]").parse();
+  try {
+    oversized->dfa();
+    assert(false);
+  } catch (const std::length_error&) {
+  }
+
+  try {
+    delete oversized->symbolic_dfa(NSIntSet('a'));
+    assert(false);
+  } catch (const std::length_error&) {
+  }
 
   return 0;
 }

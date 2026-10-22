@@ -20,14 +20,12 @@ namespace Gecode { namespace String { namespace Branch {
 
     forceinline Choice*
     BlockMin_LLLL::choice(Space&) {
-      // std::cerr << "\nVar. choice\n";
       const DashedString* p = &x[start].domain();
       const DSBlock& b = p->at(p->first_na_block());
       double s = b.logdim();
       int l = b.u - b.l;
       int m = p->min_length();
       int pos = start;
-      // std::cerr<<x[start]<<" (pos. "<<start<<", dim. "<<s<<")\n";
       for (int i = start + 1; i < x.size(); ++i) {
         if (!x[i].assigned()) {
           p = &x[i].domain();
@@ -35,7 +33,6 @@ namespace Gecode { namespace String { namespace Branch {
           double si = bi.logdim();
           int li = bi.u - bi.l;
           int mi = p->min_length();
-          // std::cerr<<x[i]<<" (pos. "<<i<<", deg. "<<di<<", dim. "<<si<<")\n";
           if (si < s || (si == s && li < l) || (si == s && li == l && mi < m)) {
             s = si;
             l = li;
@@ -44,14 +41,11 @@ namespace Gecode { namespace String { namespace Branch {
           }
         }
       }
-      // std::cerr << "Chosen var. " << x[pos] << " (pos. " << pos << ")\n";
-      // abort();
       return val_llll(pos, &x[pos].domain());
     }
 
     forceinline ExecStatus
     BlockMin_LLLL::commit(Space& home, const Choice& c, unsigned a) {
-      // this->print(home, c, a, std::cerr); std::cerr << '\n';
       return commit_choice(home, c, Block::FIRST, a);
     }
 

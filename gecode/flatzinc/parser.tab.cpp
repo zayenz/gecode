@@ -3805,7 +3805,7 @@ yyreduce:
             pp->domainConstraints.push_back(new ConExpr((yyvsp[-4].sValue), (yyvsp[-2].argVec), (yyvsp[0].argVec)));
           }
           else if (cid=="str_reg" && DashedString::_DECOMP_REGEX && (yyvsp[-2].argVec)->a[0]->isStringVar()) {
-            // FIXME: RegEx will be computed twice!
+            // Parse to detect variable-introducing decompositions; native posting reparses retained text.
             unique_ptr<RegEx> r = RegExParser((yyvsp[-2].argVec)->a[1]->getRegex()).parse();
             if (r->intro_vars()) {
               AST::StringVar* x = dynamic_cast<AST::StringVar*>((yyvsp[-2].argVec)->a[0]);

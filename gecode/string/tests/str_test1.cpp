@@ -304,7 +304,6 @@ public:
     NSBlocks vxx({NSBlock(NSIntSet(0, 1000), 390, 390)});
     DashedString xx(*this, vxx, 0, 10000);
     assert (x.equate(*this, xx));
-//     std::cerr << "x = " << x << std::endl;
     NSBlocks vy("8");
     s = "%N:K+BW#FY9X=TSG7E/<&#+LG+S&M .8K3UT)-'GXFH2D2D(?<BFE>XH*4G(:>F,;?AH652FX>2+MU)?N ?T'?YO,%(90 Y $1Y/,O 8MS6-A=5<WA 8=";
     for (auto& c : s)
@@ -314,10 +313,8 @@ public:
     NSBlocks vyy({NSBlock(NSIntSet(0, 1000), 110, 110)});
     DashedString yy(*this, vyy, 0, 10000);
     assert (y.equate(*this, yy));
-//     std::cerr << "y = " << y << std::endl;
     ConcatView xy(x, y);
     DashedString z(*this, "A;CW7.MC3ER88MWZPRP.9H@A3?(2-UL3S3-3EG<;MQ@4TW6%*,FKYZ;J3XMF9?<F9>F%I)*HTAX3)7?'/0X*19<D1T)A><#V$V4UL7$@D W$,U5&GPFA(MH;.Z-N7/FBT7H0L5/;(#$S<LFZ6(SY5H6#YY/VD.=CUJG.5<7?O%W1N@PTHD3;A3.A4X%GN3Y(/&FFQ2#MK&/)WM&:>=23WNH;Q72P YHOAM++MROZPIOJ=))4MR7?&D;=N/&RR(6E7ZB,$?<<0GIE51P8%NV:JK+BW#FY9X=TSG7E/<&#+LG+S&M .8K3UT)-''GXFH2D2D(?<BFE>XH*4G(:>F,;?AH652FX>2+MU)?N ?T'?YO,%(90 Y $1Y/,O 8MS6-A=5<WA 8=*9.63TS$1BY#<VP+%U.N#%,0@/JH$0X>A<VLG'O@M-II%;D-XXU5,,O+Q8&YWO%DX.SS/AADJG-$.7*FX+R7UEW(E(S5EY:;<M%> CKL#DBB");
-//     std::cerr << "z = " << z << std::endl;
     assert (!sweep_concat(*this, xy, x, y, z));
   }
 
@@ -687,7 +684,8 @@ public:
     std::cerr << "x = " << x << std::endl;
     std::cerr << "y = " << y << std::endl;
     assert (!sweep_equate(*this, x, y));
-    // FIXME: x and y are not equatable.
+    // Failure can follow committed first-direction refinements; callers fail
+    // the Space and do not reuse the partially refined domains.
     bool b = check_sweep<DSBlock, DSBlocks, DSBlock, DSBlocks>(
       x.blocks(), y.blocks()
     );
@@ -805,7 +803,7 @@ public:
   }
 
   void test27() {
-    std::cerr << "\n*** Test 27 ***" << std::endl; //FIXME: How match find it UNSATISFIABLE?
+    std::cerr << "\n*** Test 27 ***" << std::endl;
     NSBlocks v;
     v.push_back(NSBlock(NSIntSet('d'), 2, 3));
     v.push_back(NSBlock(NSIntSet('c'), 0, 5));

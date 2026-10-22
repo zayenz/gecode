@@ -29,8 +29,6 @@ namespace Gecode { namespace String {
 
   forceinline ExecStatus
   Lex::propagate(Space& home, const ModEventDelta&) {
-    //lt ? std::cerr<<"\nLex::propagate "<<x0<<" < " <<x1<<std::endl
-    //   : std::cerr<<"\nLex::propagate "<<x0<<" <= "<<x1<<std::endl;
     if (x0.assigned() && x1.assigned()) {
       const StringVal left = x0.val_symbols();
       const StringVal right = x1.val_symbols();
@@ -52,7 +50,6 @@ namespace Gecode { namespace String {
       assert (left < right || (!lt && left == right));
       return home.ES_SUBSUMED(*this);
     }
-    //std::cerr<<"propagated: "<<x0<<" < (<=) "<<x1<<std::endl;
     assert (x0.domain().is_normalized() && x1.domain().is_normalized());
     return ES_FIX;
   }

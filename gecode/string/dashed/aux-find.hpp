@@ -6,7 +6,6 @@ namespace Gecode { namespace String {
     const DSBlocks& x, const DSBlocks& y, const Position& start,
     int& lb, int& ub, matching& m, int xmin, int ymax, bool mod
   ) {
-    // std::cerr << "push_esp_find " << x << ' ' << y << '\n';
     bool gap = false;
     do {
       int xlen = x.length();
@@ -16,7 +15,6 @@ namespace Gecode { namespace String {
         if (gap)
           end = m.esp[i];
         m.esp[i] = push<Fwd, DSBlock, DSBlock, DSBlocks>(y, x.at(i), end, last);
-        // std::cerr << "ESP[" << i << "] = " << m.esp[i] << end << "\n";
         if (last == m.esp[i] && x.at(i).l > 0) {
           // Prefix cannot fit.
           if (mod)
@@ -39,7 +37,6 @@ namespace Gecode { namespace String {
           // end of x[i].
           m.esp[i] = end;
           gap = true;
-          // std::cerr << "ESP[" << i << "] = " << m.esp[i] << " (gap!)\n";
         }
         end = dual(y, end);
       }
@@ -63,7 +60,6 @@ namespace Gecode { namespace String {
   // Pushing forward the earliest start of x-blocks in y for replace propagator.
   forceinline bool
   push_esp_repl(const DSBlocks& x, const DSBlocks& y, matching& m) {
-    // std::cerr << "push_esp_repl " << x << ' ' << y << '\n';
     bool gap = false;
     do {
       int xlen = x.length();
@@ -73,7 +69,6 @@ namespace Gecode { namespace String {
         if (gap)
           end = m.esp[i];
         m.esp[i] = push<Fwd, DSBlock, DSBlock, DSBlocks>(y, x.at(i), end, last);
-        //std::cerr << "ESP[" << i << "] = " << m.esp[i] << "\n";
         if (last == m.esp[i])
           // Prefix cannot fit.
           return false;
@@ -91,7 +86,6 @@ namespace Gecode { namespace String {
           // end of x[i].
           m.esp[i] = end;
           gap = true;
-          // std::cerr << "ESP[" << i << "] = " << m.esp[i] << " (***GAP***)\n";
         }
         end = dual(y, end);
       }
@@ -102,7 +96,6 @@ namespace Gecode { namespace String {
   // Pushing backward latest ends of x-blocks in y for find/replace propagators.
   forceinline bool
   push_lep(const DSBlocks& x, const DSBlocks& y, matching& m) {
-    // std::cerr << "push_lep " << x << ' ' << y << '\n';
     bool gap = false;
     do {
       int xlen = x.length();
@@ -112,7 +105,6 @@ namespace Gecode { namespace String {
         if (gap)
           end = m.lep[i];
         m.lep[i] = push<Bwd, DSBlock, DSBlock, DSBlocks>(y, x.at(i), end, last);
-        // std::cerr << "LEP[" << i << "] = " << m.lep[i] << "\n";
         if (last == m.lep[i])
           // Suffix cannot fit.
           return false;
@@ -130,7 +122,6 @@ namespace Gecode { namespace String {
           // start of x[i].
           m.lep[i] = end;
           gap = true;
-//           std::cerr << "LEP[" << i << "] = " << m.lep[i] << " (***GAP***)\n";
         }
         end = dual(y, end);
       }
@@ -166,8 +157,6 @@ namespace Gecode { namespace String {
       Position le = m.lep[i];
       Position ls = i ? dual(y, m.lep[i - 1]) : m.esp[0];
       Position ee = i < xlen - 1 ? dual(y, m.esp[i + 1]) : m.lep[i];
-      //std::cerr<<"Block "<<i<<": "<<x.at(i)<<"  es: "<<es<<" ee: "<<ee
-      //  <<" ls: "<<ls<<" le: "<<le<<'\n';
       if (!check_positions(y, es, ls, ee, le))
         return false;
       if (i == 0)
@@ -183,7 +172,6 @@ namespace Gecode { namespace String {
   refine_find(DSBlocks& x, DSBlocks& y,
     matching& m, uvec& upx, uvec& upy, bool& modx, bool& mody
   ) {
-    // std::cerr << "refine_find " << x << ' ' << y << '\n';
     NSIntSet p_set;
     NSBlocks p_reg;
     Position p_es{-1, -1}, p_ls{-1, -1}, p_ee{-1, -1}, p_le{-1, -1};
@@ -210,8 +198,6 @@ namespace Gecode { namespace String {
       Position ee = i < xlen - 1 ? dual(y, m.esp[i + 1]) : m.lep[i];
       if (!check_positions(y, es, ls, ee, le))
         return false;
-      // std::cerr<<"Block "<<i<<": "<<x.at(i)<<"  es: "<<es<<" ee: "<<ee
-      //  <<" ls: "<<ls<<" le: "<<le<<'\n';
       if (xi.known())
         continue;
       if (es != p_es || ls != p_ls || ee != p_ee || le != p_le) {
@@ -232,7 +218,6 @@ namespace Gecode { namespace String {
         for (int i = 0; i < p_reg.length(); ++i)
           // p_reg[i].u - p.reg[i].l + p_l <= xi.u.
           u += p_reg[i].u;
-      // std::cerr << p_reg << ' ' << p_l << '\n';
       if (xi.l > u)
         return false;
       if (u == 0) {
@@ -312,7 +297,6 @@ namespace Gecode { namespace String {
   sweep_find(
     Space& h, DashedString& x, DashedString& y, int& lb, int& ub, bool mod
   ) {
-    // std::cerr<<"sweep_find "<<x<<' '<<y<<' '<<"["<<lb<<", "<<ub<<"] "<<mod<<'\n';
     assert (1 <= lb && lb <= ub);
     // Looking for the first position in y where x can occur.
     int b = 0, p = lb - 1;
@@ -377,7 +361,6 @@ namespace Gecode { namespace String {
       if (mody)
         refine_eq(h, y, upy);
     }
-    // std::cerr<<"swept: "<<x<<' '<<y<<' '<<"["<<lb<<", "<<ub<<"] "<<mod<<'\n';
     return true;
   }
 

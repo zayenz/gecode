@@ -51,7 +51,6 @@ namespace Gecode { namespace String {
 
   forceinline void
   DSIntSet::init(Space& h, const DSIntSet& d) {
-	  // std::cerr << "DSIntSet::init " << *this << " with " << d << "\n";
     _size = d.size();
     if (_size == 0) {
       fst(NULL);
@@ -77,7 +76,6 @@ namespace Gecode { namespace String {
 
   forceinline void
   DSIntSet::init(Space& h, const NSIntSet& that) {
-	//std::cerr << "NSIntSet::init " << *this << " with " << s << "\n";
     _size = that.size();
     if (_size == 0) {
       fst(NULL);
@@ -101,7 +99,6 @@ namespace Gecode { namespace String {
 
   forceinline void
   DSIntSet::update(Space& h, const NSIntSet& that) {
-    //std::cerr << "DSIntSet::update " << *this << " with NS " << that << '\n';
     if (that.empty()) {
       dispose(h);
       fst(NULL);
@@ -132,14 +129,11 @@ namespace Gecode { namespace String {
     r->next(NULL);
     lst(r);
     _size = that.size();
-    //std::cerr << "DSIntSet::updated " << *this << ' ' << "\n";
   }
 
   forceinline void
   DSIntSet::update(Space& h, const DSIntSet& that) {
-	//std::cerr << "DSIntSet::update " << *this << " with DS " << that <<'\n';
     BndSet::update(h, that);
-    //std::cerr << "DSIntSet::updated " << *this << "\n";
   }
 
   forceinline void
@@ -155,7 +149,6 @@ namespace Gecode { namespace String {
       _size = 1;
       return;
     }
-    //std::cerr << "DSIntSet::update " << *this << " with " << c << '\n';
     if (!empty())
       dispose(h);
     RangeList* s = new (h) RangeList(i, i);
@@ -453,7 +446,6 @@ namespace Gecode { namespace String {
 
   forceinline void
   DSBlock::update(Space& h, const DSBlock& that) {
-    //std::cerr << "DSBlock::update " << *this << " <= " << that << '\n';
     if (this != &that) {
       if (S.empty()) {
         init(h, that);
@@ -467,7 +459,6 @@ namespace Gecode { namespace String {
 
   forceinline void
   DSBlock::update(Space& h, const NSBlock& that) {
-    //std::cerr << "DSBlock::update " << *this << " <= " << that << '\n';
     if (S.empty()) {
       init(h, that);
       return;
@@ -616,7 +607,6 @@ namespace Gecode { namespace String {
 
   forceinline void
   DSBlocks::update(Space& h, const DSBlocks& d) {
-    // std::cerr<<"DSArray::update DSBlocks"<<std::endl;
     if (*this == d)
       return;
     int m = d._size;
@@ -625,18 +615,15 @@ namespace Gecode { namespace String {
         x[i].update(h, d.at(i));
       if (m < _size)
         shrink(h, m);
-      // std::cerr<<"Updated: "<<*this<<std::endl;
       return;
     }
     reset(h, m);
     for (int i = 0; i < m; ++i)
       x[i].init(h, d.at(i));
-    // std::cerr<<"Updated: "<<*this<<std::endl;
   }
 
   forceinline void
   DSBlocks::update(Space& h, const NSBlocks& v, int& l, int& u) {
-    // std::cerr<<"DSArray::update NSBlocks"<<std::endl;
     int m = v.size();
     long ll = 0, uu = 0;
     if (m <= _size) {
@@ -653,7 +640,6 @@ namespace Gecode { namespace String {
         uu = DashedString::_MAX_STR_LENGTH;
       l = (int) ll;
       u = (int) uu;
-      // std::cerr<<"Updated: "<<*this<<std::endl;
       return;
     }
     reset(h, m);
@@ -668,12 +654,10 @@ namespace Gecode { namespace String {
       uu = DashedString::_MAX_STR_LENGTH;
     l = (int) ll;
     u = (int) uu;
-    // std::cerr<<"Updated: "<<*this<<std::endl;
   }
 
   forceinline void
   DSBlocks::update(Space& h, const string& s) {
-    // std::cerr<<"DSArray::update " << *this << " with " << s <<std::endl;
     if (s.empty()) {
       clear(h);
       return;
@@ -701,7 +685,6 @@ namespace Gecode { namespace String {
           x[j].l = 1;
           x[j].u = 1;
           ++j;
-          // std::cerr << "x_j: " << x[j] << '\n';
         }
       }
       if (m < _size)
@@ -784,7 +767,6 @@ namespace Gecode { namespace String {
   template <typename Block>
   forceinline void
   DSBlocks::insert(Space& h, int k, const Block& b) {
-    // std::cerr << "Inserting " << b << " at position " << k << " of " << *this << '\n';
     DSBlock* y = h.alloc<DSBlock>(n + 1);
     for (int i = 0; i < k; i++)
       y[i].init(h, x[i]);
@@ -792,7 +774,6 @@ namespace Gecode { namespace String {
     for (int i = k; i < n; i++)
       y[i + 1].init(h, x[i]);
     replace(h, y, n + 1);
-    // std::cerr << "Inserted: " << *this << "\n";
   }
 
   forceinline void
@@ -810,7 +791,6 @@ namespace Gecode { namespace String {
 
   forceinline void
   DSBlocks::normalize(Space& h, int& l, int& u) {
-    // std::cerr<<"normalize "<<*this<<std::endl;
     int m = _size;
     long ll = 0, uu = 0, M = DashedString::_MAX_STR_LENGTH;
     for (int i = 0; i < _size; ) {
@@ -835,7 +815,6 @@ namespace Gecode { namespace String {
       }
       i = j;
     }
-    // std::cerr << "First pass: " << *this <<' '<<m<<' '<<ll<<' '<<uu<< "\n";
     if (m == 0) {
       clear(h);
       l = u = 0;
@@ -876,7 +855,6 @@ namespace Gecode { namespace String {
       if (at(0).u > u)
         at(0).u = u;
     }
-    // std::cerr<< "normalized: " << *this << ' ' << l << ' ' << u << "\n";
   }
 
   template <typename Blocks>
@@ -914,7 +892,6 @@ namespace Gecode { namespace String {
     const NSBlocks& x, int i, const NSBlock& x_i,
     const NSBlocks& y, int j, const NSBlock& y_j, set6 nogoods
   ) {
-    // std::cerr << "\tdeep_check_dp: "<<x<<' '<<i<<' '<<x_i<<"  "<<y<<' '<<j<<' '<<y_j<<' '<<'\n';
     int l_i = lower(x_i), u_i = upper(x_i), l_j = lower(y_j), u_j = upper(y_j);
     tpl6 ng(i, l_i, u_i, j, l_j, u_j);
     if (nogoods.find(ng) != nogoods.end())
@@ -978,7 +955,6 @@ namespace Gecode { namespace String {
   template <class Block1, class Blocks1, class Block2, class Blocks2>
   static bool
   deep_check(const Blocks1& x, const Blocks2& y) {
-    // std::cerr << "deep_check " << x << " " << y << "\n";
     set6 ng;
     int lx = x.length(), ly = y.length();
     if (lx == 0 || ly == 0)
@@ -1033,7 +1009,6 @@ namespace Gecode { namespace String {
     DSBlock& block = at(idx);
     switch (lev) {
       case Branch::LENGTH: {
-        // std::cerr << "Branch::LENGTH\n";
         switch (val) {
           case Branch::MIN:
             refine_ub(h, _min_length);
@@ -1046,7 +1021,6 @@ namespace Gecode { namespace String {
         }
       }
       case Branch::CARD: {
-        // std::cerr << "Branch::CARD\n";
         switch (val) {
           case Branch::MIN:
             block.u = block.l;
@@ -1065,7 +1039,6 @@ namespace Gecode { namespace String {
         }
       }
       case Branch::BASE: {
-        // std::cerr << "Branch::BASE\n";
         if (!block.S.in(split)) {
           h.fail();
           return;
@@ -1099,7 +1072,6 @@ namespace Gecode { namespace String {
       case Branch::LENGTH: {
         if (_min_length == _max_length)
           h.fail();
-        // std::cerr << "Branch::LENGTH\n";
         switch (val) {
           case Branch::MIN:
             refine_lb(_min_length + 1);
@@ -1112,7 +1084,6 @@ namespace Gecode { namespace String {
         }
       }
       case Branch::CARD: {
-        // std::cerr << "Branch::CARD\n";
         if (block.l == block.u)
           h.fail();
         switch (val) {
@@ -1129,7 +1100,6 @@ namespace Gecode { namespace String {
         }
       }
       case Branch::BASE: {
-        // std::cerr << "Branch::BASE\n";
         if (!block.S.in(split))
           return;
         NSIntSet S1(block.S);
@@ -1160,8 +1130,6 @@ namespace Gecode { namespace String {
     Space& h, Branch::Level l, Branch::Value v, Branch::Block b, int split,
     unsigned a
   ) {
-    // std::cerr<<"\nDashedString::commit "<< *this <<" ["<<_min_length<< ", "
-    // << _max_length << "] -- " << l <<' '<< v << ' ' << b << ' '<< a <<'\n';
     int i = -1;
     switch (b) {
       case Branch::FIRST:
@@ -1180,18 +1148,15 @@ namespace Gecode { namespace String {
     a == 0 ? _commit0(h, l, v, i, split) :
       _commit1(h, l, v, i, split);
     _changed = true;
-    // std::cerr<<"Set: "<<*this<<" ["<<_min_length<<", "<< _max_length <<"]\n";
     if (!is_normalized())
       normalize(h);
   }
 
   forceinline bool
   DashedString::is_normalized() const {
-    // std::cerr << *this << ' ' << _min_length << ' ' << _max_length << "\n";
     if (_min_length > _max_length)
       return false;
     int n = length();
-    // std::cerr << at(0).S << ' ' << at(0).l << ' ' << at(0).u << '\n';
     if (n == 1 && (_min_length != at(0).l || _max_length != at(0).u))
       return false;
     for (int i = 1; i < n; ++i) {
@@ -1205,13 +1170,10 @@ namespace Gecode { namespace String {
 
   forceinline bool
   DashedString::find(Space& h, DashedString& x, int& lb, int& ub, bool mod) {
-    // std::cerr << "\nDashedString::find: " << x << " in " << *this <<
-    // " from [" << lb << ", " << ub << "]\n";
     assert (0 <= lb && lb <= ub);
     _changed = x._changed = false;
     if (!sweep_find(h, x, *this, lb, ub, mod))
       return false;
-    // std::cerr << "After find: " << x << " in " << *this << "\n";
     if (mod) {
       bool again;
       do {
@@ -1333,7 +1295,6 @@ namespace Gecode { namespace String {
 
   forceinline bool
   DashedString::concat(Space& h, DashedString& x, DashedString& y) {
-    // std::cerr<<"DashedString::concat "<<*this<<" = "<<x<<" ++ "<<y<<std::endl;
     _changed = x._changed = y._changed = false;
     if (null())
       return equate(h, x) && equate(h, y);
@@ -1436,7 +1397,6 @@ namespace Gecode { namespace String {
       return equate(h, StringVal::from_symbols(std::move(symbols)));
     }
     if (x._min_length > 0 && y._min_length > 0 && contains(x, y)) {
-      // std::cerr << *this << " contains " << x << "  ++  " << y << "\n";
       int norm = x.blocks().back().S == y.at(0).S ? 1 : 0;
       double d = logdim();
       NSBlocks xy(x.length() + y.length() - norm);
@@ -1594,15 +1554,12 @@ namespace Gecode { namespace String {
 
   forceinline bool
   DashedString::lex(Space& h, DashedString& that, bool lt) {
-    // lt ? std::cerr << *this << " < "  << that << "\n"
-    //    : std::cerr << *this << " <= " << that << "\n";
     if (_min_length == 0)
       return (!lt || that.max_length() > 0);
     if (that.max_length() == 0)
       return false;
     _changed = that._changed = false;
     std::vector<float> y_succ = max_succ(that);
-    // std::cerr<<"y_succ = ["; for (auto& v:y_succ) std::cerr<<v<< ", "; std::cerr<<"]\n";
     NSBlocks y_max = that.lex_greatest(y_succ);
     if (known()) {
       StringVal sx = val_symbols(), sy = y_max.val_symbols();
@@ -1648,7 +1605,6 @@ namespace Gecode { namespace String {
       }
       if (_changed)
         normalize(h);
-      // std::cerr << "After lex: x = " << *this << " (" << sub << ")\n";
     }
     std::vector<float> x_succ = min_succ(*this);
     NSBlocks x_min = lex_least(x_succ);
@@ -1697,7 +1653,6 @@ namespace Gecode { namespace String {
       }
       if (that._changed)
         that.normalize(h);
-      // std::cerr << "After lex: y = " << that << '\n';
     }
     if (h.failed())
       return false;
@@ -1721,7 +1676,6 @@ namespace Gecode { namespace String {
 
   forceinline bool
   DashedString::rev(Space& h, DashedString& x) {
-    //std::cerr<<"DashedString::reverse "<<*this<<" = "<<x<<"^-1"<<std::endl;
     _changed = x._changed = false;
     if (known()) {
       string bytes;
@@ -1762,13 +1716,11 @@ namespace Gecode { namespace String {
       return false;
     if ((_changed || x._changed) && !refine_card_eq(h, x))
       return false;
-    // std::cerr<<"reversed: "<<*this<<" "<<_changed<<std::endl;
     return true;
   }
 
   forceinline bool
   DashedString::pow(Space& h, DashedString& x, int& n1, int& n2) {
-    // std::cerr<< "DashedString::pow " << *this << ' ' << x << ' ' << n1 << ' ' << n2 << '\n';
     assert (n1 <= n2);
     _changed = x._changed = false;
     if (n1 == 1 && n2 == 1)
@@ -1797,7 +1749,6 @@ namespace Gecode { namespace String {
     int u = min(_MAX_STR_LENGTH, long(x._max_length) * (n2 - n1));
     xn.emplace_back(x.may_chars(), 0, u);
     xn.normalize();
-//    std::cerr << "xn: " << xn << "\n";
     if (!sweep_equate(h, *this, xn))
       return false;
     if (!refine_card_pow(h, x, n1, n2))
@@ -2038,7 +1989,6 @@ namespace Gecode { namespace String {
 
   forceinline bool
   DashedString::refine_lb(int ly) {
-    // std::cerr << "refine_lb: " << *this << ' ' << ly << "\n";
     if (ly > _max_length)
       return false;
     if (known())
@@ -2074,13 +2024,11 @@ namespace Gecode { namespace String {
       _min_length = lx;
       _changed = true;
     }
-    // std::cerr << "refined: " << *this << ' ' << _changed << ' ' << _min_length << "\n";
     return true;
   }
 
   forceinline bool
   DashedString::refine_ub(Space& h, int uy) {
-    // std::cerr << "refine_ub: " << *this << ' ' << uy << ' ' << _max_length << "\n";
     if (uy < _min_length)
       return false;
     if (known())
@@ -2123,7 +2071,6 @@ namespace Gecode { namespace String {
     }
     if (norm)
       normalize(h);
-    // std::cerr << "refined: " << *this << ' ' << _max_length << "\n";
     assert (is_normalized());
     return true;
   }
@@ -2231,7 +2178,6 @@ namespace Gecode { namespace String {
 
   forceinline bool
   DashedString::equate(Space& h, DashedString& that) {
-    // std::cerr<<"DashedString::equate "<<*this<<' '<<that<<std::endl;
     _changed = that._changed = false;
     if (!refine_card_eq(h, that))
       return false;
@@ -2289,18 +2235,15 @@ namespace Gecode { namespace String {
       that._changed = true;
       return true;
     }
-//    std::cerr<<"refined: "<<*this<<' '<<that<<std::endl;
     if (!sweep_equate(h, *this, that))
       return false;
     if ((_changed || that._changed) && !refine_card_eq(h, that))
       return false;
-    // std::cerr<<"DashedString::equated "<<*this<<' '<<that<<std::endl;
     return true;
   }
 
   forceinline bool
   DashedString::equate(Space& h, const NSBlocks& that) {
-    // std::cerr<<"DashedString::equate "<<*this<<' '<<that<<std::endl;
     _changed = false;
     if (known()) {
       string s;
@@ -2357,7 +2300,6 @@ namespace Gecode { namespace String {
     }
     if (!refine_card(h, max(_min_length, l), min(_max_length, u)))
       return false;
-    // std::cerr<<"equated: "<<*this<<' '<<_changed<<std::endl;
     return true;
   }
 
@@ -2408,13 +2350,11 @@ namespace Gecode { namespace String {
       if (at(0).u > _max_length)
         at(0).u = _max_length;
     }
-    // std::cerr << *this << ' ' << l << ' ' << u << '\n';
     assert (is_normalized());
   }
 
   forceinline void
   DashedString::norm_update(Space& h, NSBlocks& v) {
-    // std::cerr << "norm_update " << *this << " with v = " << v;
     v.normalize();
     int l, u;
     _blocks.update(h, v, l, u);
@@ -2462,7 +2402,6 @@ namespace Gecode { namespace String {
     _min_length = max(_min_length, l);
     _max_length = min(_max_length, u);
     if (_min_length > _max_length) {
-//      std::cerr << "Warning! Failure detected after normalization!\n";
       h.fail();
       return;
     }
@@ -2483,7 +2422,6 @@ namespace Gecode { namespace String {
 
   forceinline bool
   DashedString::contains(const DashedString& that) const {
-    // std::cerr << *this << " DashedString::contains" << that << "\n";
     if (_min_length > that._min_length
     ||  _max_length < that._max_length)
       return false;
@@ -2505,7 +2443,6 @@ namespace Gecode { namespace String {
   }
   forceinline bool
   DashedString::contains(const NSBlocks& that) const {
-    // std::cerr << *this << " DashedString::contains" << that << "\n";
     if (isTop() || (that.null() && _min_length == 0))
       return true;
     int n1 = length(), n2 = that.length();
@@ -2524,7 +2461,6 @@ namespace Gecode { namespace String {
   }
   forceinline bool
   DashedString::contains(const DashedString& x, const DashedString& y) const {
-    // std::cerr << *this << " DashedString::contains" << that << "\n";
     if (isTop())
       return true;
     int n1 = length(), n2 = x.length() + y.length(), norm = 0;

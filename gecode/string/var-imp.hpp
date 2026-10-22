@@ -31,6 +31,10 @@ namespace Gecode { namespace String {
   /**
    * \brief String variable implementation
    *
+   * Dashed-domain methods only mutate storage and set a change marker.
+   * StringVarImp wraps each mutation in a DomainState and emits at most one
+   * aggregate value, length, or domain event per affected variable.
+   *
    * \ingroup Other
    */
   class StringVarImp : public StringVarImpBase {
@@ -38,7 +42,13 @@ namespace Gecode { namespace String {
   friend class StringView;
 
   public:
-    /// Snapshot for an in-place domain refinement
+    /**
+     * \brief Snapshot token for one domain-mutation transaction
+     *
+     * Construction records aggregate length bounds and assignment state, then
+     * clears the dashed domain's change marker. Tokens are tied to exactly one
+     * StringVarImp and are committed by that implementation.
+     */
     class DomainState {
       friend class StringVarImp;
       friend class StringView;
@@ -53,6 +63,7 @@ namespace Gecode { namespace String {
 
   private:
 
+    /// Classify and combine one transaction's aggregate modification event
     ModEvent notify(Space& home, ModEvent me, const DomainState& state);
 
     /// Notify after a mutation, classifying its aggregate length bounds
@@ -70,17 +81,22 @@ namespace Gecode { namespace String {
     GECODE_STRING_EXPORT StringVarImp(Space& home, StringVarImp& x);
 
   public:
-    /// Initialize with domain
+    /// Initialize the top domain
     StringVarImp(Space& home);
 
+    /// Initialize with aggregate length bounds [\a a,\a b]
     StringVarImp(Space& home, int a, int b);
 
+    /// Initialize from a legacy one-byte-per-symbol value
     StringVarImp(Space& home, string s);
 
+    /// Initialize from an encoding-neutral scalar-value sequence
     StringVarImp(Space& home, const StringVal& value);
 
+    /// Initialize from temporary blocks and aggregate length bounds
     StringVarImp(Space& home, NSBlocks& v, int mil, int mal);
 
+    /// Initialize from active alphabet \a s and length bounds [\a a,\a b]
     StringVarImp(Space& home, const NSIntSet& s, int a, int b);
 
     /// Return assigned value (only if assigned)
@@ -89,27 +105,33 @@ namespace Gecode { namespace String {
     /// Return assigned encoding-neutral value (only if assigned)
     StringVal val_symbols(void) const;
 
+    /// Return immutable dashed-domain storage
     const DashedString& domain(void) const;
 
+    /// Return minimum represented string length
     int min_length(void) const;
 
+    /// Return maximum represented string length
     int max_length(void) const;
-
-    int must_chars(void) const;
-
-    int may_chars(void) const;
 
     /// \name Domain tests
     //@{
     /// Test whether variable is assigned
     bool assigned(void) const;
 
+    /// Apply one archived branch alternative and emit its aggregate event
     ModEvent commit(
       Space&, Branch::Level, Branch::Value, Branch::Block, int, unsigned);
 
+    /// Intersect with ordinary-lifetime dashed domain \a d
     ModEvent dom(Space& home, const NSBlocks& d);
 
-    /// Replace the domain with an already-refined normalized block sequence
+    /**
+     * \brief Commit an already-analyzed normalized refinement \a d
+     *
+     * The caller must ensure that \a d is a subset of the current domain.
+     * This method replaces storage and emits one aggregate event.
+     */
     ModEvent refine(Space& home, const NSBlocks& d);
 
   private:
@@ -122,28 +144,40 @@ namespace Gecode { namespace String {
 
   public:
 
+    /// Enforce equality with variable implementation \a x
     ModEvent eq(Space& home, StringVarImp* x);
 
+    /// Enforce equality with legacy byte value \a x
     ModEvent eq(Space& home, string x);
 
+    /// Enforce equality with encoding-neutral value \a value
     ModEvent eq(Space& home, const StringVal& value);
 
+    /// Enforce strict/non-strict lexicographic order before \a x
     ModEvent lex(Space& home, StringVarImp* x, bool lt);
 
+    /// Enforce strictly/non-strictly increasing symbols
     ModEvent inc(Space& home, bool lt);
 
+    /// Raise the aggregate minimum length to \a l
     ModEvent lb(Space& home, int l);
 
+    /// Lower the aggregate maximum length to \a u
     ModEvent ub(Space& home, int u);
 
+    /// Enforce this = \a x concatenated with \a y
     ModEvent concat(Space& home, StringVarImp* x, StringVarImp* y);
 
+    /// Enforce this as the concatenation of \a x
     ModEvent gconcat(Space& home, vec<StringVarImp*> x);
 
+    /// Enforce this = \a x repeated between \a l and \a u times
     ModEvent pow(Space& home, StringVarImp* x, int& l, int& u);
 
+    /// Refine a find relation with one-based position bounds [\a l,\a u]
     ModEvent find(Space& home, StringVarImp* x, int& l, int& u, bool b);
 
+    /// Enforce this = reverse(\a x)
     ModEvent rev(Space& home, StringVarImp* x);
 
     /// \name Dependencies

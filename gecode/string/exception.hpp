@@ -16,7 +16,7 @@ namespace Gecode { namespace String {
   class GECODE_STRING_EXPORT VariableEmptyDomain : public Exception {
   public:
     /// Initialize with location \a l
-  VariableEmptyDomain(const char* l);
+    VariableEmptyDomain(const char* l);
   };
 
   /// %Exception: %Empty dashed string
@@ -26,11 +26,11 @@ namespace Gecode { namespace String {
     EmptyDashedString(const char* l);
   };
 
-  /// %Exception: %Empty dashed string
+  /// %Exception: Unknown string relation
   class GECODE_STRING_EXPORT UnknownRelation : public Exception {
   public:
     /// Initialize with location \a l
-  UnknownRelation(const char* l);
+    UnknownRelation(const char* l);
   };
 
   /// %Exception: Unknown value or variable selection passed as argument

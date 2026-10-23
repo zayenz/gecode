@@ -197,7 +197,7 @@ namespace Gecode {
     /// Test whether the domain contains exactly one concrete string
     bool assigned(void) const;
 
-    /// Return the size (number of strings) of the domain
+    /// Return the estimated size (number of strings) of the dashed domain
     double size(void) const;
 
     /// Return the dashed representation of the domain
@@ -208,7 +208,7 @@ namespace Gecode {
     /// Return the maximum length of a string in the domain
     int max_length() const;
 
-    /// Return scalar values occurring in every string in the domain
+    /// Return symbols from non-optional singleton blocks of the dashed domain
     String::NSIntSet must_chars() const;
     /// Return scalar values occurring in at least one string in the domain
     String::NSIntSet may_chars() const;
@@ -225,15 +225,15 @@ namespace Gecode {
     STRT_NQ,    ///< Disequality (\f$\neq\f$)
     STRT_LEXLT, ///< Lex. less than (\f$\prec\f$)
     STRT_LEXLQ, ///< Lexicographically less than or equal (\f$\preceq\f$)
-    STRT_INCLT, ///< Proper prefix
-    STRT_INCLQ, ///< Prefix
-    STRT_DECLT, ///< Proper suffix
-    STRT_DECLQ, ///< Suffix
+    STRT_INCLT, ///< Strictly increasing symbols (unary rel)
+    STRT_INCLQ, ///< Non-decreasing symbols (unary rel)
+    STRT_DECLT, ///< Strictly decreasing symbols (unary rel)
+    STRT_DECLQ, ///< Non-increasing symbols (unary rel)
   };
 
   enum StringOpType {
     STRT_CAT,    ///< Concatenation (\f$\cdot\f$)
-    STRT_SUB,    ///< Sub-string
+    STRT_SUB,    ///< Reserved substring operation (not supported by rel)
     STRT_REV,    ///< Reverse
     STRT_REP,    ///< Replace
     STRT_REPALL, ///< Replace all
@@ -311,7 +311,7 @@ namespace Gecode {
     StringVarArray(const StringVarArray&);
     /// Initialize from string variable argument array \a a (copy elements)
     StringVarArray(Space& home, const StringVarArgs&);
-    /// Allocate array for \a n string variables (variables are uninitialized)
+    /// Allocate \a n string variables with default length bounds and alphabet
     GECODE_STRING_EXPORT
     StringVarArray(Space& home, int n);
     /**
@@ -364,7 +364,7 @@ namespace Gecode {
    * \ingroup TaskModelString
    */
   //@{
-  /// Post unary prefix or suffix relation \a r on \a x
+  /// Post unary increasing or decreasing symbol-order relation \a r on \a x
   GECODE_STRING_EXPORT void
   rel(Home home, StringVar x, StringRelType r);
 
@@ -416,7 +416,12 @@ namespace Gecode {
    * \ingroup TaskModelString
    */
   //@{
-  /// Post \f$ y = x[i..j] \f$, with positions measured in scalar values
+  /**
+   * \brief Post \f$ y = x[i..j] \f$ with one-based inclusive scalar positions
+   *
+   * Select positions from max(1,i) through min(|x|,j). If the selected
+   * interval is empty, \a y is the empty string.
+   */
   GECODE_STRING_EXPORT void
   substr(Home home, StringVar x, IntVar i, IntVar j, StringVar y);
 

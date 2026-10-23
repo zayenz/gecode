@@ -8,6 +8,10 @@ It was previously known as _G-Strings_. This repository contains the maintained 
 implementation together with the Gecode source tree on which it is built, and the old 
 G-Strings implementation.
 
+MiniZinc string models require Dashed’s bundled mzn2fzn-str compiler, based on MiniZinc 2.0.97 
+with string-variable support [2]. The official MiniZinc release does not currently support this extension. 
+The bundled compiler currently supports Linux x86-64.
+
 Gecode is an open source C++ toolkit for developing constraint-based systems
 and applications. Its existing package, library, namespace, and header names
 are preserved for source and binary compatibility.
@@ -156,5 +160,8 @@ Dashed and the Gecode source tree are distributed under the
 
 1. R. Amadini, G. Gange, P.J. Stuckey. _Dashed strings for string constraint solving_.
    Artif. Intell. 289: 103368 (2020)
+   
+2. R. Amadini, P. Flener, J. Pearson, J.D. Scott, P.J. Stuckey, G. Tack.
+   MiniZinc with Strings. In LOPSTR 2016, Edinburgh, Scotland, UK.
    
    

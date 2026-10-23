@@ -446,11 +446,21 @@ namespace Gecode {
   GECODE_STRING_EXPORT void
   pow(Home home, StringVar x, IntVar n, StringVar y);
 
-  /// Post propagator for \f$ n = find(x, y) \f$
+  /**
+   * \brief Set \a n to the one-based position of \a x in \a y
+   *
+   * Here \a x is the pattern and \a y is the haystack. The value zero means
+   * that \a x does not occur in \a y. Positions count Unicode scalar values.
+   */
   GECODE_STRING_EXPORT void
   find(Home home, StringVar x, StringVar y, IntVar n);
 
-  /// Post propagator for \f$ n = rfind(x, y) \f$
+  /**
+   * \brief Set \a n to the one-based position of the last \a x in \a y
+   *
+   * Here \a x is the pattern and \a y is the haystack. The value zero means
+   * that \a x does not occur in \a y. Positions count Unicode scalar values.
+   */
   GECODE_STRING_EXPORT void
   rfind(Home home, StringVar x, StringVar y, IntVar n);
 
@@ -534,11 +544,12 @@ namespace Gecode {
   extensional(Home home, StringVar x, const std::vector<std::string>& a);
 
   /**
-   * \brief Set \a i to the first match position of strict UTF-8 regex \a expr
+   * \brief Set \a i to the earliest match position of strict UTF-8 regex \a expr
    *
-   * Positions are one-based Unicode scalar offsets. The value zero means that
-   * no non-empty substring matches. Patterns accepting the empty string
-   * violate the posting precondition.
+   * The position is the one-based starting position of the earliest
+   * non-empty substring of \a x matched by \a expr, measured in Unicode scalar
+   * values. The value zero means that no substring matches. Patterns accepting
+   * the empty string violate the posting precondition.
    */
   GECODE_STRING_EXPORT void
   match(Home home, StringVar x, string expr, IntVar i);

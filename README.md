@@ -2,9 +2,11 @@
 
 ![Gecode](images/gecode-logo-100.png "Gecode")
 
-Dashed is a finite string-variable solver integrated into Gecode 6.4. It was
-previously known as G-Strings. This repository contains the maintained Dashed
-implementation together with the Gecode source tree on which it is built.
+_Dashed_ is a bounded-length string variable solver integrated into Gecode 6.4 and
+based on the _dashed string_ representation. We refer to [1] for more details about dashed strings.
+It was previously known as _G-Strings_. This repository contains the maintained Dashed
+implementation together with the Gecode source tree on which it is built, and the old 
+G-Strings implementation.
 
 Gecode is an open source C++ toolkit for developing constraint-based systems
 and applications. Its existing package, library, namespace, and header names
@@ -22,7 +24,7 @@ Gecode comes with
 [extensive tutorial and reference documentation](https://gecode.github.io/documentation.html).
 The build and package instructions below describe this Dashed-enabled tree.
 The [Dashed engineering and performance report](docs/dashed-final-report.md)
-summarizes the final refactoring, validation, and benchmark results.
+summarizes the final refactoring, validation, and benchmark results w.r.t. G-Strings.
 
 ## CMake Build Options
 
@@ -149,3 +151,10 @@ Submit fixes and improvements as pull requests against this repository's
 
 Dashed and the Gecode source tree are distributed under the
 [MIT license](LICENSE).
+
+## References
+
+1. R. Amadini, G. Gange, P.J. Stuckey. _Dashed strings for string constraint solving_.
+   Artif. Intell. 289: 103368 (2020)
+   
+   

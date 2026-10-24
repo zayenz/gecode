@@ -1504,7 +1504,13 @@ CHECKTESTS += String::GCC::MustChars \
 	String::Branch::LengthReplay \
 	String::Branch::SymbolReplay \
 	String::Branch::FixedReplay \
-	String::Branch::Recompute
+	String::Branch::Recompute \
+	String::Channel::StrToNat::0To999 \
+	String::Channel::StrToNat::9To101 \
+	String::Channel::StrToNat::1To101 \
+	String::Channel::StrToNat::-1To101 \
+	String::Channel::NatToStr::-1To0 \
+	String::Channel::NatToStr::0To2147483646
 endif
 
 ifeq "@enable_float_vars@" "yes"
@@ -1522,6 +1528,8 @@ REQUIREDFLOATCHECKTESTS = Float::Arithmetic::PositiveNRootBounds \
 	Float::Arithmetic::NRoot::N::2::XY::Sol::C \
 	Float::Arithmetic::Mult::XYZ::Sol::C
 endif
+
+
 
 # A basic integrity test
 check: test

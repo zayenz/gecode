@@ -1511,6 +1511,7 @@ if(BUILD_TESTING)
         String::Rel::Construction
         String::Rel::AggregateBounds
         String::Rel::SizeEstimate
+        String::Rel::NSIntSetCopy
         String::Var::FailureAdvisors
         String::Var::Events
         String::Var::Lifecycle)

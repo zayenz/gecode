@@ -480,6 +480,52 @@ namespace Test { namespace String { namespace Rel {
     }
   };
 
+  /// Check ownership and range counts across ordinary set copies and moves
+  class NSIntSetCopy : public Base {
+  private:
+    static bool expected(const Gecode::String::NSIntSet& symbols) {
+      return symbols.consistent() && symbols.size() == 6 &&
+        symbols.length() == 3 && symbols.toString() == "{1..2,5,9..11}";
+    }
+
+  public:
+    NSIntSetCopy(void) : Base("String::Rel::NSIntSetCopy") {}
+
+    virtual bool run(void) {
+      using Gecode::String::NSIntSet;
+      NSIntSet source(1,2);
+      source.add(5);
+      source.include(NSIntSet(9,11));
+      {
+        NSIntSet copy(source);
+        NSIntSet assigned(20);
+        assigned = copy;
+        NSIntSet& alias = copy;
+        copy = alias;
+        if (!expected(source) || !expected(copy) || !expected(assigned) ||
+            source.first() == copy.first() || copy.first() == assigned.first())
+          return false;
+        NSIntSet moved(std::move(copy));
+        if (!expected(moved) || !copy.empty() || !copy.consistent())
+          return false;
+        assigned = std::move(moved);
+        if (!expected(assigned) || !moved.empty() || !moved.consistent())
+          return false;
+        assigned.add(20);
+        if (!expected(source) || !assigned.consistent() || assigned.size() != 7)
+          return false;
+        NSIntSet empty;
+        assigned = empty;
+        if (!assigned.empty() || !assigned.consistent())
+          return false;
+        NSIntSet empty_copy(empty);
+        if (!empty_copy.empty() || !empty_copy.consistent())
+          return false;
+      }
+      return expected(source);
+    }
+  };
+
   Binary eq_xy(Gecode::STRT_EQ, false);
   Binary nq_xy(Gecode::STRT_NQ, false);
   Binary lt_xy(Gecode::STRT_LEXLT, false);
@@ -493,6 +539,7 @@ namespace Test { namespace String { namespace Rel {
   Unary dec_lt(Gecode::STRT_DECLT);
   Unary dec_lq(Gecode::STRT_DECLQ);
   Domain domain;
+  NSIntSetCopy ns_int_set_copy;
   LexExtrema lex_extrema;
   Construction construction;
   AggregateBounds aggregate_bounds;

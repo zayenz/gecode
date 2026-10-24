@@ -1470,7 +1470,7 @@ endif
 ifeq "@enable_string_vars@" "yes"
 CHECKTESTS += String::GCC::MustChars
 CHECKTESTS += String::Rel::Construction String::Rel::AggregateBounds \
-	String::Rel::SizeEstimate
+	String::Rel::SizeEstimate String::Rel::NSIntSetCopy
 CHECKTESTS += String::Var::FailureAdvisors String::Var::Events \
 	String::Var::Lifecycle
 endif

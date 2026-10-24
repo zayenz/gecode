@@ -1544,6 +1544,12 @@ if(BUILD_TESTING)
       endforeach()
     endif()
 
+    if(GECODE_ENABLE_STRING_VARS)
+      list(APPEND GECODE_CHECK_TESTS
+        String::Extensional::DfaReification::Assigned
+        String::Extensional::DfaReification::Deferred)
+    endif()
+
     set(GECODE_CHECK_ARGS -iter 2 -threads 0 -fixprob 1)
     foreach(gecode_check_test ${GECODE_CHECK_TESTS})
       list(APPEND GECODE_CHECK_ARGS -test ${gecode_check_test})

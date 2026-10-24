@@ -1491,6 +1491,11 @@ REQUIREDFLOATCHECKTESTS = Float::Arithmetic::PositiveNRootBounds \
 	Float::Arithmetic::Mult::XYZ::Sol::C
 endif
 
+ifeq "@enable_string_vars@" "yes"
+CHECKTESTS += String::Extensional::DfaReification::Assigned \
+	String::Extensional::DfaReification::Deferred
+endif
+
 # A basic integrity test
 check: test
 	@for t in $(REQUIREDFLOATCHECKTESTS); do \

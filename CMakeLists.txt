@@ -1507,14 +1507,24 @@ if(BUILD_TESTING)
     endif()
     if(GECODE_ENABLE_STRING_VARS)
       list(APPEND GECODE_CHECK_TESTS
+        String::RelOp::Power
         String::GCC::MustChars
+        String::Substring::ClippedBoundaries
+        String::RFind::Boundaries
+        String::Branch::LengthReplay
+        String::Branch::SymbolReplay
+        String::Branch::FixedReplay
+        String::Branch::Recompute
+        String::Channel::StrToNat::0To999
+        String::Channel::StrToNat::9To101
+        String::Channel::StrToNat::1To101
+        String::Channel::StrToNat::-1To101
+        String::Channel::NatToStr::-1To0
+        String::Channel::NatToStr::0To2147483646
         String::Rel::Construction
         String::Rel::AggregateBounds
         String::Rel::SizeEstimate
         String::Rel::NSIntSetCopy
-        String::Var::FailureAdvisors
-        String::Var::Events
-        String::Var::Lifecycle
         String::Replace::All
         String::Replace::First::EqualResult::Alias
         String::Replace::First::EqualResult::Distinct
@@ -1532,23 +1542,13 @@ if(BUILD_TESTING)
         String::Replace::All::VariableQuery
         String::Replace::First::Overlap
         String::Replace::Last::Overlap
-        String::RelOp::Power
-        String::Substring::ClippedBoundaries
-        String::RFind::Boundaries
         String::Rel::ScalarIncreasing
         String::Rel::ScalarDecreasing
         String::Predicates::ScalarAlphabet
         String::Replace::ScalarReplacement
-        String::Branch::LengthReplay
-        String::Branch::SymbolReplay
-        String::Branch::FixedReplay
-        String::Branch::Recompute
-        String::Channel::StrToNat::0To999
-        String::Channel::StrToNat::9To101
-        String::Channel::StrToNat::1To101
-        String::Channel::StrToNat::-1To101
-        String::Channel::NatToStr::-1To0
-        String::Channel::NatToStr::0To2147483646)
+        String::Var::FailureAdvisors
+        String::Var::Events
+        String::Var::Lifecycle)
     endif()
     if(GECODE_ENABLE_FLOAT_VARS)
       set(GECODE_FLOAT_CHECK_TESTS
@@ -1576,6 +1576,13 @@ if(BUILD_TESTING)
             "Required Float check test is missing: ${gecode_required_float_test}")
         endif()
       endforeach()
+    endif()
+
+    if(GECODE_ENABLE_STRING_VARS)
+      list(APPEND GECODE_CHECK_TESTS
+        String::Extensional::DfaReification::Assigned
+        String::Extensional::DfaReification::Deferred
+        String::Extensional::StarDecomposition)
     endif()
 
     set(GECODE_CHECK_ARGS -iter 2 -threads 0 -fixprob 1)

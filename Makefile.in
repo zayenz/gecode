@@ -1223,7 +1223,7 @@ endif
 
 STRINGTESTSRC00 = \
 	rel rel-op extensional predicates length channel gcc char2code element find \
-	char-at substring match replace var
+	char-at substring match replace branch var
 STRINGTESTSRC0 = test/string.cpp $(STRINGTESTSRC00:%=test/string/%.cpp)
 ifeq "@enable_string_vars@" "yes"
 STRINGTESTOBJ = $(STRINGTESTSRC0:%.cpp=%$(OBJSUFFIX))
@@ -1470,47 +1470,30 @@ endif
 
 ifeq "@enable_string_vars@" "yes"
 CHECKTESTS += String::GCC::MustChars \
-	String::Rel::Construction \
-	String::Rel::AggregateBounds \
-	String::Rel::SizeEstimate \
-	String::Rel::NSIntSetCopy \
-	String::Var::FailureAdvisors \
-	String::Var::Events \
-	String::Var::Lifecycle \
-	String::Replace::All \
+	String::Branch::LengthReplay String::Branch::SymbolReplay \
+	String::Branch::FixedReplay String::Branch::Recompute
+CHECKTESTS += String::Substring::ClippedBoundaries String::RFind::Boundaries
+CHECKTESTS += String::Rel::Construction String::Rel::AggregateBounds \
+	String::Rel::SizeEstimate String::Rel::NSIntSetCopy String::Rel::ScalarIncreasing \
+	String::Rel::ScalarDecreasing String::Predicates::ScalarAlphabet \
+	String::Replace::ScalarReplacement
+CHECKTESTS += String::Replace::All \
 	String::Replace::First::EqualResult::Alias \
 	String::Replace::First::EqualResult::Distinct \
 	String::Replace::Last::EqualResult::Alias \
 	String::Replace::Last::EqualResult::Distinct \
 	String::Replace::All::EqualResult::Alias \
 	String::Replace::All::EqualResult::Distinct \
-	String::Replace::First::QueryResult \
-	String::Replace::Last::QueryResult \
+	String::Replace::First::QueryResult String::Replace::Last::QueryResult \
 	String::Replace::All::QueryResult \
-	String::Replace::First::EmptySource \
-	String::Replace::Last::EmptySource \
+	String::Replace::First::EmptySource String::Replace::Last::EmptySource \
 	String::Replace::All::EmptyQuery::Bytes \
 	String::Replace::All::EmptyQuery::Scalars \
 	String::Replace::All::VariableQuery \
-	String::Replace::First::Overlap \
-	String::Replace::Last::Overlap \
-	String::RelOp::Power \
-	String::Substring::ClippedBoundaries \
-	String::RFind::Boundaries \
-	String::Rel::ScalarIncreasing \
-	String::Rel::ScalarDecreasing \
-	String::Predicates::ScalarAlphabet \
-	String::Replace::ScalarReplacement \
-	String::Branch::LengthReplay \
-	String::Branch::SymbolReplay \
-	String::Branch::FixedReplay \
-	String::Branch::Recompute \
-	String::Channel::StrToNat::0To999 \
-	String::Channel::StrToNat::9To101 \
-	String::Channel::StrToNat::1To101 \
-	String::Channel::StrToNat::-1To101 \
-	String::Channel::NatToStr::-1To0 \
-	String::Channel::NatToStr::0To2147483646
+	String::Replace::First::Overlap String::Replace::Last::Overlap
+CHECKTESTS += String::RelOp::Power
+CHECKTESTS += String::Var::FailureAdvisors String::Var::Events \
+	String::Var::Lifecycle
 endif
 
 ifeq "@enable_float_vars@" "yes"
@@ -1529,7 +1512,17 @@ REQUIREDFLOATCHECKTESTS = Float::Arithmetic::PositiveNRootBounds \
 	Float::Arithmetic::Mult::XYZ::Sol::C
 endif
 
-
+ifeq "@enable_string_vars@" "yes"
+CHECKTESTS += String::Channel::StrToNat::0To999 \
+	String::Channel::StrToNat::9To101 \
+	String::Channel::StrToNat::1To101 \
+	String::Channel::StrToNat::-1To101 \
+	String::Channel::NatToStr::-1To0 \
+	String::Channel::NatToStr::0To2147483646 \
+	String::Extensional::DfaReification::Assigned \
+	String::Extensional::DfaReification::Deferred \
+	String::Extensional::StarDecomposition
+endif
 
 # A basic integrity test
 check: test

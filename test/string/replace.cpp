@@ -60,6 +60,75 @@ namespace Test { namespace String { namespace Replace {
     }
   };
 
+  std::string operation_name(Gecode::StringOpType operation) {
+    switch (operation) {
+    case Gecode::STRT_REP: return "First";
+    case Gecode::STRT_REPLST: return "Last";
+    case Gecode::STRT_REPALL: return "All";
+    default: GECODE_NEVER;
+    }
+    return "Unknown";
+  }
+
+  class EqualResult : public Test {
+  private:
+    Gecode::StringOpType operation;
+    bool shared;
+  public:
+    EqualResult(Gecode::StringOpType operation0, bool shared0)
+      : Test("Replace::" + operation_name(operation0) + "::EqualResult::" +
+             (shared0 ? "Alias" : "Distinct"), 2, "ab", 1),
+        operation(operation0), shared(shared0) {}
+
+    virtual bool solution(const Assignment& assignment) const {
+      return (assignment[0] == assignment[1]) || (assignment[0] == "b");
+    }
+
+    virtual void post(Gecode::Space& home, Gecode::StringVarArray& x) {
+      Gecode::StringVar source(home, "a");
+      Gecode::StringVar result = shared ? source : Gecode::StringVar(home, "a");
+      Gecode::rel(home, source, x[0], x[1], operation, result);
+    }
+  };
+
+  class QueryResult : public Test {
+  private:
+    Gecode::StringOpType operation;
+  public:
+    QueryResult(Gecode::StringOpType operation0)
+      : Test("Replace::" + operation_name(operation0) + "::QueryResult",
+             1, "ab", 2), operation(operation0) {}
+
+    virtual bool solution(const Assignment& assignment) const {
+      return (operation != Gecode::STRT_REPALL) && (assignment[0] == "a");
+    }
+
+    virtual void post(Gecode::Space& home, Gecode::StringVarArray& x) {
+      Gecode::StringVar source(home, "aa");
+      Gecode::StringVar replacement(home, "");
+      Gecode::rel(home, source, x[0], replacement, operation, x[0]);
+    }
+  };
+
+  class EmptySource : public Test {
+  private:
+    Gecode::StringOpType operation;
+  public:
+    EmptySource(Gecode::StringOpType operation0)
+      : Test("Replace::" + operation_name(operation0) + "::EmptySource",
+             2, "ab", 1), operation(operation0) {}
+
+    virtual bool solution(const Assignment& assignment) const {
+      return assignment[0] == assignment[1];
+    }
+
+    virtual void post(Gecode::Space& home, Gecode::StringVarArray& x) {
+      Gecode::StringVar source(home, "");
+      Gecode::StringVar query(home, "");
+      Gecode::rel(home, source, query, x[0], operation, x[1]);
+    }
+  };
+
   class AllProgressSpace : public Gecode::Space {
   public:
     Gecode::StringVar source;
@@ -311,6 +380,17 @@ namespace Test { namespace String { namespace Replace {
   };
 
   Occurrence all(Occurrence::ALL);
+  EqualResult first_equal_alias(Gecode::STRT_REP, true);
+  EqualResult first_equal_distinct(Gecode::STRT_REP, false);
+  EqualResult last_equal_alias(Gecode::STRT_REPLST, true);
+  EqualResult last_equal_distinct(Gecode::STRT_REPLST, false);
+  EqualResult all_equal_alias(Gecode::STRT_REPALL, true);
+  EqualResult all_equal_distinct(Gecode::STRT_REPALL, false);
+  QueryResult first_query_result(Gecode::STRT_REP);
+  QueryResult last_query_result(Gecode::STRT_REPLST);
+  QueryResult all_query_result(Gecode::STRT_REPALL);
+  EmptySource first_empty_source(Gecode::STRT_REP);
+  EmptySource last_empty_source(Gecode::STRT_REPLST);
   EmptyQuery empty_query_bytes(false);
   EmptyQuery empty_query_scalars(true);
   VariableQuery variable_query;

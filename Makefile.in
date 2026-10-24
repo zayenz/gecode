@@ -1500,7 +1500,11 @@ CHECKTESTS += String::GCC::MustChars \
 	String::Rel::ScalarIncreasing \
 	String::Rel::ScalarDecreasing \
 	String::Predicates::ScalarAlphabet \
-	String::Replace::ScalarReplacement
+	String::Replace::ScalarReplacement \
+	String::Branch::LengthReplay \
+	String::Branch::SymbolReplay \
+	String::Branch::FixedReplay \
+	String::Branch::Recompute
 endif
 
 ifeq "@enable_float_vars@" "yes"

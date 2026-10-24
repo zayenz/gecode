@@ -1538,7 +1538,11 @@ if(BUILD_TESTING)
         String::Rel::ScalarIncreasing
         String::Rel::ScalarDecreasing
         String::Predicates::ScalarAlphabet
-        String::Replace::ScalarReplacement)
+        String::Replace::ScalarReplacement
+        String::Branch::LengthReplay
+        String::Branch::SymbolReplay
+        String::Branch::FixedReplay
+        String::Branch::Recompute)
     endif()
     if(GECODE_ENABLE_FLOAT_VARS)
       set(GECODE_FLOAT_CHECK_TESTS

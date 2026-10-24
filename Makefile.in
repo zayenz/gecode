@@ -1483,6 +1483,13 @@ REQUIREDFLOATCHECKTESTS = Float::Arithmetic::PositiveNRootBounds \
 	Float::Arithmetic::Mult::XYZ::Sol::C
 endif
 
+ifeq "@enable_string_vars@" "yes"
+CHECKTESTS += String::Channel::StrToNat::0To999 \
+	String::Channel::StrToNat::9To101 \
+	String::Channel::StrToNat::1To101 \
+	String::Channel::StrToNat::-1To101
+endif
+
 # A basic integrity test
 check: test
 	@for t in $(REQUIREDFLOATCHECKTESTS); do \

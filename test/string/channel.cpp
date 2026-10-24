@@ -30,17 +30,18 @@
 
 namespace Test { namespace String { namespace Channel {
 
-  /// Decode a digit string the way StrToNat does: -1 if \a s is empty or
-  /// contains a non-digit, the (leading-zeros-tolerant) decimal value
-  /// otherwise.
+  /// Parse the short decimal strings enumerated by these tests.
   static int
   str_to_nat(const std::string& s) {
     if (s.empty())
       return -1;
-    for (std::string::const_iterator c = s.begin(); c != s.end(); ++c)
+    int value = 0;
+    for (std::string::const_iterator c = s.begin(); c != s.end(); ++c) {
       if ((*c < '0') || (*c > '9'))
         return -1;
-    return std::stoi(s);
+      value = 10 * value + (*c - '0');
+    }
+    return value;
   }
 
   /// Encode the way NatToStr does: "" for negative n, the canonical
@@ -63,8 +64,9 @@ namespace Test { namespace String { namespace Channel {
     }
 
   public:
-    StrToNat(int lo0, int hi0)
-      : Test("Channel::" + name(lo0, hi0), 1, "09a+", 2),
+    StrToNat(int lo0, int hi0, const std::string& alphabet0 = "09a+",
+             int max_length0 = 2)
+      : Test("Channel::" + name(lo0, hi0), 1, alphabet0, max_length0),
         lo(lo0), hi(hi0) {}
 
     virtual bool solution(const Assignment& a) const {
@@ -112,6 +114,12 @@ namespace Test { namespace String { namespace Channel {
   StrToNat str_to_nat_wide(-1, 99);
   StrToNat str_to_nat_narrow(0, 5);
   StrToNat str_to_nat_unreachable(11, 50);
+  StrToNat str_to_nat_three_digits(0, 999, "12", 3);
+  StrToNat str_to_nat_digit_boundary(9, 101, "019", 3);
+  StrToNat str_to_nat_leading_zeros(1, 101, "019", 4);
+  StrToNat str_to_nat_invalid(-1, 101, "019a", 3);
+  StrToNat str_to_nat_equal_width(100, 219, "0129", 3);
+  StrToNat str_to_nat_four_digits(10, 1001, "012", 4);
 
   NatToStr nat_to_str_only_negative(-3, -1);
   NatToStr nat_to_str_wide(-1, 99);

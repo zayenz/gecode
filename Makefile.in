@@ -1468,8 +1468,9 @@ BLACKBOXCHECKENV = \
 endif
 
 ifeq "@enable_string_vars@" "yes"
-CHECKTESTS += String::Rel::ScalarIncreasing \
-	String::Substring::ClippedBoundaries String::RFind::Boundaries
+CHECKTESTS += String::Rel::ScalarIncreasing String::Rel::ScalarDecreasing \
+	String::Substring::ClippedBoundaries String::RFind::Boundaries \
+	String::Predicates::ScalarAlphabet String::Replace::ScalarReplacement
 CHECKTESTS += String::RelOp::Power
 endif
 

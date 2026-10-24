@@ -98,12 +98,15 @@ namespace Test { namespace String { namespace Find {
     Gecode::StringVar source;
     Gecode::IntVar index;
 
-    ReverseSpace(const std::string& pattern_value,
-                 const std::string& source_value, bool assigned)
+    ReverseSpace(const Gecode::String::StringVal& pattern_value,
+                 const Gecode::String::StringVal& source_value, bool assigned,
+                 int first)
       : pattern(assigned ? Gecode::StringVar(*this, pattern_value) :
-          Gecode::StringVar(*this, Gecode::String::NSIntSet('a', 'b'), 0, 2)),
+          Gecode::StringVar(*this,
+            Gecode::String::NSIntSet(first, first + 1), 0, 2)),
         source(assigned ? Gecode::StringVar(*this, source_value) :
-          Gecode::StringVar(*this, Gecode::String::NSIntSet('a', 'b'), 0, 3)),
+          Gecode::StringVar(*this,
+            Gecode::String::NSIntSet(first, first + 1), 0, 3)),
         index(*this, 0, 4) {
       Gecode::rfind(*this, pattern, source, index);
       if (!assigned) {
@@ -128,18 +131,20 @@ namespace Test { namespace String { namespace Find {
 
   class ReverseBoundaries : public Base {
   private:
-    static int last_position(const std::string& pattern,
-                             const std::string& source) {
+    static int last_position(const Gecode::String::StringVal& pattern,
+                             const Gecode::String::StringVal& source) {
       int last = 0;
       for (int offset = 0; offset <= static_cast<int>(source.size()); ++offset)
-        if (source.compare(offset, pattern.size(), pattern) == 0)
+        if (pattern.size() <= source.size() - offset &&
+            std::equal(pattern.begin(), pattern.end(), source.begin() + offset))
           last = offset + 1;
       return last;
     }
 
-    static bool matches(const std::string& pattern,
-                        const std::string& source, bool assigned) {
-      ReverseSpace root(pattern, source, assigned);
+    static bool matches(const Gecode::String::StringVal& pattern,
+                        const Gecode::String::StringVal& source, bool assigned,
+                        int first) {
+      ReverseSpace root(pattern, source, assigned, first);
       Gecode::Search::Options options;
       options.threads = 1;
       Gecode::DFS<ReverseSpace> search(&root, options);
@@ -155,11 +160,20 @@ namespace Test { namespace String { namespace Find {
     ReverseBoundaries(void) : Base("String::RFind::Boundaries") {}
 
     virtual bool run(void) {
-      for (Assignment pattern(1, "ab", 2); pattern(); ++pattern)
-        for (Assignment source(1, "ab", 3); source(); ++source)
-          for (bool assigned : {false, true})
-            if (!matches(pattern[0], source[0], assigned))
-              return false;
+      for (int first : {static_cast<int>('a'), 0x100})
+        for (Assignment pattern(1, "ab", 2); pattern(); ++pattern)
+          for (Assignment source(1, "ab", 3); source(); ++source) {
+            std::vector<Gecode::String::StringSymbol> p, s;
+            for (char symbol : pattern[0])
+              p.push_back(first + symbol - 'a');
+            for (char symbol : source[0])
+              s.push_back(first + symbol - 'a');
+            for (bool assigned : {false, true})
+              if (!matches(Gecode::String::StringVal::from_symbols(p),
+                           Gecode::String::StringVal::from_symbols(s),
+                           assigned, first))
+                return false;
+          }
       return true;
     }
   };

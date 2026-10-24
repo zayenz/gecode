@@ -22,9 +22,9 @@ namespace Gecode {
     rel(home, n, IRT_LQ, uy + 1);
     rel(home, n, IRT_GQ, 0);
     // x1 = rev(x), y1 = rev(y), m = find(x1, y1).
-    StringVar x1(home, lx, ux);
+    StringVar x1(home, x.may_chars(), lx, ux);
     rel(home, x, STRT_REV, x1);
-    StringVar y1(home, ly, uy);
+    StringVar y1(home, y.may_chars(), ly, uy);
     rel(home, y, STRT_REV, y1);
     IntVar m(home, 0, std::max(1, uy));
     find(home, x1, y1, m);

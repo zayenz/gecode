@@ -45,6 +45,15 @@ namespace Test { namespace String { namespace Substring {
     }
   };
 
+  class PostingSpace : public Gecode::Space {
+  public:
+    PostingSpace(void) {}
+    PostingSpace(PostingSpace& s) : Gecode::Space(s) {}
+    virtual Gecode::Space* copy(void) {
+      return new PostingSpace(*this);
+    }
+  };
+
   /// Exercise both the concrete-source propagator and the fallback.
   class SliceSpace : public Gecode::Space {
   public:
@@ -53,12 +62,13 @@ namespace Test { namespace String { namespace Substring {
     Gecode::IntVar from;
     Gecode::IntVar to;
 
-    SliceSpace(const std::string& value, bool assigned)
+    SliceSpace(const Gecode::String::StringVal& value, bool assigned,
+               int first = 'a')
       : source(assigned ? Gecode::StringVar(*this, value) :
-          Gecode::StringVar(*this, Gecode::String::NSIntSet('a', 'b'),
+          Gecode::StringVar(*this, Gecode::String::NSIntSet(first, first + 1),
                             static_cast<int>(value.size()),
                             static_cast<int>(value.size()))),
-        result(*this, Gecode::String::NSIntSet('a', 'b'), 0, 3),
+        result(*this, Gecode::String::NSIntSet(first, first + 1), 0, 3),
         from(*this, -1, 4), to(*this, -1, 4) {
       Gecode::substr(*this, source, from, to, result);
       Gecode::IntVarArgs indices;
@@ -83,17 +93,19 @@ namespace Test { namespace String { namespace Substring {
 
   class ClippedBoundaries : public Base {
   private:
-    static std::string slice(const std::string& source, int from, int to) {
-      std::string result;
+    static Gecode::String::StringVal
+    slice(const Gecode::String::StringVal& source, int from, int to) {
+      std::vector<Gecode::String::StringSymbol> result;
       for (int position = 1; position <= static_cast<int>(source.size());
            ++position)
         if (position >= from && position <= to)
-          result += source[position - 1];
-      return result;
+          result.push_back(source[position - 1]);
+      return Gecode::String::StringVal::from_symbols(result);
     }
 
     static bool retains_empty_indices(void) {
-      SliceSpace negative_end("aa", false);
+      SliceSpace negative_end(
+        Gecode::String::StringVal::from_bytes("aa"), false);
       Gecode::rel(negative_end, negative_end.from, Gecode::IRT_EQ, 1);
       Gecode::dom(negative_end, negative_end.to, -1, 1);
       Gecode::rel(negative_end, negative_end.result, Gecode::STRT_EQ,
@@ -102,7 +114,7 @@ namespace Test { namespace String { namespace Substring {
           !negative_end.to.in(-1) || negative_end.to.in(1))
         return false;
 
-      SliceSpace inverted("aaa", false);
+      SliceSpace inverted(Gecode::String::StringVal::from_bytes("aaa"), false);
       Gecode::dom(inverted, inverted.from, 1, 3);
       Gecode::rel(inverted, inverted.to, Gecode::IRT_EQ, 1);
       Gecode::rel(inverted, inverted.result, Gecode::STRT_EQ,
@@ -111,8 +123,26 @@ namespace Test { namespace String { namespace Substring {
         inverted.from.in(3) && !inverted.from.in(1);
     }
 
-    static bool matches(const std::string& source, bool assigned) {
-      SliceSpace root(source, assigned);
+    static bool retains_excluded_scalars(void) {
+      using namespace Gecode;
+      using Gecode::String::StringVal;
+      // The selected byte must not restrict either excluded scalar boundary.
+      PostingSpace home;
+      Gecode::String::NSIntSet alphabet('b');
+      alphabet.add(0x100);
+      alphabet.add(0x101);
+      StringVar source(home, alphabet, 3, 3), result(home, "b");
+      IntVar from(home, 2, 2), to(home, 2, 2);
+      substr(home, source, from, to, result);
+      rel(home, source, STRT_EQ,
+          StringVar(home, StringVal::from_symbols({0x100, 'b', 0x101})));
+      return home.status() != SS_FAILED && source.assigned() &&
+        result.val_symbols() == StringVal::from_symbols({'b'});
+    }
+
+    static bool matches(const Gecode::String::StringVal& source, bool assigned,
+                        int first) {
+      SliceSpace root(source, assigned, first);
       if (!assigned)
         Gecode::rel(root, root.source, Gecode::STRT_EQ,
                     Gecode::StringVar(root, source));
@@ -126,7 +156,8 @@ namespace Test { namespace String { namespace Substring {
         if (!s->from.assigned() || !s->to.assigned() || !s->result.assigned())
           return false;
         const int from = s->from.val(), to = s->to.val();
-        if (seen[from + 1][to + 1] || s->result.val() != slice(source, from, to))
+        if (seen[from + 1][to + 1] ||
+            s->result.val_symbols() != slice(source, from, to))
           return false;
         seen[from + 1][to + 1] = true;
         ++count;
@@ -138,12 +169,18 @@ namespace Test { namespace String { namespace Substring {
     ClippedBoundaries(void) : Base("String::Substring::ClippedBoundaries") {}
 
     virtual bool run(void) {
-      if (!retains_empty_indices())
+      if (!retains_empty_indices() || !retains_excluded_scalars())
         return false;
-      for (Assignment source(1, "ab", 3); source(); ++source)
-        for (bool assigned : {false, true})
-          if (!matches(source[0], assigned))
-            return false;
+      for (int first : {static_cast<int>('a'), 0x100})
+        for (Assignment source(1, "ab", 3); source(); ++source) {
+          std::vector<Gecode::String::StringSymbol> symbols;
+          for (char symbol : source[0])
+            symbols.push_back(first + symbol - 'a');
+          for (bool assigned : {false, true})
+            if (!matches(Gecode::String::StringVal::from_symbols(symbols),
+                         assigned, first))
+              return false;
+        }
       return true;
     }
   };

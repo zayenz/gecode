@@ -1510,7 +1510,10 @@ if(BUILD_TESTING)
         String::RelOp::Power
         String::Substring::ClippedBoundaries
         String::RFind::Boundaries
-        String::Rel::ScalarIncreasing)
+        String::Rel::ScalarIncreasing
+        String::Rel::ScalarDecreasing
+        String::Predicates::ScalarAlphabet
+        String::Replace::ScalarReplacement)
     endif()
     if(GECODE_ENABLE_FLOAT_VARS)
       set(GECODE_FLOAT_CHECK_TESTS

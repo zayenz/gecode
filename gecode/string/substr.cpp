@@ -54,7 +54,9 @@ namespace Gecode {
     linear(home, coefficients, suffix_bounds, IRT_EQ, 0);
     length(home, y, result_length);
 
-    StringVar prefix(home), prefix_result(home), suffix(home);
+    StringVar prefix(home, x.may_chars(), 0, upper),
+      prefix_result(home, x.may_chars(), 0, upper),
+      suffix(home, x.may_chars(), 0, upper);
     length(home, prefix, prefix_length);
     length(home, suffix, suffix_length);
     rel(home, prefix, y, STRT_CAT, prefix_result);
@@ -86,14 +88,18 @@ namespace Gecode {
   // x startswith y <==> x = y ++ z.
   void
   startswith(Home home, StringVar x, StringVar y) {
-    StringVar z(home);
+    GECODE_POST;
+    StringVar z(home, x.may_chars(), 0,
+                std::max(0, x.max_length() - y.min_length()));
     rel(home, y, z, STRT_CAT, x);
   }
 
   // x endswith y <==> x = z ++ y.
   void
   endswith(Home home, StringVar x, StringVar y) {
-    StringVar z(home);
+    GECODE_POST;
+    StringVar z(home, x.may_chars(), 0,
+                std::max(0, x.max_length() - y.min_length()));
     rel(home, z, y, STRT_CAT, x);
   }
 
@@ -109,7 +115,8 @@ namespace Gecode {
   void
   endswith(Home home, StringVar x, StringVar y, BoolVar b) {
     IntVar i(home, 0, std::max(1, x.max_length()));
-    StringVar x1(home), y1(home);
+    StringVar x1(home, x.may_chars(), x.min_length(), x.max_length()),
+      y1(home, y.may_chars(), y.min_length(), y.max_length());
     rel(home, x, STRT_REV, x1);
     rel(home, y, STRT_REV, y1);
     find(home, y1, x1, i);

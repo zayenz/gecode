@@ -1510,7 +1510,10 @@ if(BUILD_TESTING)
         String::GCC::MustChars
         String::Rel::Construction
         String::Rel::AggregateBounds
-        String::Rel::SizeEstimate)
+        String::Rel::SizeEstimate
+        String::Var::FailureAdvisors
+        String::Var::Events
+        String::Var::Lifecycle)
     endif()
     if(GECODE_ENABLE_FLOAT_VARS)
       set(GECODE_FLOAT_CHECK_TESTS

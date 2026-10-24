@@ -1487,7 +1487,9 @@ ifeq "@enable_string_vars@" "yes"
 CHECKTESTS += String::Channel::StrToNat::0To999 \
 	String::Channel::StrToNat::9To101 \
 	String::Channel::StrToNat::1To101 \
-	String::Channel::StrToNat::-1To101
+	String::Channel::StrToNat::-1To101 \
+	String::Channel::NatToStr::-1To0 \
+	String::Channel::NatToStr::0To2147483646
 endif
 
 # A basic integrity test

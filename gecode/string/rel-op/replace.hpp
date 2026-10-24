@@ -620,7 +620,25 @@ namespace Gecode { namespace String {
       rhs << pref << x[2] << suff;
       gconcat(home, lhs, x[0]);
       gconcat(home, rhs, x[3]);
-      find(home, x[1], last ? suff : pref, IntVar(home, 0, 0));
+      IntVar boundary_length(home, 0, x[0].max_length());
+      length(home, last ? suff : pref, boundary_length);
+      IntVar position(home, 1, max(1, x[0].max_length()));
+      IntArgs coefficients;
+      coefficients << 1 << -1;
+      IntVarArgs terms;
+      terms << position << boundary_length;
+      linear(home, coefficients, terms, IRT_EQ, 1);
+      if (last) {
+        StringVar reversed_query(
+          home, x[1].may_chars(), x[1].min_length(), x[1].max_length());
+        StringVar reversed_source(
+          home, x[0].may_chars(), x[0].min_length(), x[0].max_length());
+        rel(home, x[1], STRT_REV, reversed_query);
+        rel(home, x[0], STRT_REV, reversed_source);
+        find(home, reversed_query, reversed_source, position);
+      }
+      else
+        find(home, x[1], x[0], position);
       return home.ES_SUBSUMED(*this);
     }
     ExecStatus es = replace_q_x(home, min_occur, repeat);

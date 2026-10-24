@@ -8,6 +8,8 @@
 #include "test/string.hh"
 
 #include <set>
+#include <utility>
+#include <vector>
 
 namespace Test { namespace String { namespace Replace {
 
@@ -189,10 +191,131 @@ namespace Test { namespace String { namespace Replace {
     }
   };
 
+  class OverlapSpace : public Gecode::Space {
+  public:
+    Gecode::StringVar source;
+    Gecode::StringVar result;
+
+    OverlapSpace(Gecode::String::StringSymbol symbol, bool last,
+                 bool assigned_source)
+      : source(*this, Gecode::String::NSIntSet(symbol),
+               assigned_source ? 3 : 2, 3) {
+      Gecode::String::NSIntSet alphabet(symbol);
+      alphabet.add('b');
+      result = Gecode::StringVar(*this, alphabet, 1, 2);
+      Gecode::StringVar query(*this,
+        Gecode::String::StringVal::from_symbols({symbol, symbol}));
+      Gecode::StringVar replacement(*this, "b");
+      if (last)
+        Gecode::replace_last(*this, source, query, replacement, result);
+      else
+        Gecode::replace(*this, source, query, replacement, result);
+      Gecode::StringVarArgs operands;
+      operands << source << result;
+      Gecode::branch(*this, operands,
+                     Gecode::STRING_VAR_NONE(), Gecode::STRING_VAL_LLLL());
+    }
+
+    OverlapSpace(OverlapSpace& s) : Gecode::Space(s) {
+      source.update(*this, s.source);
+      result.update(*this, s.result);
+    }
+
+    virtual Gecode::Space* copy(void) {
+      return new OverlapSpace(*this);
+    }
+  };
+
+  class Overlap : public Base {
+  private:
+    bool last;
+
+    static Gecode::String::StringVal
+    replace(const Gecode::String::StringVal& source, bool last) {
+      using Gecode::String::StringSymbol;
+      using Gecode::String::StringVal;
+      // The source repeats one symbol and the query contains two copies.
+      std::vector<StringSymbol> result(source.begin(), source.end());
+      const StringVal::size_type position = last ? source.size() - 2 : 0;
+      result.erase(result.begin() + position, result.begin() + position + 2);
+      result.insert(result.begin() + position, 'b');
+      return StringVal::from_symbols(std::move(result));
+    }
+
+    bool check_solutions(Gecode::String::StringSymbol symbol,
+                         bool assigned_source) const {
+      using Gecode::String::StringSymbol;
+      using Gecode::String::StringVal;
+      typedef std::pair<StringVal, StringVal> Assignment;
+      OverlapSpace root(symbol, last, assigned_source);
+      if ((root.status() == Gecode::SS_FAILED) ||
+          (root.source.assigned() != assigned_source))
+        return false;
+      Gecode::Search::Options options;
+      options.threads = 1;
+      Gecode::DFS<OverlapSpace> engine(&root, options);
+      std::set<Assignment> actual;
+      while (OverlapSpace* solution = engine.next()) {
+        const bool valid = solution->source.assigned() &&
+          solution->result.assigned() && actual.insert(Assignment(
+            solution->source.val_symbols(),
+            solution->result.val_symbols())).second;
+        delete solution;
+        if (!valid)
+          return false;
+      }
+      std::set<Assignment> expected;
+      for (int length = assigned_source ? 3 : 2; length <= 3; ++length) {
+        const StringVal source = StringVal::from_symbols(
+          std::vector<StringSymbol>(length, symbol));
+        expected.insert(Assignment(source, replace(source, last)));
+      }
+      return actual == expected;
+    }
+
+    bool check_assignment(Gecode::String::StringSymbol symbol,
+                          bool assigned_source, bool correct_result) const {
+      using Gecode::String::StringVal;
+      OverlapSpace root(symbol, last, assigned_source);
+      if ((root.status() == Gecode::SS_FAILED) ||
+          (root.source.assigned() != assigned_source))
+        return false;
+      const StringVal source = StringVal::from_symbols({symbol, symbol, symbol});
+      const StringVal result = replace(source, correct_result ? last : !last);
+      Gecode::rel(root, root.source, Gecode::STRT_EQ,
+                  Gecode::StringVar(root, source));
+      Gecode::rel(root, root.result, Gecode::STRT_EQ,
+                  Gecode::StringVar(root, result));
+      const bool failed = root.status() == Gecode::SS_FAILED;
+      return correct_result
+        ? !failed && root.result.assigned() &&
+          (root.result.val_symbols() == result)
+        : failed;
+    }
+
+  public:
+    Overlap(bool last0)
+      : Base(last0 ? "String::Replace::Last::Overlap"
+                   : "String::Replace::First::Overlap"), last(last0) {}
+
+    virtual bool run(void) {
+      const Gecode::String::StringSymbol symbols[] = {'a', 0x100};
+      for (unsigned int i = 0; i < sizeof(symbols) / sizeof(symbols[0]); ++i)
+        for (int assigned_source = 0; assigned_source <= 1; ++assigned_source)
+          if (!check_solutions(symbols[i], assigned_source) ||
+              !check_assignment(symbols[i], assigned_source, true) ||
+              !check_assignment(symbols[i], assigned_source, false))
+            return false;
+      return true;
+    }
+  };
+
   Occurrence all(Occurrence::ALL);
   EmptyQuery empty_query_bytes(false);
   EmptyQuery empty_query_scalars(true);
   VariableQuery variable_query;
+  Overlap first_overlap(false);
+  Overlap last_overlap(true);
 
 }}}
 

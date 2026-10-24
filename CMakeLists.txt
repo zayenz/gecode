@@ -1509,7 +1509,9 @@ if(BUILD_TESTING)
       list(APPEND GECODE_CHECK_TESTS
         String::Replace::All::EmptyQuery::Bytes
         String::Replace::All::EmptyQuery::Scalars
-        String::Replace::All::VariableQuery)
+        String::Replace::All::VariableQuery
+        String::Replace::First::Overlap
+        String::Replace::Last::Overlap)
     endif()
     if(GECODE_ENABLE_FLOAT_VARS)
       set(GECODE_FLOAT_CHECK_TESTS

@@ -1507,6 +1507,8 @@ if(BUILD_TESTING)
     endif()
     if(GECODE_ENABLE_STRING_VARS)
       list(APPEND GECODE_CHECK_TESTS
+        String::Substring::ClippedBoundaries
+        String::RFind::Boundaries
         String::Rel::ScalarIncreasing)
     endif()
     if(GECODE_ENABLE_FLOAT_VARS)

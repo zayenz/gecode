@@ -1470,6 +1470,7 @@ endif
 ifeq "@enable_string_vars@" "yes"
 CHECKTESTS += String::Rel::ScalarIncreasing \
 	String::Substring::ClippedBoundaries String::RFind::Boundaries
+CHECKTESTS += String::RelOp::Power
 endif
 
 ifeq "@enable_float_vars@" "yes"

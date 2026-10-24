@@ -1507,6 +1507,7 @@ if(BUILD_TESTING)
     endif()
     if(GECODE_ENABLE_STRING_VARS)
       list(APPEND GECODE_CHECK_TESTS
+        String::RelOp::Power
         String::Substring::ClippedBoundaries
         String::RFind::Boundaries
         String::Rel::ScalarIncreasing)

@@ -1507,7 +1507,10 @@ if(BUILD_TESTING)
     endif()
     if(GECODE_ENABLE_STRING_VARS)
       list(APPEND GECODE_CHECK_TESTS
-        String::GCC::MustChars)
+        String::GCC::MustChars
+        String::Rel::Construction
+        String::Rel::AggregateBounds
+        String::Rel::SizeEstimate)
     endif()
     if(GECODE_ENABLE_FLOAT_VARS)
       set(GECODE_FLOAT_CHECK_TESTS

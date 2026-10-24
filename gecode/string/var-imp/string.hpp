@@ -100,13 +100,7 @@ namespace Gecode { namespace String {
 
   forceinline ModEvent
   StringVarImp::eq(Space& home, string x) {
-    if (!check_sweep<DSBlock, DashedString, char, string>(ds, x))
-      return ME_STRING_FAILED;
-    if (ds.known())
-      return ME_STRING_NONE;
-    int old_min_length = min_length(), old_max_length = max_length();
-    ds.update(home, x);
-    return notify(home, old_min_length, old_max_length);
+    return eq(home, StringVal::from_bytes(x));
   }
 
   forceinline ModEvent

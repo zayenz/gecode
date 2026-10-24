@@ -1547,7 +1547,8 @@ if(BUILD_TESTING)
     if(GECODE_ENABLE_STRING_VARS)
       list(APPEND GECODE_CHECK_TESTS
         String::Extensional::DfaReification::Assigned
-        String::Extensional::DfaReification::Deferred)
+        String::Extensional::DfaReification::Deferred
+        String::Extensional::StarDecomposition)
     endif()
 
     set(GECODE_CHECK_ARGS -iter 2 -threads 0 -fixprob 1)

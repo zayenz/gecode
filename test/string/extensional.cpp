@@ -26,6 +26,9 @@
 
 #include "test/string.hh"
 
+#include <memory>
+#include <set>
+
 namespace Test { namespace String { namespace Extensional {
 
   /// Test regular-language membership and its reified variants
@@ -188,6 +191,100 @@ namespace Test { namespace String { namespace Extensional {
 
   DfaReification dfa_reification_assigned(true);
   DfaReification dfa_reification_deferred(false);
+
+  /// Enumerate a structured domain through either public regex overload
+  class StarSpace : public Gecode::Space {
+  public:
+    Gecode::StringVar x;
+
+    StarSpace(Gecode::String::NSBlocks blocks, int min, int max,
+              const std::string& regex, bool decomposed)
+      : x(*this, blocks, min, max) {
+      if (decomposed) {
+        Gecode::VarArgs auxiliaries;
+        Gecode::extensional(*this, x, regex, auxiliaries);
+      } else {
+        Gecode::extensional(*this, x, regex);
+      }
+      Gecode::branch(*this, Gecode::StringVarArgs() << x,
+                     Gecode::STRING_VAR_NONE(), Gecode::STRING_VAL_LLLL());
+    }
+
+    StarSpace(StarSpace& s) : Gecode::Space(s) {
+      x.update(*this, s.x);
+    }
+
+    virtual Gecode::Space* copy(void) {
+      return new StarSpace(*this);
+    }
+  };
+
+  /// Compare exact solutions with the original block and language semantics
+  class StarDecomposition : public Base {
+  private:
+    int a_min;
+    int b_min;
+    int min_length;
+    int max_length;
+    std::string alphabet;
+
+    typedef std::set<std::string> Words;
+
+    static bool collect_solutions(StarSpace& root, Words& words) {
+      Gecode::Search::Options options;
+      options.threads = 1;
+      Gecode::DFS<StarSpace> search(&root, options);
+      while (StarSpace* solution = search.next()) {
+        std::unique_ptr<StarSpace> s(solution);
+        if (!s->x.assigned() || !words.insert(s->x.val()).second)
+          return false;
+      }
+      return true;
+    }
+
+  public:
+    StarDecomposition(const std::string& name, int a_min0, int b_min0,
+                      int min, int max, const std::string& alphabet0)
+      : Base("String::Extensional::StarDecomposition::" + name),
+        a_min(a_min0), b_min(b_min0), min_length(min), max_length(max),
+        alphabet(alphabet0) {}
+
+    virtual bool run(void) {
+      Gecode::String::NSBlocks blocks;
+      blocks.emplace_back(Gecode::String::NSIntSet('a'), a_min, 1);
+      blocks.emplace_back(Gecode::String::NSIntSet('b'), b_min, 1);
+      const std::string regex = alphabet.size() == 1 ? alphabet + "*" :
+        "[" + alphabet + "]*";
+      Words expected;
+      for (int a = a_min; a <= 1; ++a)
+        for (int b = b_min; b <= 1; ++b) {
+          const std::string word = std::string(a, 'a') + std::string(b, 'b');
+          if ((a + b >= min_length) && (a + b <= max_length) &&
+              (word.find_first_not_of(alphabet) == std::string::npos))
+            expected.insert(word);
+        }
+      for (bool decomposed : {false, true}) {
+        StarSpace root(blocks, min_length, max_length, regex, decomposed);
+        Words actual;
+        if (!collect_solutions(root, actual) || (actual != expected)) {
+          if (opt.log)
+            olog << "Star decomposition: regex=" << regex
+                 << " decomposed=" << decomposed << std::endl;
+          return false;
+        }
+      }
+      return true;
+    }
+  };
+
+  StarDecomposition star_optional("OptionalIncompatible", 1, 0, 1, 2, "a");
+  StarDecomposition star_bounds("BlockBounds", 0, 0, 0, 2, "ab");
+  StarDecomposition star_aggregate("AggregateBounds", 0, 0, 1, 1, "ab");
+  StarDecomposition star_aggregate_incompatible(
+    "AggregateIncompatible", 0, 0, 2, 2, "a");
+  StarDecomposition star_mandatory("MandatoryIncompatible", 0, 1, 1, 2, "a");
+  StarDecomposition star_epsilon("Epsilon", 0, 0, 0, 2, "a");
+  StarDecomposition star_only_epsilon("OnlyEpsilon", 0, 0, 0, 2, "c");
 
   class Regex : public Test {
   public:

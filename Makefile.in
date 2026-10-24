@@ -1493,7 +1493,8 @@ endif
 
 ifeq "@enable_string_vars@" "yes"
 CHECKTESTS += String::Extensional::DfaReification::Assigned \
-	String::Extensional::DfaReification::Deferred
+	String::Extensional::DfaReification::Deferred \
+	String::Extensional::StarDecomposition
 endif
 
 # A basic integrity test

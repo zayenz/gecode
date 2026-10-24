@@ -1531,7 +1531,14 @@ if(BUILD_TESTING)
         String::Replace::All::EmptyQuery::Scalars
         String::Replace::All::VariableQuery
         String::Replace::First::Overlap
-        String::Replace::Last::Overlap)
+        String::Replace::Last::Overlap
+        String::RelOp::Power
+        String::Substring::ClippedBoundaries
+        String::RFind::Boundaries
+        String::Rel::ScalarIncreasing
+        String::Rel::ScalarDecreasing
+        String::Predicates::ScalarAlphabet
+        String::Replace::ScalarReplacement)
     endif()
     if(GECODE_ENABLE_FLOAT_VARS)
       set(GECODE_FLOAT_CHECK_TESTS

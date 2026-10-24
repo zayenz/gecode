@@ -1492,7 +1492,14 @@ CHECKTESTS += String::GCC::MustChars \
 	String::Replace::All::EmptyQuery::Scalars \
 	String::Replace::All::VariableQuery \
 	String::Replace::First::Overlap \
-	String::Replace::Last::Overlap
+	String::Replace::Last::Overlap \
+	String::RelOp::Power \
+	String::Substring::ClippedBoundaries \
+	String::RFind::Boundaries \
+	String::Rel::ScalarIncreasing \
+	String::Rel::ScalarDecreasing \
+	String::Predicates::ScalarAlphabet \
+	String::Replace::ScalarReplacement
 endif
 
 ifeq "@enable_float_vars@" "yes"

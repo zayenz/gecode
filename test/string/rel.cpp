@@ -26,6 +26,10 @@
 
 #include "test/string.hh"
 
+#include <memory>
+#include <set>
+#include <vector>
+
 namespace Test { namespace String { namespace Rel {
 
   /// Test an increasing or decreasing string relation
@@ -152,6 +156,107 @@ namespace Test { namespace String { namespace Rel {
     }
   };
 
+  /// Space for assigned scalar-value checks
+  class ScalarValueSpace : public Gecode::Space {
+  public:
+    ScalarValueSpace(void) {}
+    ScalarValueSpace(ScalarValueSpace& s) : Gecode::Space(s) {}
+    virtual Gecode::Space* copy(void) {
+      return new ScalarValueSpace(*this);
+    }
+  };
+
+  /// Enumerate an open scalar domain after posting increasing
+  class ScalarIncreasingSpace : public Gecode::Space {
+  public:
+    Gecode::StringVarArray x;
+
+    ScalarIncreasingSpace(int first, int last, bool strict) : x(*this, 1) {
+      x[0] = Gecode::StringVar(
+        *this, Gecode::String::NSIntSet(first, last), 0, 2);
+      Gecode::rel(*this, x[0], strict ? Gecode::STRT_INCLT : Gecode::STRT_INCLQ);
+      Gecode::branch(*this, Gecode::StringVarArgs(x),
+                     Gecode::STRING_VAR_NONE(), Gecode::STRING_VAL_LLLL());
+    }
+
+    ScalarIncreasingSpace(ScalarIncreasingSpace& s) : Gecode::Space(s) {
+      x.update(*this, s.x);
+    }
+
+    virtual Gecode::Space* copy(void) {
+      return new ScalarIncreasingSpace(*this);
+    }
+  };
+
+  /// Compare assigned and searched values with scalar-vector ordering
+  class ScalarIncreasing : public Base {
+  private:
+    typedef std::vector<Gecode::String::StringSymbol> Word;
+    typedef std::set<Word> Words;
+
+    static bool increasing(const Word& word, bool strict) {
+      for (Word::size_type i = 1; i < word.size(); ++i)
+        if (strict ? word[i - 1] >= word[i] : word[i - 1] > word[i])
+          return false;
+      return true;
+    }
+
+    static bool assigned_matches(const Word& word, bool strict) {
+      ScalarValueSpace home;
+      Gecode::StringVar x(
+        home, Gecode::String::StringVal::from_symbols(word));
+      Gecode::rel(home, x, strict ? Gecode::STRT_INCLT : Gecode::STRT_INCLQ);
+      return (home.status() != Gecode::SS_FAILED) == increasing(word, strict);
+    }
+
+    static bool search_matches(int first, int last, bool strict,
+                               const Words& expected) {
+      ScalarIncreasingSpace root(first, last, strict);
+      if (root.status() == Gecode::SS_FAILED)
+        return false;
+      Gecode::Search::Options options;
+      options.threads = 1;
+      Gecode::DFS<ScalarIncreasingSpace> search(&root, options);
+      Words actual;
+      while (ScalarIncreasingSpace* solution = search.next()) {
+        std::unique_ptr<ScalarIncreasingSpace> s(solution);
+        if (!s->x[0].assigned())
+          return false;
+        const Gecode::String::StringVal value = s->x[0].val_symbols();
+        const Word word(value.begin(), value.end());
+        if (!actual.insert(word).second)
+          return false;
+      }
+      return actual == expected;
+    }
+
+  public:
+    ScalarIncreasing(void) : Base("String::Rel::ScalarIncreasing") {}
+
+    virtual bool run(void) {
+      for (int first : {0x7F, 0x100, 0x10FFFE}) {
+        std::vector<Word> candidates(1);
+        for (int a = first; a <= first + 1; ++a) {
+          candidates.push_back(Word{a});
+          for (int b = first; b <= first + 1; ++b)
+            candidates.push_back(Word{a, b});
+        }
+        for (bool strict : {false, true}) {
+          Words expected;
+          for (const Word& word : candidates) {
+            if (!assigned_matches(word, strict))
+              return false;
+            if (increasing(word, strict))
+              expected.insert(word);
+          }
+          if (!search_matches(first, first + 1, strict, expected))
+            return false;
+        }
+      }
+      return true;
+    }
+  };
+
   Binary eq_xy(Gecode::STRT_EQ, false);
   Binary nq_xy(Gecode::STRT_NQ, false);
   Binary lt_xy(Gecode::STRT_LEXLT, false);
@@ -166,6 +271,7 @@ namespace Test { namespace String { namespace Rel {
   Unary dec_lq(Gecode::STRT_DECLQ);
   Domain domain;
   LexExtrema lex_extrema;
+  ScalarIncreasing scalar_increasing;
 
 }}}
 

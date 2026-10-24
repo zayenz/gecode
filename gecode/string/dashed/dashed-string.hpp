@@ -1472,7 +1472,7 @@ namespace Gecode { namespace String {
       normalize(h);
     // Scanning backward.
     bool changed = false;
-    c = _MAX_STR_ALPHA;
+    c = UNICODE_MAX + 1;
     for (int i = _blocks.length() - 1; i >= 0; --i) {
       DSBlock& b = _blocks.at(i);
       if (b.S.min() > c)

@@ -555,7 +555,8 @@ FLOATBUILDDIRS	= \
 
 STRINGSRC0 = \
 	var/string.cpp var-imp/string.cpp dashed/dashed-string.cpp exception.cpp \
-	array.cpp branch.cpp length.cpp char2code.cpp pow.cpp find.cpp rel.cpp rel-op.cpp substr.cpp \
+	array.cpp branch.cpp length.cpp char2code.cpp concat.cpp pow.cpp find.cpp \
+	rel.cpp rel-op.cpp replace.cpp substr.cpp \
 	gcc.cpp gconcat.cpp extensional.cpp element.cpp channel.cpp match.cpp
 
 STRINGHDR0 = \

@@ -246,6 +246,84 @@ namespace Gecode { namespace String {
     : _changed(d._changed), _blocks(h, d._blocks),
       _min_length(d._min_length), _max_length(d._max_length) {}
 
+  bool
+  DashedString::equate(Space& h, DashedString& that) {
+    _changed = that._changed = false;
+    if (!refine_card_eq(h, that))
+      return false;
+    if (known()) {
+      string s;
+      if (try_val_bytes(s)) {
+        if (that.known()) {
+          string t;
+          return that.try_val_bytes(t) && s == t;
+        }
+        if (check_sweep<char, string, DSBlock, DSBlocks>(s, that._blocks)) {
+          that.update(h, s);
+          that._changed = true;
+          return true;
+        }
+        return false;
+      }
+      if (that.known())
+        return equals(that);
+      if (check_sweep<DSBlock, DSBlocks, DSBlock, DSBlocks>(
+            _blocks, that._blocks)) {
+        that.update(h, *this);
+        that._changed = true;
+        return true;
+      }
+      return false;
+    }
+    if (that.known()) {
+      string s;
+      if (that.try_val_bytes(s)) {
+        if (check_sweep<DSBlock, DSBlocks, char, string>(_blocks, s)) {
+          update(h, s);
+          _changed = true;
+          return true;
+        }
+        return false;
+      }
+      if (check_sweep<DSBlock, DSBlocks, DSBlock, DSBlocks>(
+            _blocks, that._blocks)) {
+        update(h, that);
+        _changed = true;
+        return true;
+      }
+      return false;
+    }
+    if (contains(that)) {
+      if (*this == that)
+        return true;
+      update(h, that);
+      _changed = true;
+      return true;
+    }
+    if (that.contains(*this)) {
+      that.update(h, *this);
+      that._changed = true;
+      return true;
+    }
+    if (!sweep_equate(h, *this, that))
+      return false;
+    if ((_changed || that._changed) && !refine_card_eq(h, that))
+      return false;
+    return true;
+  }
+
+  bool
+  DashedString::equate(Space& h, const StringVal& that) {
+    _changed = false;
+    if (!check_equate(that))
+      return false;
+    if (known())
+      return val_symbols() == that;
+    update(h, that);
+    _changed = true;
+    return true;
+  }
+
 }}
 
 // STATISTICS: string-var

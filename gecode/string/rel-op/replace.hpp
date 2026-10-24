@@ -328,6 +328,8 @@ namespace Gecode { namespace String {
   // For decomp_all, it returns the minimum number of occurrences of q in x[0].
   forceinline int
   Replace::occur(const string& q) const {
+    if (q.empty())
+      return 0;
     int min_occur = 0;
     string curr;
     const DashedString& p = x[0].domain();
@@ -635,25 +637,11 @@ namespace Gecode { namespace String {
       return ES_FAILED;
     assert (px.is_normalized() && x[1].domain().is_normalized()
         && x[2].domain().is_normalized() && py.is_normalized());
-    switch (
-      x[0].assigned() + x[1].assigned() + x[2].assigned() + x[3].assigned()
-    ) {
-      case 4:
-      case 3:
-        if (x[0].assigned()) {
-          repeat = true;
-          return ES_OK;
-        }
-        return ES_FIX;
-      case 2:
-        if (x[1].assigned() && x[0].assigned()) {
-          repeat = true;
-          return ES_OK;
-        }
-        return ES_FIX;
-      default:
-        return ES_FIX;
+    if (x[0].assigned() && x[1].assigned()) {
+      repeat = true;
+      return ES_OK;
     }
+    return ES_FIX;
   }
 
   forceinline ExecStatus

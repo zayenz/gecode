@@ -1467,6 +1467,12 @@ BLACKBOXCHECKENV = \
 	GECODE_TEST_BLACKBOX_LOG=$(BLACKBOXLOG)
 endif
 
+ifeq "@enable_string_vars@" "yes"
+CHECKTESTS += String::Replace::All::EmptyQuery::Bytes \
+	String::Replace::All::EmptyQuery::Scalars \
+	String::Replace::All::VariableQuery
+endif
+
 ifeq "@enable_float_vars@" "yes"
 FLOATCHECKTESTS = Float::Arithmetic::PositiveNRootBounds \
 	Float::Arithmetic::PowConsistency \

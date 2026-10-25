@@ -32,8 +32,78 @@ namespace Test { namespace String { namespace Match {
     }
   };
 
+  /// Space for direct public Match posting checks
+  class MatchSpace : public Gecode::Space {
+  public:
+    MatchSpace(void) {}
+    MatchSpace(MatchSpace& s) : Gecode::Space(s) {}
+    virtual Gecode::Space* copy(void) {
+      return new MatchSpace(*this);
+    }
+  };
+
+  /// Empty effective languages retain the input and force absent index zero
+  class AbsentLanguage : public Base {
+  private:
+    std::string input;
+    std::string pattern;
+
+  public:
+    AbsentLanguage(const std::string& name, const std::string& input0,
+                   const std::string& pattern0)
+      : Base("String::Match::" + name), input(input0),
+        pattern(pattern0) {}
+
+    virtual bool run(void) {
+      using namespace Gecode;
+      // Fixed zero, a free index, and a domain excluding absence.
+      for (int bounds = 0; bounds < 3; ++bounds) {
+        MatchSpace home;
+        StringVar x(home, input);
+        IntVar index(home, bounds == 2 ? 1 : 0, bounds == 0 ? 0 : 3);
+        match(home, x, pattern, index);
+        const bool failed = home.status() == SS_FAILED;
+        if (bounds == 2) {
+          if (!failed)
+            return false;
+        } else if (failed || !index.assigned() || index.val() != 0 ||
+                   !x.assigned() || x.val() != input ||
+                   x.min_length() != static_cast<int>(input.size()) ||
+                   x.max_length() != static_cast<int>(input.size()) ||
+                   !x.domain().is_normalized()) {
+          return false;
+        }
+      }
+      return true;
+    }
+  };
+
+  /// Epsilon-accepting patterns still violate the posting precondition
+  class EpsilonPattern : public Base {
+  public:
+    EpsilonPattern(void)
+      : Base("String::Match::EpsilonPattern") {}
+
+    virtual bool run(void) {
+      using namespace Gecode;
+      for (const char* input : {"", "a"})
+        for (const char* pattern : {"()", "a*"}) {
+          MatchSpace home;
+          StringVar x(home, input);
+          IntVar index(home, 0, 3);
+          match(home, x, pattern, index);
+          if (home.status() != SS_FAILED)
+            return false;
+        }
+      return true;
+    }
+  };
+
   FirstAB absent(0);
   FirstAB first(1);
+  AbsentLanguage empty_class("EmptyClass", "a", "[^a]");
+  AbsentLanguage empty_input("EmptyInput", "", ".");
+  EpsilonPattern epsilon_pattern;
 
 }}}
 

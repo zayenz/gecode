@@ -7,6 +7,7 @@
 
 #include "test/string.hh"
 
+#include <algorithm>
 #include <memory>
 #include <sstream>
 

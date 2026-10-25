@@ -27,6 +27,7 @@
 #include "test/string.hh"
 
 #include <algorithm>
+#include <memory>
 
 namespace Test { namespace String { namespace RelOp {
 
@@ -59,7 +60,7 @@ namespace Test { namespace String { namespace RelOp {
   public:
     GConcat(const std::string& sharing, int arity,
             const std::vector<int>& operands0, int result0)
-      : Test("RelOp::GConcat::" + sharing, arity, "ab", 2),
+      : Test("RelOp::GConcat::" + sharing, arity, "ab", 2, false),
         operands(operands0), result(result0) {}
 
     virtual bool solution(const Assignment& a) const {
@@ -172,6 +173,92 @@ namespace Test { namespace String { namespace RelOp {
     }
   };
 
+  /// Search the base of a square with a fixed result
+  class InversePowerSpace : public Gecode::Space {
+  public:
+    Gecode::StringVar base;
+
+    InversePowerSpace(int first, const Gecode::String::StringVal& value)
+      : base(*this, Gecode::String::NSIntSet(first, first + 1), 1, 1) {
+      Gecode::IntVar exponent(*this, 2, 2);
+      Gecode::StringVar result(*this, value);
+      Gecode::pow(*this, base, exponent, result);
+      Gecode::branch(*this, Gecode::StringVarArgs() << base,
+                     Gecode::STRING_VAR_NONE(), Gecode::STRING_VAL_LLLL());
+    }
+
+    InversePowerSpace(InversePowerSpace& s) : Gecode::Space(s) {
+      base.update(*this, s.base);
+    }
+
+    virtual Gecode::Space*
+    copy(void) {
+      return new InversePowerSpace(*this);
+    }
+  };
+
+  /// Inverse power terminates and retains its relation until assignment
+  class InversePower : public Base {
+  private:
+    int first;
+
+  public:
+    InversePower(bool scalar)
+      : Base(scalar ? "String::RelOp::Power::Inverse::Scalars"
+                    : "String::RelOp::Power::Inverse::Bytes"),
+        first(scalar ? 0x100 : 'a') {}
+
+    virtual bool
+    run(void) {
+      using Gecode::String::StringVal;
+      const StringVal results[] = {
+          StringVal::from_symbols({first, first}),
+          StringVal::from_symbols({first + 1, first + 1}),
+          StringVal::from_symbols({first, first + 1})};
+      for (int i = 0; i < 3; ++i) {
+        InversePowerSpace root(first, results[i]);
+        if ((root.status() == Gecode::SS_FAILED) && (i < 2))
+          return false;
+        Gecode::Search::Options options;
+        options.threads = 1;
+        Gecode::DFS<InversePowerSpace> search(&root, options);
+        int count = 0;
+        while (InversePowerSpace* next = search.next()) {
+          std::unique_ptr<InversePowerSpace> solution(next);
+          if ((i == 2) || !solution->base.assigned() ||
+              (solution->base.val_symbols() !=
+               StringVal::from_symbols({first + i})) ||
+              (++count > 1))
+            return false;
+        }
+        if (count != (i < 2 ? 1 : 0))
+          return false;
+      }
+
+      InversePowerSpace root(first, results[0]);
+      if (root.status() == Gecode::SS_FAILED)
+        return false;
+      for (int i = 0; i < 2; ++i) {
+        const StringVal value = StringVal::from_symbols({first + i});
+        std::unique_ptr<InversePowerSpace> assigned(
+            static_cast<InversePowerSpace*>(root.clone()));
+        Gecode::rel(*assigned, assigned->base, Gecode::STRT_EQ,
+                    Gecode::StringVar(*assigned, value));
+        if ((assigned->status() == Gecode::SS_FAILED) != (i == 1))
+          return false;
+
+        PowerSpace home;
+        Gecode::StringVar base(home, value);
+        Gecode::IntVar exponent(home, 2, 2);
+        Gecode::StringVar result(home, results[0]);
+        Gecode::pow(home, base, exponent, result);
+        if ((home.status() == Gecode::SS_FAILED) != (i == 1))
+          return false;
+      }
+      return true;
+    }
+  };
+
   /// Empty power must preserve every representable nonnegative exponent
   class EmptyPower : public Base {
   public:
@@ -219,6 +306,7 @@ namespace Test { namespace String { namespace RelOp {
   Concat concat_xyy("XYY", 2, 0, 1, 1);
   Concat concat_xxx("XXX", 1, 0, 0, 0);
 
+  GConcat gconcat_empty("Empty", 1, std::vector<int>{}, 0);
   GConcat gconcat_xyzw("XYZW", 4, std::vector<int>{0, 1, 2}, 3);
   GConcat gconcat_xxxy("XXXY", 2, std::vector<int>{0, 0, 0}, 1);
   GConcat gconcat_xyzx("XYZX", 3, std::vector<int>{0, 1, 2}, 0);
@@ -232,6 +320,8 @@ namespace Test { namespace String { namespace RelOp {
   Case lower_xy(false, false);
   Case lower_xx(false, true);
 
+  InversePower inverse_power_bytes(false);
+  InversePower inverse_power_scalars(true);
   EmptyPower empty_power;
   OptionalPower optional_power;
   Power power_negative_xy(-1, false);

@@ -1430,18 +1430,14 @@ namespace Gecode { namespace String {
     int c = -1;
     for (int i = 0; i < _blocks.length(); ++i) {
       DSBlock& b = _blocks.at(i);
-      if (b.S.max() < c)
-        return false;
+      if (b.S.max() < c || (strict && b.S.max() == c)) {
+        if (b.l > 0)
+          return false;
+        _changed = true;
+        b.u = 0;
+      }
       else if (b.S.max() == c) {
-        if (strict) {
-          if (b.l > 0)
-            return false;
-          else {
-            _changed = true;
-            b.u = 0;
-          }
-        }
-        else if (b.S.size() > 1) {
+        if (b.S.size() > 1) {
           _changed = true;
           b.S.update(h, c);
         }
@@ -1468,25 +1464,24 @@ namespace Gecode { namespace String {
           c = b.S.min();
       }
     }
-    if (_changed)
+    if (_changed) {
       normalize(h);
+      if (h.failed())
+        return false;
+    }
     // Scanning backward.
     bool changed = false;
     c = UNICODE_MAX + 1;
     for (int i = _blocks.length() - 1; i >= 0; --i) {
       DSBlock& b = _blocks.at(i);
-      if (b.S.min() > c)
-        return false;
+      if (b.S.min() > c || (strict && b.S.min() == c)) {
+        if (b.l > 0)
+          return false;
+        changed = true;
+        b.u = 0;
+      }
       else if (b.S.min() == c) {
-        if (strict) {
-          if (b.l > 0)
-            return false;
-          else {
-            changed = true;
-            b.u = 0;
-          }
-        }
-        else if (b.S.size() > 1) {
+        if (b.S.size() > 1) {
           changed = true;
           b.S.update(h, c);
         }
@@ -1512,6 +1507,8 @@ namespace Gecode { namespace String {
     if (changed) {
       _changed = true;
       normalize(h);
+      if (h.failed())
+        return false;
     }
     return true;
   }

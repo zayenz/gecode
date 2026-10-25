@@ -26,6 +26,8 @@
 
 #include "test/string.hh"
 
+#include <algorithm>
+
 namespace Test { namespace String { namespace Predicates {
 
   /// Test prefix, suffix, and containment predicates

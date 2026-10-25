@@ -166,6 +166,98 @@ namespace Test { namespace String { namespace Rel {
     }
   };
 
+  /// Omit incompatible optional runs in either increasing scan
+  class OptionalIncreasing : public Base {
+  private:
+    bool strict;
+
+    bool omission(int first, bool reverse) const {
+      using namespace Gecode;
+      ScalarValueSpace home;
+      Gecode::String::NSBlocks blocks;
+      blocks.emplace_back(Gecode::String::NSIntSet(first + 1),
+                          reverse ? 0 : 1, 1);
+      blocks.emplace_back(Gecode::String::NSIntSet(first),
+                          reverse ? 1 : 0, 1);
+      StringVar x(home, blocks, 1, 2);
+      rel(home, x, strict ? STRT_INCLT : STRT_INCLQ);
+      const auto expected = Gecode::String::StringVal::from_symbols(
+        {reverse ? first : first + 1});
+      return home.status() != SS_FAILED && x.assigned() &&
+        x.val_symbols() == expected && x.min_length() == 1 &&
+        x.max_length() == 1 && x.domain().is_normalized();
+    }
+
+    bool mandatory(int first) const {
+      using namespace Gecode;
+      ScalarValueSpace home;
+      Gecode::String::NSBlocks blocks;
+      // Three symbols avoid the strict alphabet-size shortcut.
+      blocks.emplace_back(Gecode::String::NSIntSet(first + 1, first + 2),
+                          1, 1);
+      blocks.emplace_back(Gecode::String::NSIntSet(first), 1, 2);
+      StringVar x(home, blocks, 2, 3);
+      rel(home, x, strict ? STRT_INCLT : STRT_INCLQ);
+      return home.status() == SS_FAILED;
+    }
+
+    bool aggregate(int first, bool reverse) const {
+      using namespace Gecode;
+      // Omission leaves a run whose local bounds alone allow length 1 or 3.
+      for (int length : {1, 2, 3}) {
+        ScalarValueSpace home;
+        Gecode::String::NSBlocks blocks;
+        if (reverse) {
+          blocks.emplace_back(Gecode::String::NSIntSet(first), 0, 2);
+          blocks.emplace_back(Gecode::String::NSIntSet(first + 2), 0, 1);
+          blocks.emplace_back(Gecode::String::NSIntSet(first + 1), 1, 1);
+        } else {
+          blocks.emplace_back(Gecode::String::NSIntSet(first + 1), 1, 1);
+          blocks.emplace_back(Gecode::String::NSIntSet(first), 0, 1);
+          blocks.emplace_back(Gecode::String::NSIntSet(first + 2), 0, 2);
+        }
+        StringVar x(home, blocks, 2, 2);
+        rel(home, x, strict ? STRT_INCLT : STRT_INCLQ);
+        if (home.status() == SS_FAILED || x.min_length() != 2 ||
+            x.max_length() != 2 || !x.domain().is_normalized())
+          return false;
+        std::vector<Gecode::String::StringSymbol> symbols(length - 1,
+          reverse ? first : first + 2);
+        if (reverse)
+          symbols.push_back(first + 1);
+        else
+          symbols.insert(symbols.begin(), first + 1);
+        const auto value = Gecode::String::StringVal::from_symbols(symbols);
+        rel(home, x, STRT_EQ, StringVar(home, value));
+        if (length == 2) {
+          if (home.status() == SS_FAILED || !x.assigned() ||
+              x.val_symbols() != value || !x.domain().is_normalized())
+            return false;
+        } else if (home.status() != SS_FAILED) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+  public:
+    OptionalIncreasing(bool strict0)
+      : Base(strict0 ? "String::Rel::OptionalStrictIncreasing"
+                     : "String::Rel::OptionalIncreasing"),
+        strict(strict0) {}
+
+    virtual bool run(void) {
+      for (int first : {static_cast<int>('a'), 0x100}) {
+        if (!mandatory(first))
+          return false;
+        for (bool reverse : {false, true})
+          if (!omission(first, reverse) || !aggregate(first, reverse))
+            return false;
+      }
+      return true;
+    }
+  };
+
   /// Enumerate an open scalar domain after posting a monotone relation
   class ScalarOrderSpace : public Gecode::Space {
   public:
@@ -286,6 +378,8 @@ namespace Test { namespace String { namespace Rel {
   LexExtrema lex_extrema;
   ScalarOrder scalar_increasing(false);
   ScalarOrder scalar_decreasing(true);
+  OptionalIncreasing optional_increasing(false);
+  OptionalIncreasing optional_strict_increasing(true);
 
 }}}
 

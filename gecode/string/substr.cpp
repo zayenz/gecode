@@ -1,6 +1,8 @@
 #include <gecode/string.hh>
 #include <gecode/string/substr.hh>
 
+#include <algorithm>
+
 namespace Gecode {
 
   // Clip both boundaries into x, keeping the end at or after the start.

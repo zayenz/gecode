@@ -1508,10 +1508,17 @@ if(BUILD_TESTING)
     if(GECODE_ENABLE_STRING_VARS)
       list(APPEND GECODE_CHECK_TESTS
         String::RelOp::Power
+        String::RelOp::GConcat::Empty
+        String::Find::Extraction
+        String::Match::EmptyClass
+        String::Match::EmptyInput
+        String::Match::EpsilonPattern
         String::Substring::ClippedBoundaries
         String::RFind::Boundaries
         String::Rel::ScalarIncreasing
         String::Rel::ScalarDecreasing
+        String::Rel::OptionalIncreasing
+        String::Rel::OptionalStrictIncreasing
         String::Predicates::ScalarAlphabet
         String::Replace::ScalarReplacement)
     endif()

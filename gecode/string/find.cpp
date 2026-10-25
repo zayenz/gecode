@@ -3,6 +3,8 @@
 #include <gecode/string/replace.hh>
 #include <gecode/int/arithmetic.hh>
 
+#include <algorithm>
+
 namespace Gecode {
 
   void

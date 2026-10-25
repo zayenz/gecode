@@ -285,6 +285,102 @@ namespace Test { namespace String { namespace Rel {
     }
   };
 
+  /// Keep byte-top shortcuts within their alphabet and total length bounds
+  class ByteTopContainment : public Base {
+  private:
+    static bool equality(void) {
+      using namespace Gecode;
+      for (bool reverse : {false, true}) {
+        ContractSpace home;
+        StringVar bytes(home);
+        StringVar scalars(home, 0, Gecode::String::DashedString::_MAX_STR_LENGTH,
+          Gecode::String::StringAlphabet::from_ranges({{0x100, 0x1ff}}));
+        if (reverse)
+          rel(home, scalars, STRT_EQ, bytes);
+        else
+          rel(home, bytes, STRT_EQ, scalars);
+        if (home.status() == SS_FAILED || !bytes.assigned() ||
+            !scalars.assigned() || !bytes.val_symbols().empty() ||
+            !scalars.val_symbols().empty())
+          return false;
+        StringVar forbidden(home,
+          Gecode::String::StringVal::from_symbols({0x100}));
+        rel(home, scalars, STRT_EQ, forbidden);
+        if (home.status() != SS_FAILED)
+          return false;
+      }
+      for (const std::string& value : {"", "ab"}) {
+        ContractSpace home;
+        StringVar bytes(home);
+        StringVar subset(home, Gecode::String::NSIntSet('a', 'b'), 0, 2);
+        rel(home, bytes, STRT_EQ, subset);
+        StringVar concrete(home, value);
+        rel(home, subset, STRT_EQ, concrete);
+        if (home.status() == SS_FAILED || !bytes.assigned() ||
+            bytes.val() != value || subset.val() != value)
+          return false;
+      }
+      return true;
+    }
+
+    static bool shortcuts(void) {
+      using namespace Gecode::String;
+      ContractSpace home;
+      const int limit = DashedString::_MAX_STR_LENGTH;
+      DashedString bytes(home, DSBlock::top(home));
+      NSBlocks ns_bytes(bytes);
+      NSBlocks scalar_blocks(1, NSBlock(NSIntSet(0x100, 0x1ff), 0, limit));
+      DashedString scalars(home, scalar_blocks, 0, limit);
+      NSBlocks scalar_run(1, NSBlock(NSIntSet(0x100), 0, 2));
+      DashedString scalar_subset(home, scalar_run, 0, 2);
+      NSBlocks byte_blocks;
+      byte_blocks.emplace_back(NSIntSet('a'), 0, 2);
+      byte_blocks.emplace_back(NSIntSet('b'), 0, 2);
+      DashedString subset(home, byte_blocks, 0, 4);
+      DashedString empty(home, std::string());
+      NSBlocks ns_empty(empty);
+      if (!bytes.isTop() || !ns_bytes.isTop() || scalars.isTop() ||
+          scalar_blocks.isTop() || bytes.contains(scalars) ||
+          bytes.contains(scalar_blocks) || scalars.contains(bytes) ||
+          scalar_blocks.contains<DSBlock>(bytes.blocks()) ||
+          ns_bytes.contains<DSBlock>(scalars.blocks()) ||
+          ns_bytes.contains<NSBlock>(scalar_blocks))
+        return false;
+      if (!bytes.contains(subset) || !bytes.contains(byte_blocks) ||
+          !bytes.contains(empty) || !bytes.contains(ns_empty) ||
+          !ns_bytes.contains<DSBlock>(subset.blocks()) ||
+          !ns_bytes.contains<NSBlock>(byte_blocks) ||
+          !ns_bytes.contains<NSBlock>(ns_empty) ||
+          !ns_bytes.contains<DSBlock>(empty.blocks()))
+        return false;
+      if (!bytes.contains(subset, subset) ||
+          !bytes.contains(empty, subset) || !bytes.contains(subset, empty) ||
+          bytes.contains(subset, scalar_subset) ||
+          bytes.contains(scalar_subset, subset))
+        return false;
+      NSBlocks long_blocks;
+      long_blocks.emplace_back(NSIntSet('a'), 0, limit);
+      long_blocks.emplace_back(NSIntSet('b'), 0, 1);
+      DSBlocks long_ds_blocks(home, long_blocks);
+      NSBlocks long_run(1, NSBlock(NSIntSet('a'), 0, limit));
+      DashedString long_string(home, long_run, 0, limit);
+      if (bytes.contains(long_blocks) || bytes.contains(long_string, subset) ||
+          ns_bytes.contains<NSBlock>(long_blocks) ||
+          ns_bytes.contains<DSBlock>(long_ds_blocks))
+        return false;
+      DashedString bounded(home, byte_blocks, 2, 2);
+      return !bounded.contains(byte_blocks) && !bounded.contains(subset, empty);
+    }
+
+  public:
+    ByteTopContainment(void)
+      : Base("String::Rel::ByteTopContainment") {}
+
+    virtual bool run(void) {
+      return equality() && shortcuts();
+    }
+  };
+
   /// Keep aggregate restrictions on direct tells and concrete operations
   class AggregateBounds : public Base {
   private:
@@ -297,6 +393,50 @@ namespace Test { namespace String { namespace Rel {
     static Gecode::ModEvent concat(Gecode::Space& home,
                                   Gecode::StringVar result,
                                   Gecode::StringVar x, Gecode::StringVar y);
+
+    static bool
+    structured_concat(bool direct) {
+      using namespace Gecode;
+      for (const std::string& word : {"ab", "aab", "abb", "aaabbb"}) {
+        ContractSpace home;
+        Gecode::String::NSIntSet ac('a'), bd('b');
+        ac.add('c');
+        bd.add('d');
+        Gecode::String::NSBlocks blocks;
+        blocks.emplace_back(ac, 1, 3);
+        blocks.emplace_back(bd, 1, 3);
+        StringVar z(home, blocks, 3, 3);
+        StringVar x(home, Gecode::String::NSIntSet('a'), 1, 3);
+        StringVar y(home, Gecode::String::NSIntSet('b'), 1, 3);
+        if (direct) {
+          if (me_failed(concat(home, z, x, y)))
+            return false;
+        } else {
+          rel(home, x, y, STRT_CAT, z);
+        }
+        // Public length channels used to hide a widening by rejecting ab later.
+        if (home.status() == SS_FAILED || z.min_length() != 3 ||
+            z.max_length() != 3 || !z.domain().is_normalized())
+          return false;
+        rel(home, z, STRT_EQ, StringVar(home, word));
+        const bool accepted = home.status() != SS_FAILED;
+        if (accepted != (word.size() == 3) ||
+            (accepted && (!z.assigned() || z.val() != word)))
+          return false;
+      }
+      // Reconstructed lengths 2..4 cannot meet the original total of five.
+      ContractSpace home;
+      Gecode::String::NSBlocks blocks;
+      blocks.emplace_back(Gecode::String::NSIntSet('a', 'c'), 1, 3);
+      blocks.emplace_back(Gecode::String::NSIntSet('b', 'd'), 1, 3);
+      StringVar z(home, blocks, 5, 5);
+      StringVar x(home, Gecode::String::NSIntSet('a'), 1, 2);
+      StringVar y(home, Gecode::String::NSIntSet('b'), 1, 2);
+      if (direct)
+        return me_failed(concat(home, z, x, y));
+      rel(home, x, y, STRT_CAT, z);
+      return home.status() == SS_FAILED;
+    }
 
   public:
     AggregateBounds(void) : Base("String::Rel::AggregateBounds") {}
@@ -406,7 +546,7 @@ namespace Test { namespace String { namespace Rel {
           }
         }
       }
-      return true;
+      return structured_concat(true) && structured_concat(false);
     }
   };
 
@@ -542,6 +682,7 @@ namespace Test { namespace String { namespace Rel {
   NSIntSetCopy ns_int_set_copy;
   LexExtrema lex_extrema;
   Construction construction;
+  ByteTopContainment byte_top_containment;
   AggregateBounds aggregate_bounds;
   SizeEstimate size_estimate;
 

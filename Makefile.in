@@ -1468,6 +1468,18 @@ BLACKBOXCHECKENV = \
 endif
 
 ifeq "@enable_string_vars@" "yes"
+CHECKTESTS += String::Rel::ByteTopContainment
+CHECKTESTS += String::Match::AggregateBounds::DFA
+CHECKTESTS += String::Match::AggregateBounds::NFA
+CHECKTESTS += String::Match::AggregateBounds::AUTO
+CHECKTESTS += String::GCC::StructuredCounts::Bytes
+CHECKTESTS += String::GCC::StructuredCounts::Scalars
+CHECKTESTS += String::GCC::DuplicateCounts::Consistent
+CHECKTESTS += String::GCC::DuplicateCounts::Conflicting
+CHECKTESTS += String::GCC::DuplicateCounts::Equality
+CHECKTESTS += String::GCC::Shape::CountsShorter
+CHECKTESTS += String::GCC::Shape::CountsLonger
+CHECKTESTS += String::Var::CollectionConstructors
 CHECKTESTS += String::GCC::MustChars
 CHECKTESTS += String::Rel::Construction String::Rel::AggregateBounds \
 	String::Rel::SizeEstimate String::Rel::NSIntSetCopy

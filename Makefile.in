@@ -1468,7 +1468,8 @@ BLACKBOXCHECKENV = \
 endif
 
 ifeq "@enable_string_vars@" "yes"
-CHECKTESTS += String::Branch::LengthReplay String::Branch::SymbolReplay \
+CHECKTESTS += String::Branch::LengthSelection String::Branch::Positional \
+	String::Branch::LengthReplay String::Branch::SymbolReplay \
 	String::Branch::FixedReplay String::Branch::Recompute
 endif
 

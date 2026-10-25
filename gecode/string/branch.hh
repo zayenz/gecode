@@ -281,6 +281,35 @@ namespace Gecode { namespace String { namespace Branch {
       return me_failed(me) ? ES_FAILED : ES_OK;
     }
 
+    /// Enforce the saved positional predicate and retain a progressing view
+    ExecStatus
+    commit_position(Space& home, const PositionVal& p, unsigned a) {
+      NSIntSet selected(p.chars);
+      if (a == 0)
+        selected = NSIntSet(p.split);
+      else
+        selected.remove(p.split);
+      if (selected.empty())
+        return ES_FAILED;
+      NSBlocks restriction;
+      if (p.index > 0)
+        restriction.emplace_back(p.alphabet, p.index, p.index);
+      restriction.emplace_back(std::move(selected), 1, 1);
+      if (p.index + 1 < p.length)
+        restriction.emplace_back(p.alphabet, p.length - p.index - 1,
+                                 p.length - p.index - 1);
+      if (!has_fixed_block_positions(&x[p.pos].domain())) {
+        // Branch on fixed positions while equality retains the original
+        // domain's correlations between optional blocks.
+        StringVar proxy(home, restriction, p.length, p.length);
+        rel(home, StringVar(x[p.pos]), STRT_EQ, proxy);
+        x[p.pos] = StringView(proxy);
+        return home.failed() ? ES_FAILED : ES_OK;
+      }
+      ModEvent me = x[p.pos].dom(home, restriction);
+      return me_failed(me) ? ES_FAILED : ES_OK;
+    }
+
     /// Replay any supported choice representation
     ExecStatus
     commit_choice(Space& home, const Choice& c, unsigned a) {
@@ -289,26 +318,9 @@ namespace Gecode { namespace String { namespace Branch {
         case ChoiceKind::LENGTH:
           return commit_length(
             home, static_cast<const LengthVal&>(base), a);
-        case ChoiceKind::POSITION: {
-          const PositionVal& p = static_cast<const PositionVal&>(base);
-          NSIntSet selected(p.chars);
-          if (a == 0)
-            selected = NSIntSet(p.split);
-          else
-            selected.remove(p.split);
-          if (selected.empty())
-            return ES_FAILED;
-          NSBlocks restriction;
-          if (p.index > 0)
-            restriction.emplace_back(p.alphabet, p.index, p.index);
-          restriction.emplace_back(std::move(selected), 1, 1);
-          if (p.index + 1 < p.length)
-            restriction.emplace_back(
-              p.alphabet, p.length - p.index - 1,
-              p.length - p.index - 1);
-          ModEvent me = x[p.pos].dom(home, restriction);
-          return me_failed(me) ? ES_FAILED : ES_OK;
-        }
+        case ChoiceKind::POSITION:
+          return commit_position(home, static_cast<const PositionVal&>(base),
+                                 a);
         case ChoiceKind::FIXED: {
           if (a != 0)
             return ES_FAILED;
@@ -322,6 +334,7 @@ namespace Gecode { namespace String { namespace Branch {
       return ES_FAILED;
     }
 
+    /// Try minimum length, then the smallest symbol at an unresolved position
     Choice*
     val_llll(int pos, const DashedString* p) {
       if (p->min_length() < p->max_length())
@@ -331,6 +344,7 @@ namespace Gecode { namespace String { namespace Branch {
       return block_decision(pos, p, Value::MIN);
     }
 
+    /// Try minimum length, then prefer a mandatory symbol at that position
     Choice*
     val_lllm(int pos, const DashedString* p) {
       if (p->min_length() < p->max_length())
@@ -509,7 +523,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
-  /// Minimum estimated-domain variable selection with LLUL value selection
+  /// Minimum estimated-domain selection; legacy LLUL uses LLLL decisions
   struct SizeMin_LLUL: public StringBrancher {
 
     SizeMin_LLUL(Home home, ViewArray<String::StringView>& x0);
@@ -531,7 +545,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
-  /// Minimum-block-count variable selection with LLLL value selection
+  /// Select by the first unassigned block's estimate with LLLL values
   struct BlockMin_LLLL: public StringBrancher {
 
     BlockMin_LLLL(Home home, ViewArray<String::StringView>& x0);
@@ -553,7 +567,7 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
-  /// Minimum-block-count variable selection with LLLM value selection
+  /// Select by the first unassigned block's estimate with LLLM values
   struct BlockMin_LLLM: public StringBrancher {
 
     BlockMin_LLLM(Home home, ViewArray<String::StringView>& x0);
@@ -575,7 +589,8 @@ namespace Gecode { namespace String { namespace Branch {
 
 namespace Gecode { namespace String { namespace Branch {
 
-  /// Minimum-length/block-count selection with LLLM value selection
+  /// Length-span/block scan with LLLM values
+  /// \sa StringVarBranch::STRING_VAR_LENBLOCKMIN
   struct LenBlockMin_LLLM: public StringBrancher {
 
     LenBlockMin_LLLM(Home home, ViewArray<String::StringView>& x0);

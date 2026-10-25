@@ -1507,6 +1507,8 @@ if(BUILD_TESTING)
     endif()
     if(GECODE_ENABLE_STRING_VARS)
       list(APPEND GECODE_CHECK_TESTS
+        String::Branch::LengthSelection
+        String::Branch::Positional
         String::Branch::LengthReplay
         String::Branch::SymbolReplay
         String::Branch::FixedReplay

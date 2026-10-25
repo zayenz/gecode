@@ -31,6 +31,7 @@ namespace Gecode { namespace String { namespace Branch {
           pos = i;
         }
       }
+      // LLUL retains its legacy name but makes the same decisions as LLLL.
       return val_llll(pos, p);
     }
 

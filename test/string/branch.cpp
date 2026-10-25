@@ -30,6 +30,7 @@
 
 #include <memory>
 #include <set>
+#include <sstream>
 #include <vector>
 
 namespace Test { namespace String { namespace Branch {
@@ -74,6 +75,16 @@ namespace Test { namespace String { namespace Branch {
                selectors[selector].vals);
     }
 
+    ReplaySpace(StringVarBranch vars, int lower0, int upper0, int lower1,
+                int upper1)
+      : x(*this, 2) {
+      NSBlocks domain;
+      domain.emplace_back(NSIntSet('a', 'b'), 1, 5);
+      x[0] = StringVar(*this, domain, lower0, upper0);
+      x[1] = StringVar(*this, domain, lower1, upper1);
+      branch(*this, StringVarArgs(x), vars, STRING_VAL_LLLL());
+    }
+
     ReplaySpace(ReplaySpace& s) : Space(s) {
       x.update(*this, s.x);
     }
@@ -91,6 +102,8 @@ namespace Test { namespace String { namespace Branch {
     options.threads = 1;
     options.c_d = c_d;
     options.a_d = a_d;
+    Search::NodeStop stop(1000);
+    options.stop = &stop;
     DFS<ReplaySpace> search(&root, options);
     Words actual;
     while (ReplaySpace* solution = search.next()) {
@@ -106,6 +119,10 @@ namespace Test { namespace String { namespace Branch {
         return false;
       }
     }
+    if (search.stopped()) {
+      olog << "String branch search did not exhaust" << std::endl;
+      return false;
+    }
     if (actual != expected) {
       olog << "Wrong String branch solution set: expected " << expected.size()
            << ", got " << actual.size() << std::endl;
@@ -118,15 +135,18 @@ namespace Test { namespace String { namespace Branch {
   static bool
   replay_matches(ReplaySpace& root, const Choice& choice,
                  const NSBlocks& restriction, int lower, int upper,
-                 const Words& first, const Words& second) {
+                 const Words& first, const Words& second,
+                 bool prune_after = false) {
     for (int archived = 0; archived < 2; ++archived)
       for (unsigned int alternative = 0; alternative < 2; ++alternative) {
         std::unique_ptr<ReplaySpace> s(
           static_cast<ReplaySpace*>(root.clone()));
         NSBlocks domain(restriction);
-        rel(*s, s->x[0], STRT_DOM, domain, lower, upper);
-        if (s->status() == SS_FAILED)
-          return false;
+        if (!prune_after) {
+          rel(*s, s->x[0], STRT_DOM, domain, lower, upper);
+          if (s->status() == SS_FAILED)
+            return false;
+        }
         if (archived) {
           Archive archive;
           choice.archive(archive);
@@ -134,6 +154,12 @@ namespace Test { namespace String { namespace Branch {
           s->commit(*restored, alternative);
         } else {
           s->commit(choice, alternative);
+        }
+        if (prune_after) {
+          if (s->status() == SS_FAILED)
+            return false;
+          s.reset(static_cast<ReplaySpace*>(s->clone()));
+          rel(*s, s->x[0], STRT_DOM, domain, lower, upper);
         }
         if (!solutions_match(*s, alternative == 0 ? first : second)) {
           olog << "Archived: " << archived
@@ -143,6 +169,43 @@ namespace Test { namespace String { namespace Branch {
       }
     return true;
   }
+
+  /// Select by length endpoints and retain the first candidate on ties
+  class LengthSelection : public Base {
+  public:
+    LengthSelection(void)
+      : Base("String::Branch::LengthSelection") {}
+
+    virtual bool
+    run(void) {
+      struct Fixture {
+        StringVarBranch selector;
+        int lower0, upper0, lower1, upper1;
+        int selected;
+      };
+      const Fixture fixtures[] = {{STRING_VAR_LENMIN(), 5, 5, 1, 2, 1},
+                                  {STRING_VAR_LENMAX(), 5, 5, 1, 2, 0},
+                                  {STRING_VAR_LENMIN(), 1, 5, 1, 2, 0},
+                                  {STRING_VAR_LENMAX(), 2, 5, 1, 5, 0}};
+      for (const Fixture& fixture : fixtures) {
+        ReplaySpace root(fixture.selector, fixture.lower0, fixture.upper0,
+                         fixture.lower1, fixture.upper1);
+        if (root.status() != SS_BRANCH)
+          return false;
+        std::unique_ptr<const Choice> choice(root.choice());
+        std::ostringstream printed;
+        root.print(*choice, 0, printed);
+        const std::string selected =
+            " -- Var. " + std::to_string(fixture.selected) + " --";
+        if (printed.str().find(selected) == std::string::npos) {
+          olog << "Wrong length selector choice: " << printed.str()
+               << ", expected variable " << fixture.selected << std::endl;
+          return false;
+        }
+      }
+      return true;
+    }
+  };
 
   /// Replay the reviewed length endpoint before and after assignment
   class LengthReplay : public Base {
@@ -315,10 +378,73 @@ namespace Test { namespace String { namespace Branch {
     }
   };
 
+  /// Partition overlapping optional blocks without repeating concrete strings
+  class Positional : public Base {
+  public:
+    Positional(void) : Base("String::Branch::Positional") {}
+
+    virtual bool
+    run(void) {
+      NSBlocks domain;
+      domain.emplace_back(NSIntSet('a', 'b'), 0, 1);
+      domain.emplace_back(NSIntSet('a', 'c'), 0, 1);
+      domain.emplace_back(NSIntSet('b', 'c'), 0, 1);
+      const Words first{{'a', 'a'}, {'a', 'b'}, {'a', 'c'}};
+      const Words second{
+          {'b', 'a'}, {'b', 'b'}, {'b', 'c'}, {'c', 'b'}, {'c', 'c'}};
+      Words expected(first);
+      expected.insert(second.begin(), second.end());
+      const unsigned int distances[][2] = {{1, 1}, {2, 1}, {8, 2}};
+      for (int selector = 0; selector < 7; ++selector) {
+        ReplaySpace root(domain, 2, 2, selector);
+        if (root.status() != SS_BRANCH)
+          return false;
+        std::unique_ptr<const Choice> choice(root.choice());
+        for (bool prune_after : {false, true}) {
+          if (!replay_matches(root, *choice, domain, 2, 2, first, second,
+                              prune_after))
+            return false;
+          NSBlocks narrowed(domain);
+          narrowed[1].S.remove('c');
+          if (!replay_matches(root, *choice, narrowed, 2, 2, first,
+                              {{'b', 'a'}, {'b', 'b'}, {'b', 'c'}},
+                              prune_after))
+            return false;
+          for (const Word& word : expected) {
+            Words positive = word[0] == 'a' ? Words{word} : Words{};
+            Words negative = word[0] == 'a' ? Words{} : Words{word};
+            if (!replay_matches(root, *choice, NSBlocks(word), 2, 2, positive,
+                                negative, prune_after))
+              return false;
+          }
+        }
+        for (const auto& distance : distances)
+          if (!solutions_match(root, expected, distance[0], distance[1]))
+            return false;
+        NSBlocks prefixed(domain);
+        prefixed.insert(prefixed.begin(),
+                        Gecode::String::NSBlock(NSIntSet(0x1f600), 1, 1));
+        Words prefixed_expected;
+        for (Word word : expected) {
+          word.insert(word.begin(), 0x1f600);
+          prefixed_expected.insert(word);
+        }
+        ReplaySpace prefixed_root(prefixed, 3, 3, selector);
+        for (const auto& distance : distances)
+          if (!solutions_match(prefixed_root, prefixed_expected, distance[0],
+                               distance[1]))
+            return false;
+      }
+      return true;
+    }
+  };
+
+  LengthSelection length_selection;
   LengthReplay length_replay;
   SymbolReplay symbol_replay;
   FixedReplay fixed_replay;
   Recompute recompute;
+  Positional positional;
 
 }}}
 

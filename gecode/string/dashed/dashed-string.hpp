@@ -374,7 +374,8 @@ namespace Gecode { namespace String {
   forceinline bool
   DSBlock::isTop() const {
     return l == 0 && u == DashedString::_MAX_STR_LENGTH &&
-           S.size() == (unsigned) DashedString::_MAX_STR_ALPHA + 1;
+           S.size() == (unsigned) DashedString::_MAX_STR_ALPHA + 1 &&
+           S.min() == 0 && S.max() == DashedString::_MAX_STR_ALPHA;
   }
 
   forceinline void
@@ -2374,8 +2375,14 @@ namespace Gecode { namespace String {
     if (_min_length > that._min_length
     ||  _max_length < that._max_length)
       return false;
-    if (isTop() || (that.null() && _min_length == 0))
+    if (that.null() && _min_length == 0)
       return true;
+    if (isTop()) {
+      for (int i = 0; i < that.length(); ++i)
+        if (!that.at(i).null() && !at(0).S.contains(that.at(i).S))
+          return false;
+      return true;
+    }
     int n1 = length(), n2 = that.length();
     if (n1 < n2)
       return false;
@@ -2392,8 +2399,25 @@ namespace Gecode { namespace String {
   }
   forceinline bool
   DashedString::contains(const NSBlocks& that) const {
-    if (isTop() || (that.null() && _min_length == 0))
+    long lower = 0, upper = 0;
+    for (const NSBlock& block : that) {
+      if (block.null())
+        continue;
+      if (block.u > _max_length - upper)
+        return false;
+      lower += block.l;
+      upper += block.u;
+    }
+    if (_min_length > lower || _max_length < upper)
+      return false;
+    if (upper == 0)
       return true;
+    if (isTop()) {
+      for (const NSBlock& block : that)
+        if (!block.null() && !at(0).S.contains(block.S))
+          return false;
+      return true;
+    }
     int n1 = length(), n2 = that.length();
     if (n1 < n2)
       return false;
@@ -2410,8 +2434,15 @@ namespace Gecode { namespace String {
   }
   forceinline bool
   DashedString::contains(const DashedString& x, const DashedString& y) const {
+    if (_min_length > static_cast<long>(x._min_length) + y._min_length ||
+        _max_length < static_cast<long>(x._max_length) + y._max_length)
+      return false;
+    if (x.null())
+      return contains(y);
+    if (y.null())
+      return contains(x);
     if (isTop())
-      return true;
+      return contains(x) && contains(y);
     int n1 = length(), n2 = x.length() + y.length(), norm = 0;
     if (x.blocks().back().S == y.at(0).S) {
       norm = 1;

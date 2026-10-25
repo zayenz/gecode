@@ -357,6 +357,49 @@ namespace Test { namespace String { namespace Var {
     }
   };
 
+  /// Domain-initialized collections own independent variable implementations
+  class CollectionConstructors : public Base {
+  private:
+    static bool independent(Space& home, const StringVarArgs& variables,
+                            const Gecode::String::NSBlocks& domain) {
+      if (variables.size() != 2)
+        return false;
+      for (int i = 0; i < variables.size(); ++i)
+        if (variables[i].assigned() || variables[i].min_length() != 1 ||
+            variables[i].max_length() != 2 ||
+            !variables[i].domain().equals(domain))
+          return false;
+      if (me_failed(variables[0].varimp()->eq(home, std::string("a"))) ||
+          !variables[0].assigned() || variables[0].val() != "a" ||
+          variables[1].assigned() ||
+          !variables[1].domain().equals(domain))
+        return false;
+      return !me_failed(variables[1].varimp()->eq(home, std::string("bc"))) &&
+        home.status() != SS_FAILED && variables[1].assigned() &&
+        variables[1].val() == "bc" && variables[0].val() == "a";
+    }
+
+  public:
+    CollectionConstructors(void)
+      : Base("String::Var::CollectionConstructors") {}
+
+    virtual bool run(void) {
+      ObserverSpace home;
+      Gecode::String::NSBlocks domain;
+      domain.emplace_back(Gecode::String::NSIntSet('a', 'b'), 1, 1);
+      domain.emplace_back(Gecode::String::NSIntSet('c'), 0, 1);
+      const Gecode::String::NSBlocks original(domain);
+      StringVarArgs args(home, 2, original);
+      StringVarArray array(home, 2, domain);
+      StringVarArgs empty_args(home, 0, original);
+      StringVarArray empty_array(home, 0, domain);
+      return empty_args.size() == 0 && empty_array.size() == 0 &&
+        independent(home, args, original) &&
+        independent(home, StringVarArgs(array), original);
+    }
+  };
+
+  CollectionConstructors collection_constructors;
   FailureAdvisors failure_advisors;
   Events events;
   Lifecycle lifecycle;

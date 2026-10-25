@@ -1507,6 +1507,26 @@ if(BUILD_TESTING)
     endif()
     if(GECODE_ENABLE_STRING_VARS)
       list(APPEND GECODE_CHECK_TESTS
+        String::Rel::ByteTopContainment
+        String::Match::AggregateBounds::DFA
+        String::Match::AggregateBounds::NFA
+        String::Match::AggregateBounds::AUTO
+        String::GCC::StructuredCounts::Bytes
+        String::GCC::StructuredCounts::Scalars
+        String::GCC::DuplicateCounts::Consistent
+        String::GCC::DuplicateCounts::Conflicting
+        String::GCC::DuplicateCounts::Equality
+        String::GCC::Shape::CountsShorter
+        String::GCC::Shape::CountsLonger
+        String::Var::CollectionConstructors
+        String::GCC::MustChars
+        String::Rel::Construction
+        String::Rel::AggregateBounds
+        String::Rel::SizeEstimate
+        String::Rel::NSIntSetCopy
+        String::Var::FailureAdvisors
+        String::Var::Events
+        String::Var::Lifecycle
         String::Branch::LengthSelection
         String::Branch::Positional
         String::Branch::LengthReplay

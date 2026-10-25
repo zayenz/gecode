@@ -1222,7 +1222,7 @@ endif
 
 STRINGTESTSRC00 = \
 	rel rel-op extensional predicates length channel gcc char2code element find \
-	char-at substring match replace branch
+	char-at substring match replace branch var
 STRINGTESTSRC0 = test/string.cpp $(STRINGTESTSRC00:%=test/string/%.cpp)
 ifeq "@enable_string_vars@" "yes"
 STRINGTESTOBJ = $(STRINGTESTSRC0:%.cpp=%$(OBJSUFFIX))
@@ -1468,6 +1468,23 @@ BLACKBOXCHECKENV = \
 endif
 
 ifeq "@enable_string_vars@" "yes"
+CHECKTESTS += String::Rel::ByteTopContainment
+CHECKTESTS += String::Match::AggregateBounds::DFA
+CHECKTESTS += String::Match::AggregateBounds::NFA
+CHECKTESTS += String::Match::AggregateBounds::AUTO
+CHECKTESTS += String::GCC::StructuredCounts::Bytes
+CHECKTESTS += String::GCC::StructuredCounts::Scalars
+CHECKTESTS += String::GCC::DuplicateCounts::Consistent
+CHECKTESTS += String::GCC::DuplicateCounts::Conflicting
+CHECKTESTS += String::GCC::DuplicateCounts::Equality
+CHECKTESTS += String::GCC::Shape::CountsShorter
+CHECKTESTS += String::GCC::Shape::CountsLonger
+CHECKTESTS += String::Var::CollectionConstructors
+CHECKTESTS += String::GCC::MustChars
+CHECKTESTS += String::Rel::Construction String::Rel::AggregateBounds \
+	String::Rel::SizeEstimate String::Rel::NSIntSetCopy
+CHECKTESTS += String::Var::FailureAdvisors String::Var::Events \
+	String::Var::Lifecycle
 CHECKTESTS += String::Branch::LengthSelection String::Branch::Positional \
 	String::Branch::LengthReplay String::Branch::SymbolReplay \
 	String::Branch::FixedReplay String::Branch::Recompute

@@ -306,10 +306,10 @@ namespace Gecode { namespace String {
       }
       return q < d.final_fst() || q >= d.final_lst() ? ES_FAILED : ES_OK;
     }
-    trimDFA* dfa = new trimDFA(d);
-    NSBlocks dx(dom(dfa));
+    TrimDFAHandle dfa(new trimDFA(d));
+    NSBlocks dx(dom(dfa.get()));
     rel(home, x, STRT_DOM, dx, x.min_length(), x.max_length());
-    (void) new (home) Reg(home, x, dfa);
+    (void) new (home) Reg(home, x, dfa.get());
     return ES_OK;
   }
 

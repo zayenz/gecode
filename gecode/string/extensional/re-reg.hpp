@@ -322,7 +322,8 @@ namespace Gecode { namespace String {
       for (int i = 0; i < n; ++i) {
         F[i] = Reg::reach_fwd(dfa.get(), *states, x.at(i));
         if (F[i].empty()) {
-          GECODE_ME_CHECK(b.eq(home, 0));
+          if (rm != RM_PMI)
+            GECODE_ME_CHECK(b.eq(home, 0));
           return home.ES_SUBSUMED(*this);
         }
         states = &F[i].back();
@@ -335,12 +336,13 @@ namespace Gecode { namespace String {
       NSIntSet accepting = dfa->accepting_states();
       NSIntSet rejecting;
       bool have_rejecting = false;
-      if (accepting.contains(E))
-        GECODE_ME_CHECK(b.eq(home, 1));
-      else {
+      if (accepting.contains(E)) {
+        if (rm != RM_IMP)
+          GECODE_ME_CHECK(b.eq(home, 1));
+      } else {
         rejecting = accepting.comp();
         have_rejecting = true;
-        if (rejecting.contains(E))
+        if ((rm != RM_PMI) && rejecting.contains(E))
           GECODE_ME_CHECK(b.eq(home, 0));
       }
       if (b.one()) {
@@ -364,11 +366,13 @@ namespace Gecode { namespace String {
       for (int i = n - 1; i >= 0; --i)
         y[i] = Reg::reach_bwd(dfa.get(), F[i], E, x.at(i), changed);
       if (changed) {
-        GECODE_ME_CHECK(commit_refined_blocks(home, x0, std::move(y)));
+        ModEvent me = commit_refined_blocks(home, x0, std::move(y));
+        GECODE_ME_CHECK(me);
         assert (x0.domain().is_normalized());
         if (x0.assigned())
           return home.ES_SUBSUMED(*this);
-        continue;
+        if (me_modified(me))
+          continue;
       }
       assert (x0.domain().is_normalized());
       return ES_FIX;

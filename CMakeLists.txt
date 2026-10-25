@@ -1548,7 +1548,14 @@ if(BUILD_TESTING)
       list(APPEND GECODE_CHECK_TESTS
         String::Extensional::DfaReification::Assigned
         String::Extensional::DfaReification::Deferred
-        String::Extensional::StarDecomposition)
+        String::Extensional::StarDecomposition
+        String::Extensional::RegexReification
+        String::Extensional::BoundedStar
+        String::Extensional::C12
+        String::Extensional::SingletonIntersection
+        String::Extensional::C13
+        String::Extensional::ClassParentheses
+        String::Extensional::Collections)
     endif()
 
     set(GECODE_CHECK_ARGS -iter 2 -threads 0 -fixprob 1)

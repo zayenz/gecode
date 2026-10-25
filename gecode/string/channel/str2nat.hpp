@@ -1,5 +1,33 @@
 namespace Gecode { namespace String {
 
+  /// False proves every ASCII-digit member fits native int; true is uncertain.
+  forceinline bool
+  str2nat_may_overflow(const DashedString& domain) {
+    int value = 0;
+    const NSIntSet digits('0', '9');
+    for (int i = 0; i < domain.length(); ++i) {
+      const DSBlock& block = domain.at(i);
+      NSIntSet allowed(block.S);
+      allowed.intersect(digits);
+      if (allowed.empty()) {
+        if (block.l > 0)
+          return false;
+        continue;
+      }
+      const int digit = allowed.max() - '0';
+      if ((value == 0) && (digit == 0))
+        continue;
+      // Maximum digits and repetitions bound every member from above,
+      // even when aggregate length bounds exclude this particular word.
+      for (int j = 0; j < block.u; ++j) {
+        if (value > (INT_MAX - digit) / 10)
+          return true;
+        value = 10 * value + digit;
+      }
+    }
+    return false;
+  }
+
   forceinline
   StrToNat::StrToNat(Home home, StringView x, Gecode::Int::IntView y)
   : MixBinaryPropagator
@@ -150,6 +178,13 @@ namespace Gecode { namespace String {
         }
         GECODE_ME_CHECK(x1.eq(home, value));
         return home.ES_SUBSUMED(*this);
+      }
+      if ((x1.min() == -1) && str2nat_may_overflow(x0.domain())) {
+        if (!x1.assigned() && !x0.domain().check_equate(strdom()))
+          GECODE_ME_CHECK(x1.eq(home, -1));
+        // Possible overflow is not entailment. Retain both subscriptions
+        // until assignment or removal of the sentinel resolves the choice.
+        return ES_FIX;
       }
       if (x1.assigned()) {
         if (x1.val() > -1) {

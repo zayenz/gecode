@@ -26,6 +26,8 @@
 
 #include "test/string.hh"
 
+#include <climits>
+#include <memory>
 #include <sstream>
 
 namespace Test { namespace String { namespace Channel {
@@ -72,6 +74,159 @@ namespace Test { namespace String { namespace Channel {
       Gecode::str2nat(home, x[0], n);
     }
   };
+
+  /// A direct channel model, without enumerating its decimal strings
+  class StrToNatSpace : public Gecode::Space {
+  public:
+    Gecode::StringVar x;
+    Gecode::IntVar n;
+
+    StrToNatSpace(Gecode::String::NSBlocks domain, int lo, int hi)
+      : x(*this, domain, 0, Gecode::String::DashedString::_MAX_STR_LENGTH),
+        n(*this, lo, hi) {
+      Gecode::str2nat(*this, x, n);
+    }
+
+    StrToNatSpace(StrToNatSpace& s) : Gecode::Space(s) {
+      x.update(*this, s.x);
+      n.update(*this, s.n);
+    }
+
+    virtual Gecode::Space*
+    copy(void) {
+      return new StrToNatSpace(*this);
+    }
+
+    bool
+    assign_and_check(const std::string& word, int expected) {
+      Gecode::rel(*this, x, Gecode::STRT_EQ, Gecode::StringVar(*this, word));
+      return (status() != Gecode::SS_FAILED) && x.assigned() &&
+             (x.val() == word) && n.assigned() && (n.val() == expected);
+    }
+  };
+
+  /// Retain overflow witnesses through a stable, initially unassigned channel
+  class StrToNatOverflow : public Base {
+  public:
+    StrToNatOverflow(void)
+      : Base("String::Channel::StrToNat::Overflow") {}
+
+    virtual bool
+    run(void) {
+      using namespace Gecode;
+      using namespace Gecode::String;
+      for (int length : {10, 20}) {
+        const NSBlocks domain(1, NSBlock(NSIntSet('8', '9'), length, length));
+        for (int hi : {-1, 0}) {
+          StrToNatSpace root(domain, -1, hi);
+          if ((root.status() == SS_FAILED) || root.x.assigned() ||
+              (root.x.min_length() != length) ||
+              (root.x.max_length() != length) ||
+              !root.x.domain().is_normalized() ||
+              !root.x.domain().contains(domain) || !root.n.assigned() ||
+              (root.n.val() != -1))
+            return false;
+          for (char digit : {'8', '9'}) {
+            const std::string word(length, digit);
+            std::unique_ptr<StrToNatSpace> deferred(
+                static_cast<StrToNatSpace*>(root.clone()));
+            StrToNatSpace assigned(NSBlocks(word), -1, hi);
+            if (!deferred->assign_and_check(word, -1) ||
+                !assigned.assign_and_check(word, -1))
+              return false;
+          }
+          rel(root, root.n, IRT_EQ, 0);
+          if (root.status() != SS_FAILED)
+            return false;
+        }
+      }
+      NSIntSet alphabet('8', '9');
+      alphabet.add('0');
+      const NSBlocks domain(1, NSBlock(alphabet, 10, 10));
+      StrToNatSpace root(domain, -1, 0);
+      if ((root.status() == SS_FAILED) || (root.n.min() != -1) ||
+          (root.n.max() != 0) || root.x.assigned())
+        return false;
+      for (char digit : {'0', '8', '9'}) {
+        const std::string word(10, digit);
+        const int expected = digit == '0' ? 0 : -1;
+        std::unique_ptr<StrToNatSpace> deferred(
+            static_cast<StrToNatSpace*>(root.clone()));
+        if (!deferred->assign_and_check(word, expected))
+          return false;
+        StrToNatSpace rejected(domain, expected == 0 ? -1 : 0,
+                               expected == 0 ? -1 : 0);
+        if (rejected.status() != SS_FAILED) {
+          rel(rejected, rejected.x, STRT_EQ, StringVar(rejected, word));
+          if (rejected.status() != SS_FAILED)
+            return false;
+        }
+      }
+      // Removing the sentinel after a fixpoint must wake the integer side.
+      rel(root, root.n, IRT_EQ, 0);
+      return (root.status() != SS_FAILED) && root.x.assigned() &&
+             (root.x.val() == std::string(10, '0'));
+    }
+  };
+
+  /// Explicit native-int boundaries, with both string posting orders
+  class StrToNatBoundaries : public Base {
+  public:
+    StrToNatBoundaries(void)
+      : Base("String::Channel::StrToNat::Boundaries") {}
+
+    virtual bool
+    run(void) {
+      using namespace Gecode;
+      using namespace Gecode::String;
+      struct Boundary {
+        std::string word;
+        int value;
+      };
+      const Boundary boundaries[] = {
+          {std::to_string(Int::Limits::max), Int::Limits::max},
+          {std::to_string(INT_MAX), INT_MAX},
+          {std::to_string(static_cast<long long>(INT_MAX) + 1), -1}};
+      for (const Boundary& boundary : boundaries)
+        for (const std::string& prefix :
+             {std::string(), std::string(20, '0')}) {
+          const std::string word = prefix + boundary.word;
+          const int length = static_cast<int>(word.size());
+          for (bool assigned : {false, true})
+            for (bool sentinel_only : {false, true}) {
+              const NSBlocks domain =
+                  assigned ? NSBlocks(word)
+                           : NSBlocks(1, NSBlock(NSIntSet('0', '9'), length,
+                                                 length));
+              StrToNatSpace s(domain, -1,
+                              sentinel_only ? -1 : Int::Limits::max);
+              const bool allowed = (boundary.value != INT_MAX) &&
+                                   (!sentinel_only || (boundary.value == -1));
+              if (s.status() == SS_FAILED) {
+                if (allowed)
+                  return false;
+                continue;
+              }
+              rel(s, s.x, STRT_EQ, StringVar(s, word));
+              if ((s.status() != SS_FAILED) != allowed)
+                return false;
+              if (allowed && (!s.n.assigned() || (s.n.val() != boundary.value)))
+                return false;
+            }
+        }
+      // A long zero prefix does not itself imply possible overflow.
+      NSBlocks small(1, NSBlock(NSIntSet('0'), 1000, 1000));
+      small.push_back(NSBlock(NSIntSet('1', '2'), 1, 1));
+      StrToNatSpace root(small, -1, 2);
+      if ((root.status() == SS_FAILED) || (root.n.min() != 1) ||
+          (root.n.max() != 2))
+        return false;
+      return root.assign_and_check(std::string(1000, '0') + "2", 2);
+    }
+  };
+
+  StrToNatOverflow str_to_nat_overflow;
+  StrToNatBoundaries str_to_nat_boundaries;
 
   /// Test nat2str against a fixed source range for the integer variable
   class NatToStr : public Test {

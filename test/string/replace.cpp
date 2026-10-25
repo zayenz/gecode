@@ -260,6 +260,100 @@ namespace Test { namespace String { namespace Replace {
     }
   };
 
+  class OptionalOccurrencesSpace : public Gecode::Space {
+  public:
+    Gecode::StringVar source;
+    Gecode::StringVar result;
+
+    OptionalOccurrencesSpace(int offset, int repetition_length) {
+      using Gecode::String::NSBlock;
+      using Gecode::String::NSBlocks;
+      using Gecode::String::NSIntSet;
+      using Gecode::String::StringVal;
+      NSBlocks blocks;
+      blocks.push_back(NSBlock(NSIntSet('a' + offset),
+                               repetition_length ? repetition_length : 1,
+                               repetition_length ? repetition_length : 2));
+      blocks.push_back(NSBlock(NSIntSet('b' + offset), 1, 1));
+      source = Gecode::StringVar(*this, blocks, 2, 3);
+      result =
+          Gecode::StringVar(*this, NSIntSet('b' + offset, 'c' + offset), 2, 3);
+      Gecode::StringVar query(*this, StringVal::from_symbols({'a' + offset}));
+      Gecode::StringVar replacement(*this,
+                                    StringVal::from_symbols({'c' + offset}));
+      Gecode::replace_all(*this, source, query, replacement, result);
+      Gecode::branch(*this, Gecode::StringVarArgs() << source << result,
+                     Gecode::STRING_VAR_NONE(), Gecode::STRING_VAL_LLLL());
+    }
+
+    OptionalOccurrencesSpace(OptionalOccurrencesSpace& s) : Gecode::Space(s) {
+      source.update(*this, s.source);
+      result.update(*this, s.result);
+    }
+
+    virtual Gecode::Space*
+    copy(void) {
+      return new OptionalOccurrencesSpace(*this);
+    }
+  };
+
+  class OptionalOccurrences : public Base {
+  private:
+    int offset;
+
+  public:
+    OptionalOccurrences(bool scalar)
+      : Base(scalar ? "String::Replace::All::OptionalOccurrences::Scalars"
+                    : "String::Replace::All::OptionalOccurrences::Bytes"),
+        offset(scalar ? 0x100 : 0) {}
+
+    virtual bool
+    run(void) {
+      using Gecode::String::StringVal;
+      typedef std::pair<StringVal, StringVal> Assignment;
+      const Assignment expected[] = {
+          Assignment(StringVal::from_symbols({'a' + offset, 'b' + offset}),
+                     StringVal::from_symbols({'c' + offset, 'b' + offset})),
+          Assignment(StringVal::from_symbols(
+                         {'a' + offset, 'a' + offset, 'b' + offset}),
+                     StringVal::from_symbols(
+                         {'c' + offset, 'c' + offset, 'b' + offset}))};
+      // Zero keeps the repetition optional; one and two assign the source.
+      for (int repetition_length = 0; repetition_length <= 2;
+           ++repetition_length) {
+        OptionalOccurrencesSpace root(offset, repetition_length);
+        if ((root.status() == Gecode::SS_FAILED) ||
+            (root.source.assigned() != (repetition_length != 0)))
+          return false;
+        Gecode::Search::Options options;
+        options.threads = 1;
+        Gecode::DFS<OptionalOccurrencesSpace> search(&root, options);
+        std::set<Assignment> actual;
+        while (OptionalOccurrencesSpace* solution = search.next()) {
+          const bool valid =
+              solution->source.assigned() && solution->result.assigned() &&
+              actual
+                  .insert(Assignment(solution->source.val_symbols(),
+                                     solution->result.val_symbols()))
+                  .second;
+          delete solution;
+          if (!valid)
+            return false;
+        }
+        std::set<Assignment> expected_results;
+        if (repetition_length == 0) {
+          expected_results.insert(expected[0]);
+          expected_results.insert(expected[1]);
+        } else {
+          expected_results.insert(expected[repetition_length - 1]);
+        }
+        if (actual != expected_results)
+          return false;
+      }
+      return true;
+    }
+  };
+
   class OverlapSpace : public Gecode::Space {
   public:
     Gecode::StringVar source;
@@ -394,6 +488,8 @@ namespace Test { namespace String { namespace Replace {
   EmptyQuery empty_query_bytes(false);
   EmptyQuery empty_query_scalars(true);
   VariableQuery variable_query;
+  OptionalOccurrences optional_occurrences_bytes(false);
+  OptionalOccurrences optional_occurrences_scalars(true);
   Overlap first_overlap(false);
   Overlap last_overlap(true);
 

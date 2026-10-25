@@ -1522,6 +1522,8 @@ if(BUILD_TESTING)
         String::Replace::All::EmptyQuery::Bytes
         String::Replace::All::EmptyQuery::Scalars
         String::Replace::All::VariableQuery
+        String::Replace::All::OptionalOccurrences::Bytes
+        String::Replace::All::OptionalOccurrences::Scalars
         String::Replace::First::Overlap
         String::Replace::Last::Overlap)
     endif()

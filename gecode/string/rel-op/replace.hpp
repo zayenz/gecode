@@ -344,8 +344,9 @@ namespace Gecode { namespace String {
           curr.erase(0, pos + q.size());
           pos = curr.find(q);
         }
+        // Optional copies interrupt the known suffix after consumed matches.
         if (b.l < b.u)
-          curr.assign(b.l, c);
+          curr.clear();
       }
       else
         curr.clear();
@@ -375,8 +376,9 @@ namespace Gecode { namespace String {
           position = std::search(
             current.begin(), current.end(), q.begin(), q.end());
         }
+        // Optional copies interrupt the known suffix after consumed matches.
         if (block.l < block.u)
-          current.assign(block.l, symbol);
+          current.clear();
       }
       else
         current.clear();
